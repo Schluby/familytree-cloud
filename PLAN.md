@@ -1,0 +1,289 @@
+# FamilyTree Cloud — plan de route
+
+Feuille de route de la version hébergée. Un lot = une séance de travail qui
+tient debout toute seule : si ça s'arrête au milieu, on reprend au premier ☐
+non coché. Les décisions techniques et leurs raisons sont dans
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Protocole de reprise
+
+1. Lire ce fichier, puis `ARCHITECTURE.md` avant de toucher au code.
+2. `npm run dev` (wrangler) monte le Worker et une D1 **locale** : on développe
+   sans jamais toucher à la base en ligne.
+3. Toute requête API doit être testée **avec deux comptes** : un compte ne doit
+   jamais voir la sauvegarde d'un autre. C'est le test qu'on n'a pas le droit
+   d'oublier.
+4. À la fin d'un lot : cocher ici, écrire deux lignes dans le journal du bas.
+
+## Où on en est
+
+**Lot 0 fait (08/08/2026).** Le dépôt est déployable en l'état : il ne reste
+qu'à créer la base et brancher GitHub — la marche à suivre est dans
+[`DEPLOIEMENT.md`](DEPLOIEMENT.md). Le lot 1 n'a pas commencé.
+
+L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
+définit le contrat d'API et le format des sauvegardes.
+
+## Lot 0 — Le squelette  ☑
+
+- ☑ Worker TypeScript + **Hono**, écrit à la main plutôt que par
+  `npm create cloudflare@latest` : moins de fichiers, et rien qu'on ne
+  comprenne pas.
+- ☑ [`wrangler.jsonc`](wrangler.jsonc) (et non `.toml` : le format accepte les
+  commentaires, et c'est celui que Wrangler écrit aujourd'hui) — binding D1,
+  `public/` en Static Assets avec `run_worker_first: ["/api/*"]`, tâche cron.
+- ☑ Le schéma devient [`migrations/0001_schema_initial.sql`](migrations/0001_schema_initial.sql) :
+  c'est là que Wrangler le cherche, et il n'en existe donc **qu'une copie**.
+  `schema.sql` n'est plus qu'un panneau indicateur.
+- ☑ `/api/sante` compte les lignes et le prouve ; tout `/api/*` inconnu répond
+  en JSON ; le reste sert un fichier de `public/`, sinon la page d'accueil.
+- ☑ En-têtes de sécurité, et ménage nocturne des sessions expirées (cron).
+- ☑ Vérifié : `tsc --noEmit` passe, `wrangler deploy --dry-run` construit,
+  la migration applique **14 commandes** sur une D1 locale, et
+  `curl /api/sante` renvoie `{"ok":true,"base":"joignable",…}`.
+
+*Fini.* `npm run verif` avant chaque push ; `npm run dev` pour travailler.
+
+## Lot 1 — Les comptes  ☐
+
+Inscription **ouverte à qui veut** : personne n'a besoin d'un code, ni de rien
+installer.
+
+- ☐ `POST /api/auth/inscription` (e-mail + mot de passe) : PBKDF2-SHA256,
+  210 000 itérations, sel de 16 octets.
+- ☐ **Code de secours** tiré à l'inscription, affiché une seule fois, stocké
+  haché : sans courriel, c'est la seule récupération possible.
+  `POST /api/auth/recuperation`.
+- ☐ `POST /api/auth/connexion` → cookie de session `HttpOnly; Secure;
+  SameSite=Lax`, jeton stocké **haché**.
+- ☐ `POST /api/auth/deconnexion`, `GET /api/auth/moi` (renvoie aussi le rôle).
+- ☐ Un intergiciel qui résout le cookie et refuse `401` sans session.
+- ☐ Limites : 5 connexions échouées → attente progressive ; **3 inscriptions
+  par heure et par IP** (table `tentatives`).
+- ☐ Page de connexion / inscription : deux champs, un bouton. Sur
+  l'inscription, **dire ce qui est stocké et que les administrateurs peuvent
+  consulter les arbres** — une phrase, pas un pavé juridique.
+
+*Fini quand :* deux comptes créés, chacun voit `GET /api/auth/moi` renvoyer le
+sien, une requête sans cookie reçoit un 401, et un mot de passe se récupère avec
+son code de secours.
+
+## Lot 2 — Les sauvegardes, par utilisateur  ☐
+
+- ☐ `GET /api/sauvegardes` (les siennes), `POST` (créer, vide ou copie),
+  `PATCH` (renommer), `DELETE`.
+- ☐ `GET /api/sauvegardes/<id>/export` (un `.json`),
+  `POST /api/sauvegardes/import` (un `.json`).
+- ☐ `PUT /api/sauvegardes/<id>/contenu` : le document entier, un seul point
+  d'écriture pour l'import et la restauration.
+- ☐ Le document est stocké **compact** (73 Ko au lieu de 112 sur la vraie
+  campagne) ; l'export réindente.
+- ☐ À l'import, **retirer les portraits `data:`** avec un message clair, et
+  garder les `avatar` en `http(s)` (voir `ARCHITECTURE.md`, « Pas de photos »).
+- ☐ **Plafonds par compte** : 10 sauvegardes, 2 Mo chacune (colonnes
+  `plafond_*`, relevables par un admin). Message qui dit quoi faire quand
+  c'est atteint.
+- ☐ **Test de cloisonnement** : le compte A demande la sauvegarde de B → 404,
+  jamais 403 (on ne confirme pas l'existence).
+
+*Fini quand :* on crée, renomme, exporte et réimporte une sauvegarde depuis
+`curl`, et que le test de cloisonnement passe.
+
+## Lot 3 — Le domaine, porté en TypeScript  ☐
+
+Le gros morceau. On porte, module par module, en gardant les mêmes noms qu'en
+Python pour que les deux versions se relisent ensemble.
+
+- ☐ `humeur.ts` (l'échelle 1-7, MD/MP, épaisseur) — le plus simple, à faire en
+  premier pour caler la façon de tester.
+- ☐ `models.ts` (Personne, Relation, Dataset, normalisations, `migrations`).
+- ☐ `genealogie.ts` (générations, couples, fratries déduites, surcharges).
+- ☐ `filtres.ts` (variables, segments, dégradé, tests, listes nommées).
+- ☐ `vues/sociogramme.ts` : le payload, à l'octet près.
+- ☐ Les routes qui vont avec : `/api/vue/<id>`, `/api/personnes/*`,
+  `/api/relations/*`, `/api/maisons/*`, `/api/types-relations/*`,
+  `/api/categories/*`, `/api/joueurs/*`, `/api/filtres/*`, `/api/listes/*`,
+  `/api/referentiels`, `/api/lieux`.
+- ☐ **Mesurer le temps CPU** sur un arbre de 500 fiches (le plan gratuit donne
+  10 ms par requête) et **noter le chiffre dans le journal**. C'est le seul
+  palier qui peut mordre. Replis, dans l'ordre : générations calculées côté
+  navigateur, puis normalisation des personnes et relations en lignes D1.
+
+*Fini quand :* pour une même sauvegarde, `/api/vue/sociogramme` renvoie le même
+JSON que la version Python (comparaison automatisée, champ par champ).
+
+## Lot 4 — L'interface  ☐
+
+- ☐ Copier `web/` depuis l'application locale dans `public/`. **Aucune
+  réécriture** : c'est tout l'intérêt d'avoir gardé le contrat d'API. La copie
+  est assumée comme une **fourche** : les deux interfaces vont diverger, et
+  l'invariant partagé est le contrat d'API, pas les fichiers.
+- ☐ Barre du haut : le compte connecté, un bouton de déconnexion.
+- ☐ Le bloc « Sauvegardes » du rail parle aux nouvelles routes (les siennes,
+  pas un dossier).
+- ☐ Retirer ce qui n'a plus de sens : compteur de modifications en attente **et
+  son sondage toutes les 15 s** (240 requêtes/heure et par onglet, pour rien),
+  la zone photo de la fiche ; `📸` reste ; `Enregistrer sous…` devient « Tout
+  télécharger ».
+- ☐ Redirection vers la page de connexion sur 401.
+- ☐ **Passe téléphone minimale**, pas une refonte : `<meta viewport>`, les deux
+  volets deviennent des tiroirs plein écran, la barre du haut se replie. But
+  affiché : **consulter** un arbre depuis un téléphone. Éditer reste une
+  activité d'écran large, et c'est dit à l'utilisateur plutôt que subi.
+
+*Fini quand :* on joue une séance complète dans le navigateur, sans jamais
+ouvrir un terminal, et qu'un arbre se lit sur un téléphone.
+
+## Lot 5 — Sortir ses données  ☐
+
+- ☐ `GET /api/export/zip` : un `.zip` de toutes ses sauvegardes + un
+  `LISEZMOI.txt`. Écrit à la main, en mode « stocké », sans dépendance.
+- ☐ Bouton « Tout télécharger » dans la barre du haut.
+- ☐ `POST /api/sauvegardes/import` accepte aussi un `.zip`.
+
+*Fini quand :* on télécharge le `.zip`, on l'ouvre dans l'application locale,
+et on retrouve tout.
+
+> Le chantier « photos vers R2 » qui figurait ici est **annulé** : la version
+> hébergée ne prend pas les portraits (décision du 06/08/2026). Un service de
+> moins, une clé de moins, et le stockage devient un non-sujet.
+
+## Lot 6 — Mise en ligne  ☐
+
+- ☐ Suivre [`DEPLOIEMENT.md`](DEPLOIEMENT.md) : base D1 en `weur`, migrations
+  en ligne, premier `wrangler deploy`, puis le dépôt branché sur Cloudflare.
+  **Aucun secret à poser** — voir « Tranché ».
+- ☐ Vérifier les en-têtes : `Secure` sur le cookie, HSTS, pas de `Server`.
+- ☐ Verrou optimiste (`modifie_le`) : deux onglets ne s'écrasent plus en
+  silence.
+- ☐ Purge des sessions expirées (tâche `cron` du Worker, gratuite).
+- ☐ Une page « Vos données » : ce qui est stocké, **que les administrateurs
+  peuvent consulter les arbres**, tout télécharger, tout supprimer.
+- ☐ Mesurer la consommation sur une semaine, la noter ici.
+
+*Fini quand :* l'adresse est partageable et qu'un joueur crée son compte tout
+seul.
+
+## Lot 7 — Administration  ☐
+
+Un compte `admin` voit **tous** les arbres, en lecture seule. Les colonnes
+nécessaires sont déjà dans [`schema.sql`](schema.sql) : rien à migrer.
+
+- ☐ Promouvoir le premier administrateur **en SQL**
+  (`UPDATE utilisateurs SET role='admin' WHERE email_norm='…'`) — jamais depuis
+  l'interface, et surtout pas de « le premier inscrit devient admin ».
+- ☐ Intergiciel `exigerAdmin`, dans **son propre module**. Les routes de membres
+  ne reçoivent aucune exception : on n'y ajoute jamais un « ou si je suis
+  admin ».
+- ☐ `GET /api/admin/utilisateurs` (comptes, nombre d'arbres, octets, dernier
+  accès), `GET /api/admin/utilisateurs/<id>/sauvegardes`,
+  `GET /api/admin/sauvegardes/<id>` (le document, en lecture),
+  `GET /api/admin/sauvegardes/<id>/export`.
+- ☐ `POST /api/admin/utilisateurs/<id>/plafond`,
+  `POST /api/admin/utilisateurs/<id>/mot-de-passe` (réinitialisation),
+  `DELETE /api/admin/utilisateurs/<id>`.
+- ☐ **Aucune écriture sur l'arbre d'autrui** : les routes de modification ne
+  savent désigner que la sauvegarde de la session. Vérifié par un test : un
+  admin qui tente un `PATCH` sur la sauvegarde d'un autre reçoit un 403.
+- ☐ Chaque consultation et chaque export écrivent une ligne dans
+  `journal_admin`.
+- ☐ Interface : une vue « Administration » (liste des comptes, leurs arbres),
+  et un bandeau **« consultation — lecture seule »** quand on ouvre l'arbre de
+  quelqu'un d'autre.
+
+*Fini quand :* un admin ouvre l'arbre d'un autre compte, le lit, l'exporte, ne
+peut rien y modifier, et que le journal en porte la trace.
+
+## Tranché
+
+- **Inscription ouverte à qui veut**, sans code d'invitation (06/08/2026). D'où
+  le code de secours, les plafonds par compte et la limite d'inscriptions par
+  IP au lot 1.
+- **Rien à installer côté utilisateur** : une adresse, un navigateur, un compte.
+  L'export `.zip` reste une possibilité, jamais un passage obligé.
+- **Comptes administrateurs** voyant tous les arbres, en **lecture seule**, par
+  une surface d'API séparée et journalisée (lot 7).
+- **Pas de photos en ligne**, donc pas de R2.
+
+Tranché le **08/08/2026**, pour que « pousser suffise » :
+
+- **Une seule brique en plus du Worker : la base D1.** Ni KV (cohérence
+  différée : une déconnexion mettrait une minute à prendre effet), ni Durable
+  Objects (il n'y a pas d'édition simultanée en temps réel), ni Queues (rien
+  d'asynchrone), ni Pages (fusionné dans Workers ; un seul domaine évite CORS
+  et fait marcher le cookie sans contorsion).
+- **Aucun secret.** Le `SESSION_SECRET` du lot 6 est **abandonné** : les jetons
+  de session sont aléatoires et stockés hachés, il n'y a rien à signer. Un
+  poivre de hachage n'aurait ajouté qu'un risque — le perdre rendrait tous les
+  mots de passe invérifiables. Un déploiement propre ne demande donc rien à
+  ressaisir.
+- **Déploiement par la construction Cloudflare** branchée sur le dépôt Git,
+  *deploy command* = `npm run deploy` (migrations **puis** déploiement).
+  GitHub Actions reste en réserve, en fichier `.exemple` non actif.
+- **Les migrations sont additives.** On ne modifie jamais un fichier déjà
+  appliqué en ligne : on ajoute `0002_…`. C'est la condition pour qu'un push
+  ne puisse pas casser la base.
+- **Un seul environnement**, la production. Pas de préproduction : ce serait un
+  deuxième Worker et une deuxième base à tenir à jour. Le banc d'essai, c'est
+  `npm run dev` sur une D1 **locale**. (Cloudflare crée tout de même une
+  version de prévisualisation pour les pushes hors `main` : c'est gratuit et
+  ça ne coûte aucune maintenance.)
+- **Adresse : `workers.dev`** pour l'instant. HTTPS d'office, isolation des
+  cookies garantie (`workers.dev` est sur la *Public Suffix List*). Un domaine
+  à soi se branche en trois clics le jour où on en veut un ; le seul coût est
+  une reconnexion pour tout le monde.
+- **Téléphone : consulter oui, éditer non.** Une passe minimale au lot 4
+  (volets en tiroirs, barre repliable) au lieu d'une refonte. C'est un choix
+  d'effort : rendre l'édition confortable au doigt vaut un lot entier, et
+  l'usage réel est un arbre qu'on regarde en séance.
+- **Dépôt Git séparé de l'application locale.** Deux projets, deux dépôts :
+  sinon chaque retouche du Python déclencherait une construction Cloudflare.
+
+## À trancher
+
+- **Le partage entre membres** : montrer un arbre en lecture seule à ses propres
+  joueurs, sans en faire des administrateurs ? Ce serait un lot 8 et une table
+  `partages`. **Repoussé volontairement** : tant qu'il n'y a pas d'utilisateurs,
+  on ne sait pas si le besoin est « montrer » ou « co-éditer », et les deux
+  n'ont pas la même réponse.
+- **Vérification de l'adresse de courriel** : impossible sans service d'envoi.
+  Conséquence acceptée : une adresse peut être fausse, et c'est le code de
+  secours qui sert de filet. À revoir si un jour on a un service d'envoi
+  gratuit fiable.
+
+## Journal
+
+- **06/08/2026** — dossier créé, architecture arrêtée : Workers + D1 + Static
+  Assets, comptes maison (PBKDF2 + cookie de session), contrat d'API identique
+  à la version locale pour réutiliser `web/` sans le réécrire, export `.zip`
+  pour que partir ne coûte rien. Aucun code encore.
+- **06/08/2026** — **inscription ouverte, rien à installer, comptes
+  administrateurs**. L'inscription ouverte amène trois choses au lot 1 : code de
+  secours (pas de courriel, donc pas de « mot de passe oublié » classique),
+  plafonds par compte (10 sauvegardes de 2 Mo — sinon un compte peut remplir la
+  base), limite d'inscriptions par IP. Les administrateurs deviennent le lot 7 :
+  **surface d'API séparée, lecture seule, journalisée**, et l'API des membres
+  garde son `WHERE utilisateur_id = ?` intact — aucune exception « ou si je suis
+  admin » nulle part. Les colonnes (`role`, `code_secours`, `plafond_*`) et la
+  table `journal_admin` sont dans le schéma dès maintenant : rien à migrer.
+- **08/08/2026** — **lot 0 écrit et vérifié**, et la chaîne de déploiement
+  arrêtée pour que « pousser » suffise : Worker `familytree` + base D1
+  `familytree` (`weur`), **rien d'autre**, **aucun secret**, construction
+  Cloudflare branchée sur le dépôt avec `npm run deploy` en commande de
+  déploiement. Marche à suivre complète dans `DEPLOIEMENT.md`. Chiffres
+  Cloudflare **revérifiés à la source** ce jour : 10 ms de CPU par requête,
+  100 000 requêtes/jour, 5 Go et 100 000 lignes écrites/jour pour D1, 3 000
+  minutes de construction par mois. **Piège trouvé** : le jeton créé
+  automatiquement par la construction Cloudflare couvre Workers/KV/R2 mais
+  **pas D1** — il faut lui ajouter `D1:Edit`, sinon la migration échoue au
+  déploiement. Décisions annexes tranchées : `workers.dev` pour l'adresse,
+  téléphone en consultation seulement (passe minimale au lot 4), partage entre
+  membres repoussé, un seul environnement, migrations additives.
+- **06/08/2026** — **pas de photos en ligne** (décision de Maxime), donc R2
+  abandonné et lot 5 réduit à l'export. Faisabilité chiffrée sur la vraie
+  campagne : 73 Ko compact pour 72 fiches, 8 requêtes par chargement de page,
+  1 ligne écrite par modification → **moins de 5 % du palier gratuit** pour une
+  dizaine de personnes. Le seul point serré reste le temps de CPU par requête,
+  avec deux replis prévus. « Une instance par personne » se fait par les
+  **comptes**, pas par des déploiements séparés (les quotas sont par compte
+  Cloudflare, pas par Worker).

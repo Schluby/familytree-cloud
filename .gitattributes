@@ -1,0 +1,3 @@
+# Le dépôt est écrit sous Windows mais construit sous Linux chez Cloudflare :
+# on normalise les fins de ligne pour que les deux lisent la même chose.
+* text=auto eol=lf

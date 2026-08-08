@@ -1,0 +1,14 @@
+-- Ce fichier a déménagé.
+--
+-- Le schéma vit maintenant dans `migrations/0001_schema_initial.sql`, parce que
+-- c'est là que Wrangler va le chercher : `wrangler d1 migrations apply` lit le
+-- dossier `migrations/` et retient ce qui a déjà tourné.
+--
+-- Il n'y a donc qu'une seule copie du schéma, et elle est celle qui s'exécute.
+-- En garder une deuxième ici, à jour « à la main », aurait fini par mentir.
+--
+--   npm run base:local   → applique les migrations à la base locale
+--   npm run base:ligne   → applique les migrations à la base en ligne
+--
+-- Pour changer le schéma : ajouter `migrations/0002_....sql`, jamais modifier
+-- un fichier déjà appliqué en ligne.

@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // Le nom du Worker. Il donne l'adresse : https://familytree.<compte>.workers.dev
+  "name": "familytree",
+  "main": "src/index.ts",
+
+  // Date figée volontairement : elle décide du comportement du moteur. On ne la
+  // change que sciemment, jamais « pour être à jour ».
+  "compatibility_date": "2026-08-01",
+
+  // Journaux et traces dans le tableau de bord. Gratuit, et c'est la seule
+  // façon de voir ce qui se passe en ligne.
+  "observability": { "enabled": true },
+
+  // ------------------------------------------------------------------------
+  // Les fichiers de l'interface (public/) sont servis par Cloudflare, pas par
+  // le Worker : ils ne comptent pas dans les 100 000 requêtes par jour.
+  //
+  // run_worker_first : /api/* va TOUJOURS au Worker, même si un fichier du même
+  // nom existait. Tout le reste essaie d'abord un fichier, puis retombe sur le
+  // Worker (qui renvoie index.html).
+  // ------------------------------------------------------------------------
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // ------------------------------------------------------------------------
+  // La base. database_id est donné par « wrangler d1 create familytree ».
+  // Il n'est PAS secret : c'est un identifiant, pas une clé.
+  // ------------------------------------------------------------------------
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "familytree",
+      "database_id": "A_REMPLACER_APRES_wrangler_d1_create"
+    }
+  ],
+
+  // Ménage nocturne : sessions expirées, compteurs de tentatives périmés.
+  // Les tâches cron ne sont pas facturées sur le plan gratuit.
+  "triggers": {
+    "crons": ["17 4 * * *"]
+  }
+}
