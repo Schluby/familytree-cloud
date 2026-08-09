@@ -3,6 +3,39 @@
 Objectif : après cette page, **un `git push` suffit** pour mettre à jour le site.
 Tout est gratuit, aucune carte bancaire n'est demandée.
 
+> ## C'est fait — 09/08/2026
+>
+> | | |
+> | --- | --- |
+> | Adresse | **https://familytree.schlub-perso.workers.dev** |
+> | Compte Cloudflare | `Schlub_perso` — `1df084d9829788d12811b34411295ca9` |
+> | Base D1 | `familytree` — `790c7252-c1ec-44ed-8885-06c8f44be8c6`, région **WEUR** |
+> | Dépôt | https://github.com/Schluby/familytree-cloud, branche `main` |
+>
+> **Pourquoi un compte à part** : le même identifiant Cloudflare porte un autre
+> compte, qui héberge le site de quelqu'un d'autre. Les quotas gratuits étant
+> comptés **par compte**, une pointe de trafic sur FamilyTree — dont
+> l'inscription est ouverte à tous — aurait pu couper ce site-là jusqu'à
+> minuit UTC. Le risque n'était pas le nôtre à prendre.
+>
+> La suite de cette page reste la marche à suivre de référence, pour refaire
+> l'installation ailleurs ou comprendre un réglage.
+
+## Trois pièges rencontrés, pour ne pas les réapprendre
+
+1. **`wrangler login` ne couvre que les comptes qui existent au moment de
+   l'autorisation.** Le compte créé après coup donne une « Authentication
+   error [code: 10000] » à la première commande. Créer le compte **d'abord**,
+   autoriser ensuite.
+2. **Le tableau de bord propose deux chemins qui se ressemblent.** « Set up your
+   application » *crée* un Worker nommé d'après le dépôt (`familytree-cloud`),
+   ce qui échoue puisque la configuration dit `familytree` : Cloudflare exige
+   que les deux noms soient identiques. Le bon chemin est le Worker existant →
+   *Settings → Builds → Connect*.
+3. **Dans les secondes qui suivent un déploiement**, les fichiers statiques
+   mettent un instant à se propager : `/` peut répondre 404 puis « error code
+   1042 ». Ce n'est pas un bug. Réessayer.
+
 ## La réponse courte
 
 | À créer chez Cloudflare | Combien | Nom | À quoi ça sert |
