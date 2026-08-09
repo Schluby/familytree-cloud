@@ -12,6 +12,7 @@
  */
 
 import { Hono } from 'hono';
+import { routesAuth } from './auth/routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -64,6 +65,12 @@ app.get('/api/sante', async (c) => {
     );
   }
 });
+
+/* --------------------------------------------------------------------------
+ * Les comptes.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api/auth', routesAuth);
 
 /* --------------------------------------------------------------------------
  * Tout /api/ inconnu répond en JSON, jamais en HTML : le front sait alors

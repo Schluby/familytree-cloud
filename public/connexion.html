@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FamilyTree — connexion</title>
+  <link rel="stylesheet" href="/css/base.css">
+</head>
+<body>
+<main>
+  <h1>FamilyTree</h1>
+  <p>Vos arbres, en ligne, chacun chez soi.</p>
+
+  <div class="carte">
+    <div class="onglets" role="tablist">
+      <button id="ongletConnexion"   role="tab" aria-selected="true">Se connecter</button>
+      <button id="ongletInscription" role="tab" aria-selected="false">Créer un compte</button>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <form id="formulaire" autocomplete="on">
+      <label>Adresse de courriel
+        <input id="email" type="email" required autocomplete="username" placeholder="vous@exemple.fr">
+      </label>
+
+      <label id="ligneNom" class="cache">Nom affiché <span style="opacity:.7">(facultatif)</span>
+        <input id="nom" type="text" maxlength="80" autocomplete="nickname">
+      </label>
+
+      <label>Mot de passe
+        <input id="motDePasse" type="password" required minlength="8" autocomplete="current-password">
+      </label>
+
+      <label id="ligneConfirmation" class="cache">Confirmer le mot de passe
+        <input id="confirmation" type="password" minlength="8" autocomplete="new-password">
+      </label>
+
+      <button id="valider" class="principal" type="submit">Se connecter</button>
+    </form>
+
+    <button id="lienOubli" class="lien" type="button">Mot de passe oublié ?</button>
+
+    <div id="message" class="message"></div>
+
+    <!-- Dit avant de créer le compte, pas enfoui dans une page de mentions. -->
+    <div id="mention" class="mention cache">
+      <strong>Ce qui est stocké :</strong> votre adresse, un nom d'affichage si
+      vous en mettez un, et vos arbres.
+      <strong>Votre mot de passe n'est jamais transmis</strong> — votre
+      navigateur en calcule une empreinte irréversible, et c'est elle qui part.
+      <strong>Les administrateurs du service peuvent consulter les arbres</strong>
+      créés sur cette instance. Vous pouvez tout télécharger ou tout supprimer,
+      à tout moment.
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div id="carteRecuperation" class="carte cache">
+    <h2 style="font-size:1.1rem;margin:0">Récupérer son compte</h2>
+    <p style="font-size:.88rem">
+      Il n'y a pas d'envoi de courriel ici : le <strong>code de secours</strong>
+      donné à l'inscription est la seule façon de reprendre la main tout seul.
+      Sans lui, il faut passer par un administrateur.
+    </p>
+    <form id="formulaireRecuperation">
+      <label>Adresse de courriel
+        <input id="emailRecuperation" type="email" required>
+      </label>
+      <label>Code de secours
+        <input id="codeSecours" type="text" required placeholder="XXXXX-XXXXX-XXXXX-XXXXX">
+      </label>
+      <label>Nouveau mot de passe
+        <input id="nouveauMotDePasse" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <button id="validerRecuperation" class="principal" type="submit">Changer le mot de passe</button>
+    </form>
+    <button id="lienRetour" class="lien" type="button">Revenir à la connexion</button>
+    <div id="messageRecuperation" class="message"></div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div id="carteCode" class="carte cache">
+    <h2 style="font-size:1.1rem;margin:0">Notez ce code de secours</h2>
+    <p style="font-size:.88rem">
+      Il ne sera <strong>plus jamais affiché</strong> : la base n'en garde qu'une
+      empreinte. Sans lui et sans votre mot de passe, votre compte est perdu.
+    </p>
+    <div id="codeAffiche" class="code"></div>
+    <button id="continuer" class="principal" type="button">C'est noté, continuer</button>
+  </div>
+</main>
+
+<script type="module" src="/js/connexion.js"></script>
+</body>
+</html>

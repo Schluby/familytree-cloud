@@ -3,49 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FamilyTree — en construction</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body {
-      margin: 0; min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-      background: #14110f; color: #e8ded0;
-    }
-    main { max-width: 34rem; padding: 2rem; }
-    h1 { font-size: 1.6rem; margin: 0 0 .4rem; letter-spacing: .02em; }
-    p  { margin: .6rem 0; color: #b7a894; }
-    #sante {
-      margin-top: 1.6rem; padding: .8rem 1rem; border-radius: .5rem;
-      border: 1px solid #3a322a; background: #1b1714;
-      font-family: ui-monospace, Consolas, monospace; font-size: .85rem;
-      white-space: pre-wrap; color: #cbbfae;
-    }
-    .ok  { border-color: #46603f; }
-    .ko  { border-color: #6b3a34; }
-  </style>
+  <title>FamilyTree</title>
+  <link rel="stylesheet" href="/css/base.css">
 </head>
 <body>
-  <main>
-    <h1>FamilyTree</h1>
-    <p>La version hébergée est en cours de construction. L'interface complète
-       arrive au lot 4&nbsp;; cette page ne sert qu'à vérifier que le Worker et
-       la base se parlent.</p>
-    <div id="sante">interrogation de /api/sante…</div>
-  </main>
-  <script>
-    fetch('/api/sante')
-      .then(r => r.json().then(d => ({ code: r.status, d })))
-      .then(({ code, d }) => {
-        const zone = document.getElementById('sante');
-        zone.className = d.ok ? 'ok' : 'ko';
-        zone.textContent = 'GET /api/sante → ' + code + '\n' + JSON.stringify(d, null, 2);
-      })
-      .catch(e => {
-        const zone = document.getElementById('sante');
-        zone.className = 'ko';
-        zone.textContent = 'Le Worker ne répond pas : ' + e.message;
-      });
-  </script>
+<main>
+  <h1>FamilyTree</h1>
+  <p id="salutation">Chargement…</p>
+
+  <div class="carte">
+    <p style="margin-top:0">
+      L'interface des arbres arrive au <strong>lot 4</strong>. D'ici là, cette
+      page sert à vérifier que votre compte, le Worker et la base se parlent.
+    </p>
+    <div id="etat" class="technique">interrogation de /api/sante…</div>
+    <button id="deconnexion" class="lien" type="button">Se déconnecter</button>
+  </div>
+</main>
+
+<script type="module">
+  import { appeler, compteConnecte } from '/js/identite.js';
+
+  const compte = await compteConnecte();
+  if (!compte) {
+    window.location.replace('/connexion');
+  } else {
+    document.getElementById('salutation').textContent =
+      `Connecté en tant que ${compte.nom_affiche || compte.email}` +
+      (compte.role === 'admin' ? ' (administrateur)' : '');
+
+    const { code, donnees } = await appeler('/api/sante');
+    const zone = document.getElementById('etat');
+    zone.textContent = `GET /api/sante → ${code}\n${JSON.stringify(donnees, null, 2)}`;
+
+    document.getElementById('deconnexion').addEventListener('click', async () => {
+      await appeler('/api/auth/deconnexion', { method: 'POST' });
+      window.location.replace('/connexion');
+    });
+  }
+</script>
 </body>
 </html>

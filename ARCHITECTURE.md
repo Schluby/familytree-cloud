@@ -75,10 +75,16 @@ l'inscription ouverte »).
 Pas de service tiers : tout tient dans D1 et dans `crypto.subtle`, disponible
 dans les Workers.
 
-- **Mot de passe** : PBKDF2-SHA256, 210 000 itérations, sel aléatoire de
-  16 octets, le tout rangé en `sel$empreinte` (base64). Argon2 et scrypt ne
-  sont pas disponibles nativement dans un Worker ; PBKDF2 correctement itéré
-  est la recommandation de repli de l'OWASP.
+- **Mot de passe** : dérivation **en deux temps**, décidée le 09/08/2026 après
+  mesure (voir l'encadré ci-dessous). Le navigateur calcule
+  `cle = PBKDF2(mot de passe, sel déterministe, 600 000 tours)` ; le serveur
+  range `PBKDF2(cle, sel aléatoire de 16 octets, 25 000 tours)`, au format
+  `v1$sel$empreinte`. Argon2 et scrypt ne sont pas disponibles nativement dans
+  un Worker ; PBKDF2 correctement itéré est la recommandation de repli de
+  l'OWASP.
+- **Code de secours** : 20 caractères tirés au hasard (~100 bits), rangé en
+  SHA-256 salé. Pas besoin de ralentir la vérification d'un secret qui n'est
+  pas devinable — et ça épargne 4 ms de CPU à chaque inscription.
 - **Session** : un jeton aléatoire de 32 octets, envoyé en cookie
   `HttpOnly; Secure; SameSite=Lax; Max-Age=30 jours`, et stocké **haché** en
   base — une fuite de la table ne donne aucune session utilisable.
@@ -96,6 +102,39 @@ dans les Workers.
 > 50 utilisateurs) supprimerait toute la gestion de mots de passe. Mais il
 > impose de créer chaque compte dans le tableau de bord Cloudflare —
 > incompatible avec une inscription ouverte.
+
+#### Pourquoi deux étages de dérivation — mesuré, pas supposé
+
+Le plan prévoyait 210 000 itérations sur le serveur. **C'est impossible**, et
+on l'a su en mesurant en production le 09/08/2026 :
+
+| Tours | Réponse | CPU |
+| --- | --- | --- |
+| 50 000 | 200 | 7 ms |
+| 100 000 | 200 | 19 ms |
+| 110 000 et au-delà | 500 | — |
+
+Cloudflare **refuse** PBKDF2 au-delà de 100 000 tours :
+`NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+supported`. Ce n'est pas une question de temps de calcul mais un plafond dur de
+la plateforme. Et même le maximum autorisé coûte 19 ms de CPU, soit le double
+du budget documenté du plan gratuit : bâtir dessus reviendrait à parier sur une
+tolérance que Cloudflare ne promet pas.
+
+D'où le partage : le navigateur fait les 600 000 tours (une fraction de seconde,
+une fois, à la connexion — et il n'a aucun plafond), le serveur en refait
+25 000 par-dessus pour ~4 ms de CPU. Trois effets :
+
+1. **Le facteur de travail total dépasse 600 000**, au-dessus des
+   recommandations 2026 — donc *plus* solide que ce qui était prévu.
+2. **Le serveur ne voit jamais le mot de passe.** Même une trace de requête mal
+   configurée, même un journal trop bavard, ne peuvent pas le divulguer.
+3. Le sel du navigateur est déterministe (dérivé de l'adresse) : sinon il
+   faudrait le demander au serveur *avant* de se connecter, ce qui révélerait
+   quelles adresses ont un compte.
+
+Le prix : la page de connexion exige JavaScript. L'application entière l'exige
+de toute façon.
 
 ### Ce qu'impose l'inscription ouverte
 

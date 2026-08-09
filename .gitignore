@@ -1,5 +1,6 @@
 node_modules/
 .wrangler/
+.essai-*/
 dist/
 .dev.vars
 .env

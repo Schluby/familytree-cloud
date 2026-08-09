@@ -56,29 +56,34 @@ définit le contrat d'API et le format des sauvegardes.
 
 *Fini.* `npm run verif` avant chaque push ; `npm run dev` pour travailler.
 
-## Lot 1 — Les comptes  ☐
+## Lot 1 — Les comptes  ☑
 
 Inscription **ouverte à qui veut** : personne n'a besoin d'un code, ni de rien
 installer.
 
-- ☐ `POST /api/auth/inscription` (e-mail + mot de passe) : PBKDF2-SHA256,
-  210 000 itérations, sel de 16 octets.
-- ☐ **Code de secours** tiré à l'inscription, affiché une seule fois, stocké
-  haché : sans courriel, c'est la seule récupération possible.
-  `POST /api/auth/recuperation`.
-- ☐ `POST /api/auth/connexion` → cookie de session `HttpOnly; Secure;
-  SameSite=Lax`, jeton stocké **haché**.
-- ☐ `POST /api/auth/deconnexion`, `GET /api/auth/moi` (renvoie aussi le rôle).
-- ☐ Un intergiciel qui résout le cookie et refuse `401` sans session.
-- ☐ Limites : 5 connexions échouées → attente progressive ; **3 inscriptions
-  par heure et par IP** (table `tentatives`).
-- ☐ Page de connexion / inscription : deux champs, un bouton. Sur
-  l'inscription, **dire ce qui est stocké et que les administrateurs peuvent
-  consulter les arbres** — une phrase, pas un pavé juridique.
+- ☑ `POST /api/auth/inscription`. **Dérivation en deux temps** au lieu des
+  210 000 itérations prévues : Cloudflare plafonne PBKDF2 à 100 000 tours
+  (mesuré, voir `ARCHITECTURE.md`). Le navigateur en fait 600 000, le serveur
+  25 000 par-dessus — plus solide que le plan d'origine, et le mot de passe ne
+  quitte jamais la page.
+- ☑ **Code de secours** tiré à l'inscription, affiché une seule fois, stocké
+  haché. `POST /api/auth/recuperation` le consomme, en délivre un nouveau et
+  ferme toutes les sessions ouvertes.
+- ☑ `POST /api/auth/connexion` → cookie `HttpOnly; SameSite=Lax; Max-Age=30 j`,
+  `Secure` sauf sur `http://localhost` ; jeton stocké **haché**.
+- ☑ `POST /api/auth/deconnexion`, `GET /api/auth/moi` (renvoie aussi le rôle).
+- ☑ `exigerSession` dans `src/intergiciels.ts` : c'est lui qui portera le
+  cloisonnement des lots suivants.
+- ☑ Limites : attente doublante au-delà de 5 échecs, **3 inscriptions par heure
+  et par IP**.
+- ☑ Page de connexion / inscription / récupération, et la phrase de
+  transparence sur l'écran d'inscription.
+- ☑ `outils/essai-comptes.sh` : 20 vérifications, **deux comptes**, rejouable
+  en local comme en ligne. C'est le harnais que les lots suivants étendront.
 
-*Fini quand :* deux comptes créés, chacun voit `GET /api/auth/moi` renvoyer le
-sien, une requête sans cookie reçoit un 401, et un mot de passe se récupère avec
-son code de secours.
+*Fini.* 20/20 en local et en ligne, dont : un compte ne voit pas l'autre, une
+adresse inconnue et un mot de passe faux donnent la même réponse, et le code de
+secours change bien le mot de passe.
 
 ## Lot 2 — Les sauvegardes, par utilisateur  ☐
 
