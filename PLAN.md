@@ -308,6 +308,13 @@ Tranché le **10/08/2026**, au lot 2 :
   `partages`. **Repoussé volontairement** : tant qu'il n'y a pas d'utilisateurs,
   on ne sait pas si le besoin est « montrer » ou « co-éditer », et les deux
   n'ont pas la même réponse.
+- **Les instantanés.** La table `instantanes` existe depuis le lot 0, et
+  l'application locale sait en faire — mais **aucun lot ne les programme**.
+  Constaté au lot 2, laissé ouvert exprès : tant que l'interface n'est pas là
+  (lot 4), on ne sait pas si l'utile est « une copie datée à la demande » ou
+  « les cinq derniers états, automatiques ». Le point d'écriture est déjà prêt
+  (`PUT .../contenu` restaure un document entier) ; il ne manquerait que les
+  routes.
 - **Vérification de l'adresse de courriel** : impossible sans service d'envoi.
   Conséquence acceptée : une adresse peut être fausse, et c'est le code de
   secours qui sert de filet. À revoir si un jour on a un service d'envoi
