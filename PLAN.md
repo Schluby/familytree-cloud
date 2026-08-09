@@ -32,11 +32,17 @@ non coché. Les décisions techniques et leurs raisons sont dans
 non par un envoi manuel).
 
 **Lot 1 livré le 09/08/2026** : on crée son compte et on se connecte, en ligne.
-20/20 au harnais `outils/essai-comptes.sh`, en local **et** en production, plus
-un parcours complet à la souris (inscription → code de secours → accueil). Les
-comptes d'essai ont été effacés de la base.
+20/20 au harnais, en local **et** en production, plus un parcours complet à la
+souris (inscription → code de secours → accueil). Les comptes d'essai ont été
+effacés de la base.
 
-Le lot 2 n'a pas commencé.
+**Lot 2 livré le 10/08/2026** : chacun a ses sauvegardes, et personne ne voit
+celles des autres. Le harnais est passé à **81 vérifications** et s'appelle
+désormais `outils/essai.sh` — il couvre les deux lots, et couvrira les suivants.
+La page d'accueil montre un panneau provisoire (créer, importer, copier,
+renommer, exporter, supprimer) en attendant l'interface du lot 4.
+
+Le lot 3 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -83,33 +89,49 @@ installer.
   et par IP**.
 - ☑ Page de connexion / inscription / récupération, et la phrase de
   transparence sur l'écran d'inscription.
-- ☑ `outils/essai-comptes.sh` : 20 vérifications, **deux comptes**, rejouable
-  en local comme en ligne. C'est le harnais que les lots suivants étendront.
+- ☑ `outils/essai.sh` : 20 vérifications, **deux comptes**, rejouable en local
+  comme en ligne. C'est le harnais que les lots suivants étendent. (Il
+  s'appelait `essai-comptes.sh` jusqu'au lot 2, qui l'a élargi.)
 
 *Fini.* 20/20 en local et en ligne, dont : un compte ne voit pas l'autre, une
 adresse inconnue et un mot de passe faux donnent la même réponse, et le code de
 secours change bien le mot de passe.
 
-## Lot 2 — Les sauvegardes, par utilisateur  ☐
+## Lot 2 — Les sauvegardes, par utilisateur  ☑
 
-- ☐ `GET /api/sauvegardes` (les siennes), `POST` (créer, vide ou copie),
-  `PATCH` (renommer), `DELETE`.
-- ☐ `GET /api/sauvegardes/<id>/export` (un `.json`),
-  `POST /api/sauvegardes/import` (un `.json`).
-- ☐ `PUT /api/sauvegardes/<id>/contenu` : le document entier, un seul point
-  d'écriture pour l'import et la restauration.
-- ☐ Le document est stocké **compact** (73 Ko au lieu de 112 sur la vraie
-  campagne) ; l'export réindente.
-- ☐ À l'import, **retirer les portraits `data:`** avec un message clair, et
-  garder les `avatar` en `http(s)` (voir `ARCHITECTURE.md`, « Pas de photos »).
-- ☐ **Plafonds par compte** : 10 sauvegardes, 2 Mo chacune (colonnes
-  `plafond_*`, relevables par un admin). Message qui dit quoi faire quand
-  c'est atteint.
-- ☐ **Test de cloisonnement** : le compte A demande la sauvegarde de B → 404,
-  jamais 403 (on ne confirme pas l'existence).
+- ☑ `GET /api/sauvegardes` (les siennes), `POST` (créer : vierge, copie, ou
+  `referentiels` — le même univers sans les fiches), `PATCH` (renommer),
+  `DELETE`. Plus `GET /api/sauvegardes/<id>` pour une fiche seule.
+- ☑ `GET /api/sauvegardes/<id>/export` (un `.json` réindenté, avec
+  `Content-Disposition` : le téléchargement se fait sans une ligne de
+  JavaScript), `POST /api/sauvegardes/import`.
+- ☑ L'import accepte le **document brut** autant que `{nom, document}` : on
+  réimporte un fichier de la version locale par
+  `curl --data-binary @sauvegarde.json`, sans rien réemballer.
+- ☑ `PUT /api/sauvegardes/<id>/contenu` : le document entier, un seul point
+  d'écriture. `GET .../contenu` rend le texte stocké **tel quel**, sans le
+  reparser — il est déjà compact, et le budget est le CPU.
+- ☑ Le document est stocké **compact** : mesuré sur la vraie campagne,
+  **74 717 octets contre 115 069** sur le disque. L'export réindente (deux
+  espaces et un saut de ligne final, comme `ecrire_json` en local).
+- ☑ **Portraits `data:` retirés** à toute écriture, avec le compte exact rendu
+  dans la réponse (`portraits_retires`) ; les `avatar` en `http(s)` survivent.
+- ☑ **Plafonds par compte** : 10 sauvegardes (409), 2 Mo chacune (413), avec un
+  message qui dit quoi faire. Les plafonds voyagent dans la session, donc les
+  vérifier ne coûte aucune requête de plus.
+- ☑ **Verrou optimiste** : migration `0002` ajoute `revision`. `modifie_le` ne
+  pouvait pas servir — il est en secondes, et deux onglets qui enregistrent
+  dans la même seconde s'écraseraient sans bruit. La révision se lit dans
+  l'`ETag` de `GET .../contenu` et se renvoie dans le `PUT` ; si elle a bougé,
+  409 au lieu d'un écrasement.
+- ☑ **Test de cloisonnement** : sept routes essayées par le compte B sur une
+  sauvegarde de A (fiche, contenu, export, écriture, renommage, copie,
+  suppression) → **404 partout**, jamais 403.
+- ☑ Panneau provisoire sur la page d'accueil, en attendant le lot 4.
 
-*Fini quand :* on crée, renomme, exporte et réimporte une sauvegarde depuis
-`curl`, et que le test de cloisonnement passe.
+*Fini.* 81/81 au harnais en local et en ligne, dont l'import de la **vraie
+campagne** (72 fiches, 178 liens) et un parcours à la souris jusqu'au
+téléchargement du `.json`.
 
 ## Lot 3 — Le domaine, porté en TypeScript  ☐
 
@@ -261,6 +283,22 @@ Tranché le **08/08/2026**, pour que « pousser suffise » :
 - **Dépôt Git séparé de l'application locale.** Deux projets, deux dépôts :
   sinon chaque retouche du Python déclencherait une construction Cloudflare.
 
+Tranché le **10/08/2026**, au lot 2 :
+
+- **Le nom d'une sauvegarde vit dans sa colonne, pas dans son document.** En
+  local, renommer réécrit `meta.sauvegarde` dans le fichier ; ici ce serait
+  relire, reparser et réécrire 75 Ko pour un libellé. Les deux ne sont recollés
+  qu'à l'**export**, seul moment où le fichier doit se suffire à lui-même.
+- **`revision`, et pas `modifie_le`, pour le verrou optimiste.** Les secondes
+  ont une zone aveugle : deux enregistrements dans la même seconde passeraient
+  tous les deux. Un compteur qui ne fait qu'augmenter n'en a pas.
+- **Le lot 2 ne normalise pas le document**, il le stocke tel qu'il arrive
+  (moins les portraits `data:`), exactement comme le fichier local. La
+  normalisation, c'est `models.ts` au lot 3 : elle se branchera dans
+  `preparerDocument`, qui est déjà le passage obligé des trois écritures.
+- **404 et jamais 403** sur une sauvegarde qui n'est pas la sienne — un 403
+  confirmerait que l'identifiant existe.
+
 ## À trancher
 
 - **Le partage entre membres** : montrer un arbre en lecture seule à ses propres
@@ -327,7 +365,7 @@ Tranché le **08/08/2026**, pour que « pousser suffise » :
   coûte 19 ms de CPU pour un budget documenté de 10. D'où une **dérivation en
   deux temps** — 600 000 tours dans le navigateur, 25 000 sur le serveur : plus
   solide que le plan d'origine, et le mot de passe ne quitte jamais la page.
-  Détail et chiffres dans `ARCHITECTURE.md`. Vérifié par
-  `outils/essai-comptes.sh` (20 contrôles, deux comptes) en local et en ligne,
-  puis par un parcours à la souris. La limite de 3 inscriptions/heure/IP s'est
-  déclenchée toute seule pendant les essais : elle marche.
+  Détail et chiffres dans `ARCHITECTURE.md`. Vérifié par `outils/essai.sh`
+  (20 contrôles, deux comptes) en local et en ligne, puis par un parcours à la
+  souris. La limite de 3 inscriptions/heure/IP s'est déclenchée toute seule
+  pendant les essais : elle marche.

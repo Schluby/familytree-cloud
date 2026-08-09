@@ -3,21 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FamilyTree</title>
+  <title>FamilyTree — vos sauvegardes</title>
   <link rel="stylesheet" href="/css/base.css">
 </head>
-<body>
-<main>
-  <h1>FamilyTree</h1>
-  <p id="salutation">Chargement…</p>
-
-  <div class="carte">
-    <p style="margin-top:0">
-      L'interface des arbres arrive au <strong>lot 4</strong>. D'ici là, cette
-      page sert à vérifier que votre compte, le Worker et la base se parlent.
-    </p>
-    <div id="etat" class="technique">interrogation de /api/sante…</div>
+<body class="haut">
+<main class="large">
+  <div class="entete">
+    <div>
+      <h1>FamilyTree</h1>
+      <p id="salutation">Chargement…</p>
+    </div>
     <button id="deconnexion" class="lien" type="button">Se déconnecter</button>
+  </div>
+
+  <div class="carte" id="panneau" hidden>
+    <div class="rangee">
+      <label for="nom">Nouvelle sauvegarde
+        <input id="nom" type="text" maxlength="120" autocomplete="off"
+               placeholder="Le nom de votre monde">
+      </label>
+      <button id="creer" class="bouton accent" type="button">Créer</button>
+      <button id="importer" class="bouton" type="button">Importer un .json</button>
+      <input id="fichier" type="file" accept="application/json,.json" class="cache">
+    </div>
+
+    <div id="message" class="message"></div>
+    <ul id="liste" class="liste"></ul>
+
+    <p class="mention">
+      L’affichage de l’arbre arrive au <strong>lot 4</strong>. D’ici là, vous pouvez déjà
+      créer vos mondes, importer un fichier venu de la version locale, et tout réexporter
+      quand vous voulez : rien n’est enfermé ici. Les portraits collés dans les fiches ne
+      sont pas conservés en ligne — le reste l’est intégralement.
+    </p>
   </div>
 </main>
 
@@ -32,14 +50,15 @@
       `Connecté en tant que ${compte.nom_affiche || compte.email}` +
       (compte.role === 'admin' ? ' (administrateur)' : '');
 
-    const { code, donnees } = await appeler('/api/sante');
-    const zone = document.getElementById('etat');
-    zone.textContent = `GET /api/sante → ${code}\n${JSON.stringify(donnees, null, 2)}`;
-
     document.getElementById('deconnexion').addEventListener('click', async () => {
       await appeler('/api/auth/deconnexion', { method: 'POST' });
       window.location.replace('/connexion');
     });
+
+    // Chargé seulement une fois la session confirmée : le panneau n'a aucun
+    // sens hors connexion, et toutes ses requêtes répondraient 401.
+    document.getElementById('panneau').hidden = false;
+    await import('/js/sauvegardes.js');
   }
 </script>
 </body>

@@ -34,7 +34,7 @@ import {
   NOM_COOKIE,
   ouvrirSession,
   resoudreSession,
-  type Compte,
+  type ComptePublic,
 } from './sessions';
 
 /**
@@ -78,7 +78,7 @@ function adresse(requete: Request): string {
   return requete.headers.get('CF-Connecting-IP') ?? 'inconnue';
 }
 
-function enPublic(compte: Compte): Compte {
+function enPublic(compte: ComptePublic): ComptePublic {
   return {
     id: compte.id,
     email: compte.email,
@@ -172,7 +172,7 @@ routesAuth.post('/connexion', async (c) => {
     'SELECT id, email, nom_affiche, role, mot_de_passe FROM utilisateurs WHERE email_norm = ?'
   )
     .bind(email)
-    .first<Compte & { mot_de_passe: string }>();
+    .first<ComptePublic & { mot_de_passe: string }>();
 
   // Même sans compte, on dérive : le temps de réponse ne doit pas dire si
   // l'adresse existe.

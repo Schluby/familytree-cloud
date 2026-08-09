@@ -13,8 +13,10 @@
 
 import { Hono } from 'hono';
 import { routesAuth } from './auth/routes';
+import { routesSauvegardes } from './sauvegardes/routes';
+import type { Variables } from './intergiciels';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /* --------------------------------------------------------------------------
  * En-têtes de sécurité, posés une fois pour toutes.
@@ -71,6 +73,13 @@ app.get('/api/sante', async (c) => {
  * -------------------------------------------------------------------------- */
 
 app.route('/api/auth', routesAuth);
+
+/* --------------------------------------------------------------------------
+ * Les sauvegardes. Tout ce qui est monté ici exige une session, et ne voit
+ * jamais que les sauvegardes du compte connecté.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api/sauvegardes', routesSauvegardes);
 
 /* --------------------------------------------------------------------------
  * Tout /api/ inconnu répond en JSON, jamais en HTML : le front sait alors

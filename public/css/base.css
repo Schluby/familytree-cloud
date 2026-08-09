@@ -141,3 +141,63 @@ button.principal:disabled { opacity: .55; cursor: progress; }
 }
 
 .cache { display: none !important; }
+
+/* --------------------------------------------------------------------------
+ * La liste des sauvegardes (provisoire : l'interface des arbres arrive au
+ * lot 4, celle-ci sert à manipuler ses mondes en attendant).
+ * -------------------------------------------------------------------------- */
+
+body.haut { align-items: flex-start; }
+main.large { max-width: 46rem; }
+
+.entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.entete .lien { margin-top: 0; }
+
+.rangee { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
+.rangee label { flex: 1 1 14rem; margin-top: 0; }
+
+.bouton {
+  padding: .45rem .8rem;
+  border: 1px solid var(--bord);
+  border-radius: .4rem;
+  background: transparent;
+  color: var(--encre);
+  font: inherit;
+  font-size: .88rem;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bouton:hover { border-color: var(--accent); }
+.bouton.accent { background: var(--accent); border-color: var(--accent); color: #191308; font-weight: 600; }
+.bouton.danger:hover { border-color: var(--erreur); color: var(--erreur); }
+.bouton:disabled { opacity: .55; cursor: progress; }
+
+.liste { list-style: none; margin: 1.2rem 0 0; padding: 0; }
+
+.liste li {
+  border: 1px solid var(--bord);
+  border-radius: .5rem;
+  padding: .8rem 1rem;
+  margin-top: .6rem;
+}
+
+.liste .titre { font-weight: 600; }
+.liste .detail { margin-top: .15rem; font-size: .82rem; color: var(--encre-douce); }
+.liste .actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
+
+.vide {
+  margin-top: 1.2rem;
+  padding: 1.2rem;
+  border: 1px dashed var(--bord);
+  border-radius: .5rem;
+  text-align: center;
+}

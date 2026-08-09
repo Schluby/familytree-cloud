@@ -22,7 +22,17 @@ export interface Compte {
   email: string;
   nom_affiche: string;
   role: string;
+  /**
+   * Les plafonds voyagent avec la session, et pas dans une requête à part :
+   * toute écriture de sauvegarde en a besoin, et une jointure déjà faite coûte
+   * moins cher qu'un aller-retour de plus vers la base.
+   */
+  plafond_octets: number;
+  plafond_sauvegardes: number;
 }
+
+/** Ce qu'on montre au navigateur : ni les plafonds internes, ni rien d'autre. */
+export type ComptePublic = Pick<Compte, 'id' | 'email' | 'nom_affiche' | 'role'>;
 
 function versBase64Url(octets: Uint8Array): string {
   return versBase64(octets).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -56,7 +66,7 @@ export async function resoudreSession(base: D1Database, jeton: string): Promise<
   const maintenant = Math.floor(Date.now() / 1000);
   const ligne = await base
     .prepare(
-      `SELECT u.id, u.email, u.nom_affiche, u.role
+      `SELECT u.id, u.email, u.nom_affiche, u.role, u.plafond_octets, u.plafond_sauvegardes
          FROM sessions s
          JOIN utilisateurs u ON u.id = s.utilisateur_id
         WHERE s.jeton_hache = ? AND s.expire_le > ?`

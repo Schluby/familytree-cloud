@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "titre": "Petit univers d'essai",
+    "description": "Trois fiches, deux liens, et deux portraits pour vérifier le tri des avatars.",
+    "univers": "Essai",
+    "version": 1,
+    "sauvegarde": "Univers d'essai",
+    "schema": 2
+  },
+  "types_relations": {
+    "parent": {
+      "label": "Filiation",
+      "label_sortant": "Parent de",
+      "label_entrant": "Enfant de",
+      "couleur": "#8a94a0",
+      "dirige": true,
+      "categorie": "famille",
+      "style": "solide",
+      "ordre": 1
+    },
+    "ami": {
+      "label": "Amitié",
+      "couleur": "#5fa8d3",
+      "dirige": false,
+      "categorie": "social",
+      "style": "solide",
+      "ordre": 5
+    }
+  },
+  "maisons": {
+    "autre": { "label": "Sans maison", "couleur": "#7a7f87", "devise": "" },
+    "ombreval": { "label": "Ombreval", "couleur": "#6b4f9a", "devise": "Rien ne se perd" }
+  },
+  "categories": {},
+  "filtres": {},
+  "joueurs": [{ "id": "j1", "nom": "Camille", "personnage": "Aloïse", "couleur": "#d64545" }],
+  "personnes": [
+    {
+      "id": "aloise",
+      "prenom": "Aloïse",
+      "nom": "Ombreval",
+      "maison": "ombreval",
+      "genre": "F",
+      "statut": "vivant",
+      "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "notes": "Son portrait est collé en dur : il doit disparaître à l'import.",
+      "tags": ["essai"],
+      "relations_joueurs": {}
+    },
+    {
+      "id": "brannic",
+      "prenom": "Brannic",
+      "nom": "Ombreval",
+      "maison": "ombreval",
+      "genre": "M",
+      "statut": "vivant",
+      "avatar": "https://exemple.test/portraits/brannic.png",
+      "notes": "Son portrait est une adresse : il doit survivre.",
+      "tags": [],
+      "relations_joueurs": {}
+    },
+    {
+      "id": "corvin",
+      "prenom": "Corvin",
+      "nom": "",
+      "maison": "autre",
+      "genre": "M",
+      "statut": "mort",
+      "avatar": "",
+      "notes": "Sans portrait du tout.",
+      "tags": [],
+      "relations_joueurs": {}
+    }
+  ],
+  "relations": [
+    {
+      "id": "r1",
+      "source": "aloise",
+      "cible": "brannic",
+      "type": "parent",
+      "humeur": 4,
+      "label": "",
+      "notes": "",
+      "secret": false,
+      "dirige": true
+    },
+    {
+      "id": "r2",
+      "source": "brannic",
+      "cible": "corvin",
+      "type": "ami",
+      "humeur": 6,
+      "label": "",
+      "notes": "",
+      "secret": false,
+      "dirige": false
+    }
+  ]
+}

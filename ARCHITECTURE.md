@@ -229,10 +229,30 @@ document JSON) : afficher la liste des sauvegardes ne doit pas lire 100 Ko par
 ligne.
 
 Le document est stocké **compact** (sans indentation) : sur la campagne réelle,
-112 Ko d'un fichier lisible tombent à **73 Ko**. L'export, lui, réindente — un
-fichier qu'on ouvre à la main doit rester lisible.
+mesuré au lot 2, **115 069 octets tombent à 74 717**. L'export, lui, réindente —
+un fichier qu'on ouvre à la main doit rester lisible.
 
 Le schéma complet est dans [`schema.sql`](schema.sql).
+
+### Le nom est dans la colonne, le document ne bouge pas pour si peu
+
+En local, renommer une sauvegarde réécrit `meta.sauvegarde` dans le fichier.
+Ici, ce serait relire, reparser et réécrire 75 Ko pour un libellé. Le nom de
+référence est donc la colonne `sauvegardes.nom` ; les deux ne sont recollés
+qu'à l'**export**, le seul moment où le fichier doit se suffire à lui-même.
+
+Même logique pour la lecture : `GET /api/sauvegardes/<id>/contenu` rend le texte
+stocké **tel quel**, sans le reparser. Ce qui est déjà compact n'a pas besoin
+d'être relu pour être renvoyé, et le budget serré n'est pas la place, c'est le
+temps de CPU.
+
+### Un seul point d'écriture
+
+Créer, importer et remplacer un contenu passent tous par la même fonction
+(`preparerDocument`, dans `src/sauvegardes/document.ts`). C'est là que les
+portraits `data:` disparaissent, que les compteurs sont recalculés et que la
+taille réelle est mesurée. Une règle ajoutée là s'applique aux trois sans qu'on
+ait à y penser — et c'est là que la normalisation du lot 3 se branchera.
 
 ### Pas de photos ici — décidé le 06/08/2026
 
@@ -311,8 +331,14 @@ Conséquences sur l'interface :
   `💾 Enregistrer` devient **« Tout télécharger »** — l'export local demandé.
 - Un `PUT /api/sauvegardes/<id>/contenu` sert à l'import et à la restauration
   d'un instantané : un seul point d'écriture pour le document entier.
-- Deux onglets ouverts sur la même sauvegarde : la dernière écriture gagne. Un
-  verrou optimiste (`modifie_le` renvoyé et vérifié) est prévu au lot 6.
+- Deux onglets ouverts sur la même sauvegarde : **un verrou optimiste**, posé
+  dès le lot 2. Il ne s'appuie pas sur `modifie_le` comme prévu au départ —
+  celui-ci est en secondes, et deux enregistrements dans la même seconde
+  passeraient tous les deux sans que personne ne le voie. La migration `0002`
+  ajoute une colonne `revision`, un compteur qui ne fait qu'augmenter : il se
+  lit dans l'`ETag` de `GET .../contenu` et se renvoie dans le `PUT`. S'il a
+  bougé, le serveur répond **409** avec la révision courante au lieu d'effacer
+  le travail de l'autre onglet.
 
 ## L'export local
 
