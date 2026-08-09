@@ -31,7 +31,12 @@ non coché. Les décisions techniques et leurs raisons sont dans
 Éprouvé le 09/08/2026 à 15:56 (version `4e1ce727`, déclenchée par le dépôt et
 non par un envoi manuel).
 
-Le lot 1 n'a pas commencé.
+**Lot 1 livré le 09/08/2026** : on crée son compte et on se connecte, en ligne.
+20/20 au harnais `outils/essai-comptes.sh`, en local **et** en production, plus
+un parcours complet à la souris (inscription → code de secours → accueil). Les
+comptes d'essai ont été effacés de la base.
+
+Le lot 2 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -316,3 +321,13 @@ Tranché le **08/08/2026**, pour que « pousser suffise » :
   construction est bien posée. Trois pièges rencontrés, consignés en tête de
   `DEPLOIEMENT.md` — dont le plus coûteux : `wrangler login` ne couvre que les
   comptes existant **au moment de l'autorisation**.
+- **09/08/2026** — **lot 1 : les comptes**, en ligne. La conception a changé
+  sur mesure, pas sur intuition : Cloudflare **plafonne PBKDF2 à 100 000
+  tours**, donc les 210 000 prévus étaient impossibles, et même le maximum
+  coûte 19 ms de CPU pour un budget documenté de 10. D'où une **dérivation en
+  deux temps** — 600 000 tours dans le navigateur, 25 000 sur le serveur : plus
+  solide que le plan d'origine, et le mot de passe ne quitte jamais la page.
+  Détail et chiffres dans `ARCHITECTURE.md`. Vérifié par
+  `outils/essai-comptes.sh` (20 contrôles, deux comptes) en local et en ligne,
+  puis par un parcours à la souris. La limite de 3 inscriptions/heure/IP s'est
+  déclenchée toute seule pendant les essais : elle marche.

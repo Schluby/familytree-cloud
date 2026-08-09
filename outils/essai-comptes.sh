@@ -6,6 +6,15 @@
 #
 # Cree deux comptes jetables et verifie qu'aucun ne voit l'autre. Les adresses
 # portent un horodatage, donc le script est rejouable sans nettoyage.
+#
+# ATTENTION : il cree 2 comptes, et la limite est de 3 inscriptions par heure et
+# par IP. Deux passages d'affilee sur la meme base la declenchent (c'est le
+# garde-fou qui fait son travail). Pour repartir a zero en ligne :
+#   npx wrangler d1 execute familytree --remote --command "DELETE FROM tentatives"
+#
+# Pour effacer les comptes d'essai :
+#   npx wrangler d1 execute familytree --remote \
+#     --command "DELETE FROM utilisateurs WHERE email_norm LIKE 'essai-%@exemple.test'"
 
 set -u
 BASE="${1:-http://127.0.0.1:8787}"
