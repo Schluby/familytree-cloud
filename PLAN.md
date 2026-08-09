@@ -37,7 +37,7 @@ souris (inscription → code de secours → accueil). Les comptes d'essai ont é
 effacés de la base.
 
 **Lot 2 livré le 10/08/2026** : chacun a ses sauvegardes, et personne ne voit
-celles des autres. Le harnais est passé à **81 vérifications** et s'appelle
+celles des autres. Le harnais est passé à **83 vérifications** et s'appelle
 désormais `outils/essai.sh` — il couvre les deux lots, et couvrira les suivants.
 La page d'accueil montre un panneau provisoire (créer, importer, copier,
 renommer, exporter, supprimer) en attendant l'interface du lot 4.
@@ -129,9 +129,11 @@ secours change bien le mot de passe.
   suppression) → **404 partout**, jamais 403.
 - ☑ Panneau provisoire sur la page d'accueil, en attendant le lot 4.
 
-*Fini.* 81/81 au harnais en local et en ligne, dont l'import de la **vraie
+*Fini.* 83/83 au harnais en local **et** en ligne, dont l'import de la **vraie
 campagne** (72 fiches, 178 liens) et un parcours à la souris jusqu'au
-téléchargement du `.json`.
+téléchargement du `.json`. Temps de CPU mesurés en production : **≤ 11 ms** pour
+toutes les routes de sauvegardes, contre 14 ms pour l'inscription — le document
+n'est pas ce qui coûte cher.
 
 ## Lot 3 — Le domaine, porté en TypeScript  ☐
 
@@ -369,3 +371,25 @@ Tranché le **10/08/2026**, au lot 2 :
   (20 contrôles, deux comptes) en local et en ligne, puis par un parcours à la
   souris. La limite de 3 inscriptions/heure/IP s'est déclenchée toute seule
   pendant les essais : elle marche.
+- **10/08/2026** — **lot 2 : les sauvegardes**, en ligne. Chacun a les siennes,
+  et sept routes essayées par un second compte répondent **404, jamais 403**.
+  Le harnais passe à 83 vérifications, en local **et** en production, dont
+  l'import de la vraie campagne : **74 717 octets compacts contre 115 069** sur
+  le disque, ce qui confirme le chiffre du 06/08 sans l'avoir supposé.
+  **Temps de CPU mesurés en production** (`wrangler tail`, 50 requêtes) :
+  inscription 14 ms, connexion 12 ms, `PUT .../contenu` 11 ms, import de la
+  campagne 9 ms, export 5 ms, lecture d'un document 7 ms au pire et 1 ms en
+  médiane, liste 1 à 2 ms. **Aucune exception, aucun `outcome` autre que `ok`**,
+  y compris sur le refus d'un document de 2,4 Mo. Le portage du lot 3 a donc de
+  la marge : ce qui coûte, c'est PBKDF2, pas le document.
+  Deux corrections de conception faites en chemin, l'une et l'autre pour éviter
+  une perte silencieuse : `modifie_le` **ne pouvait pas** servir de verrou
+  optimiste (secondes → deux onglets de la même seconde passent tous les deux),
+  d'où la migration `0002` et sa colonne `revision` ; et l'upsert du contenu
+  plutôt qu'un `UPDATE`, qui ne dirait rien si la ligne manquait.
+  **La chaîne des migrations additives est éprouvée pour de vrai** : `0002` a
+  été appliquée en ligne **par le déploiement**, sans commande à la main.
+  Un piège de plus, consigné dans `DEPLOIEMENT.md` : juste après un push, les
+  routes neuves répondent 404 sur les points de présence encore à l'ancienne
+  version — une vérification a échoué pour ça, et repassait deux minutes plus
+  tard. Attendre une minute avant de lancer le harnais.

@@ -141,7 +141,9 @@ verifier "  3 fiches" 3 "$(lire sauvegarde.personnes)"
 verifier "  2 liens" 2 "$(lire sauvegarde.relations)"
 verifier "  1 portrait colle retire" 1 "$(lire portraits_retires)"
 verifier "  le nom vient de meta.sauvegarde" "Univers d'essai" "$(lire sauvegarde.nom)"
-code "$BOCAL_A" GET /api/sauvegardes/$ID_IMPORT/contenu > /dev/null
+# Le code est verifie, pas jete : sans lui, une reponse 404 ferait passer les
+# controles d'absence qui suivent et echouer les autres, sans dire pourquoi.
+verifier "  on relit le document" 200 "$(code "$BOCAL_A" GET /api/sauvegardes/$ID_IMPORT/contenu)"
 verifier "  le portrait data: a disparu" non "$(contient 'data:image')"
 verifier "  le portrait https a survecu" oui "$(contient 'exemple.test/portraits')"
 verifier "un fichier qui n'est pas une sauvegarde" 400 "$(code "$BOCAL_A" POST /api/sauvegardes/import '{"bonjour":"non"}')"
@@ -168,7 +170,7 @@ verifier "  la copie a les memes fiches" 3 "$(lire sauvegarde.personnes)"
 verifier "A repart des referentiels" 201 "$(code "$BOCAL_A" POST /api/sauvegardes "{\"nom\":\"Autre campagne\",\"depuis\":\"$ID_IMPORT\",\"contenu\":\"referentiels\"}")"
 ID_REF="$(lire sauvegarde.id)"
 verifier "  sans aucune fiche" 0 "$(lire sauvegarde.personnes)"
-code "$BOCAL_A" GET /api/sauvegardes/$ID_REF/contenu > /dev/null
+verifier "  son document se relit" 200 "$(code "$BOCAL_A" GET /api/sauvegardes/$ID_REF/contenu)"
 verifier "  mais les maisons restent" oui "$(contient 'Ombreval')"
 verifier "copier une sauvegarde inconnue" 404 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"x","depuis":"inconnue"}')"
 

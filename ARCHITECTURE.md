@@ -299,6 +299,34 @@ Deux économies faciles à ne pas oublier :
 > Les paliers ci-dessus sont ceux que je connais ; Cloudflare les fait bouger.
 > À revérifier dans le tableau de bord au moment de créer le compte.
 
+### Le temps de CPU, mesuré en production — 10/08/2026
+
+Le seul palier qui pouvait mordre. Relevé par `wrangler tail` pendant le harnais
+du lot 2, sur 50 requêtes réelles ; palier documenté : **10 ms par requête**.
+
+| Route | Pire cas | Médiane |
+| --- | --- | --- |
+| `POST /api/auth/inscription` | **14 ms** | 6 ms |
+| `POST /api/auth/connexion` | 12 ms | 11 ms |
+| `PUT /api/sauvegardes/<id>/contenu` | 11 ms | 5 ms |
+| `POST /api/sauvegardes/import` (campagne de 115 Ko) | 9 ms | 2 ms |
+| `GET /api/sauvegardes/<id>/contenu` | 7 ms | **1 ms** |
+| `GET /api/sauvegardes/<id>/export` (réindentation) | 5 ms | 5 ms |
+| `GET /api/sauvegardes` (la liste) | 2 ms | 1 ms |
+
+Trois choses à retenir :
+
+- **Ce qui coûte, c'est PBKDF2, pas le document.** Manipuler 75 Ko de JSON est
+  moins cher que vérifier un mot de passe — et l'un arrive une fois par séance
+  quand l'autre arrive à chaque écriture.
+- **Aucune requête n'a échoué** (`outcome: ok` partout, zéro exception), y
+  compris le refus d'un document de 2,4 Mo : parcourir un corps trop gros pour
+  le rejeter ne fait pas sauter la requête.
+- Le dépassement du palier documenté n'est donc pas fatal en pratique — mais on
+  ne construit pas dessus. C'est la raison pour laquelle la lecture d'un
+  document ne le reparse pas : 1 ms en médiane, c'est de la marge gardée pour
+  le lot 3, qui calculera des générations et des filtres sur la même requête.
+
 ## Une instance par personne ?
 
 « Chacun son instance » se lit de trois façons. La bonne, ici, est la deuxième.

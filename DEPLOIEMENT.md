@@ -21,7 +21,7 @@ Tout est gratuit, aucune carte bancaire n'est demandée.
 > La suite de cette page reste la marche à suivre de référence, pour refaire
 > l'installation ailleurs ou comprendre un réglage.
 
-## Quatre pièges rencontrés, pour ne pas les réapprendre
+## Cinq pièges rencontrés, pour ne pas les réapprendre
 
 1. **`wrangler login` ne couvre que les comptes qui existent au moment de
    l'autorisation.** Le compte créé après coup donne une « Authentication
@@ -35,7 +35,15 @@ Tout est gratuit, aucune carte bancaire n'est demandée.
 3. **Dans les secondes qui suivent un déploiement**, les fichiers statiques
    mettent un instant à se propager : `/` peut répondre 404 puis « error code
    1042 ». Ce n'est pas un bug. Réessayer.
-4. **La base D1 locale est rangée sous le `database_id`.** Le jour où cet
+4. **Les routes d'API aussi mettent un instant à se propager** (constaté au
+   lot 2, 10/08/2026). Une requête qui tombe sur un point de présence encore à
+   l'ancienne version reçoit le 404 « route inconnue » du fourre-tout, alors que
+   la route existe bel et bien. Vérifier qu'une route neuve répond à *un*
+   endroit ne prouve donc pas qu'elle réponde **partout**. En pratique :
+   **laisser passer une minute** après un push avant de lancer `outils/essai.sh`,
+   sinon une vérification échoue au hasard et fait chercher un bug qui n'existe
+   pas.
+5. **La base D1 locale est rangée sous le `database_id`.** Le jour où cet
    identifiant change dans `wrangler.jsonc`, le développement local repart sur
    une base vide et tout répond « no such table ». Remède :
    `npm run base:local`. Ça n'a aucun effet sur la base en ligne.
