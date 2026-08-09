@@ -26,9 +26,12 @@ non coché. Les décisions techniques et leurs raisons sont dans
 - Base D1 `familytree` (`790c7252-c1ec-44ed-8885-06c8f44be8c6`), région **WEUR**.
 - Dépôt : https://github.com/Schluby/familytree-cloud
 
-Reste à brancher la construction automatique (tableau de bord → le Worker →
-*Settings → Builds*), voir [`DEPLOIEMENT.md`](DEPLOIEMENT.md) étapes 6 et 7. Le
-lot 1 n'a pas commencé.
+**La construction automatique est branchée et vérifiée** : un `git push` sur
+`main` applique les migrations puis déploie, sans rien lancer à la main.
+Éprouvé le 09/08/2026 à 15:56 (version `4e1ce727`, déclenchée par le dépôt et
+non par un envoi manuel).
+
+Le lot 1 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -296,3 +299,15 @@ Tranché le **08/08/2026**, pour que « pousser suffise » :
   avec deux replis prévus. « Une instance par personne » se fait par les
   **comptes**, pas par des déploiements séparés (les quotas sont par compte
   Cloudflare, pas par Worker).
+- **09/08/2026** — **en ligne**, sur https://familytree.schlub-perso.workers.dev.
+  Compte `Schlub_perso` créé exprès : les quotas gratuits sont comptés **par
+  compte**, et l'autre compte du même identifiant héberge le site d'un tiers —
+  une pointe de trafic sur une inscription ouverte aurait pu le couper jusqu'à
+  minuit UTC. Base D1 en WEUR, migrations appliquées, Worker déployé à la main,
+  **puis** la construction Cloudflare branchée sur le dépôt et **éprouvée par un
+  vrai push** (version `4e1ce727`, déclenchée par le dépôt et non par un envoi
+  manuel). Le déploiement automatique applique les migrations *avant* de
+  déployer : son existence prouve donc que la permission `D1:Edit` du jeton de
+  construction est bien posée. Trois pièges rencontrés, consignés en tête de
+  `DEPLOIEMENT.md` — dont le plus coûteux : `wrangler login` ne couvre que les
+  comptes existant **au moment de l'autorisation**.
