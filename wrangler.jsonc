@@ -5,6 +5,12 @@
   "name": "familytree",
   "main": "src/index.ts",
 
+  // Compte « schlub_perso », dédié à ce projet. Figé ici volontairement : le
+  // même identifiant Cloudflare porte un autre compte, qui héberge le site de
+  // quelqu'un d'autre. Sans cette ligne, une commande lancée au mauvais moment
+  // pourrait créer ou déployer là-bas.
+  "account_id": "1df084d9829788d12811b34411295ca9",
+
   // Date figée volontairement : elle décide du comportement du moteur. On ne la
   // change que sciemment, jamais « pour être à jour ».
   "compatibility_date": "2026-08-01",
@@ -35,7 +41,7 @@
     {
       "binding": "DB",
       "database_name": "familytree",
-      "database_id": "A_REMPLACER_APRES_wrangler_d1_create"
+      "database_id": "790c7252-c1ec-44ed-8885-06c8f44be8c6"
     }
   ],
 
