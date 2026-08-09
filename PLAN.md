@@ -17,9 +17,18 @@ non coché. Les décisions techniques et leurs raisons sont dans
 
 ## Où on en est
 
-**Lot 0 fait (08/08/2026).** Le dépôt est déployable en l'état : il ne reste
-qu'à créer la base et brancher GitHub — la marche à suivre est dans
-[`DEPLOIEMENT.md`](DEPLOIEMENT.md). Le lot 1 n'a pas commencé.
+**Lot 0 fait, et en ligne (09/08/2026).**
+
+- Adresse : **https://familytree.schlub-perso.workers.dev**
+- Compte Cloudflare **`Schlub_perso`** (`1df084d9829788d12811b34411295ca9`),
+  créé exprès pour ce projet : les quotas gratuits sont comptés par compte, et
+  l'autre compte du même identifiant héberge le site de quelqu'un d'autre.
+- Base D1 `familytree` (`790c7252-c1ec-44ed-8885-06c8f44be8c6`), région **WEUR**.
+- Dépôt : https://github.com/Schluby/familytree-cloud
+
+Reste à brancher la construction automatique (tableau de bord → le Worker →
+*Settings → Builds*), voir [`DEPLOIEMENT.md`](DEPLOIEMENT.md) étapes 6 et 7. Le
+lot 1 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
