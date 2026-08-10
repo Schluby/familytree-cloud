@@ -359,6 +359,81 @@ verifier "la feuille de style est servie" 200 "$(code - GET /css/app.css)"
 verifier "  avec la passe telephone" oui "$(contient 'max-width: 760px')"
 
 # ---------------------------------------------------------------------------
+# Lot 7 : l'administration
+#
+# Le role ne se donne pas par l'API — c'est une decision du plan, pas un oubli.
+# Le harnais promeut donc A **en SQL**, exactement comme un vrai premier
+# administrateur, puis le redescend a la fin. Si wrangler n'est pas disponible,
+# ces verifications echouent bruyamment : c'est voulu, un « saute » silencieux
+# laisserait croire que la surface est testee alors qu'elle ne l'est pas.
+# ---------------------------------------------------------------------------
+
+sql() { # sql <requete> : sur la base locale ou en ligne, selon $BASE
+  local ou="--remote"
+  case "$BASE" in http://127.0.0.1*|http://localhost*) ou="--local" ;; esac
+  npx wrangler d1 execute familytree $ou --command "$1" > /dev/null 2>&1
+}
+
+echo "-- la surface d'administration est fermee par defaut"
+verifier "sans session, refusee" 401 "$(code - GET /api/admin/utilisateurs)"
+verifier "un membre est refuse" 403 "$(code "$BOCAL_B" GET /api/admin/utilisateurs)"
+verifier "  y compris sur le journal" 403 "$(code "$BOCAL_B" GET /api/admin/journal)"
+verifier "  et sur les arbres" 403 "$(code "$BOCAL_B" GET /api/admin/sauvegardes/$ID_REF)"
+
+echo "-- A devient administrateur (en SQL, comme le premier de tous)"
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+verifier "A voit la liste des comptes" 200 "$(code "$BOCAL_A" GET /api/admin/utilisateurs)"
+verifier "  B y figure" oui "$(contient "$EMAIL_B")"
+verifier "A lit le journal" 200 "$(code "$BOCAL_A" GET /api/admin/journal)"
+
+code "$BOCAL_A" GET /api/auth/moi > /dev/null
+ID_COMPTE_A="$(lire compte.id)"
+code "$BOCAL_B" GET /api/sauvegardes > /dev/null
+ID_SAUVEGARDE_B="$(lire sauvegardes.0.id)"
+code "$BOCAL_A" GET /api/admin/utilisateurs > /dev/null
+ID_COMPTE_B="$(node -e "
+  const fs=require('fs');
+  const d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8'));
+  const b=(d.utilisateurs||[]).find(u=>u.email==='$EMAIL_B');
+  process.stdout.write(b?b.id:'');
+")"
+
+echo "-- A consulte l'arbre de B"
+verifier "les sauvegardes de B sont listees" 200 "$(code "$BOCAL_A" GET /api/admin/utilisateurs/$ID_COMPTE_B/sauvegardes)"
+verifier "l'arbre de B s'ouvre" 200 "$(code "$BOCAL_A" GET /api/admin/sauvegardes/$ID_SAUVEGARDE_B)"
+verifier "  avec ses cinq tableaux" oui "$(contient '"titre":"Regard des joueurs"')"
+verifier "  et la fiche que B avait creee" oui "$(contient 'Chez B')"
+verifier "l'export JSON marche" 200 "$(code "$BOCAL_A" GET /api/admin/sauvegardes/$ID_SAUVEGARDE_B/export)"
+verifier "l'export Excel aussi" 200 "$(code "$BOCAL_A" GET /api/admin/sauvegardes/$ID_SAUVEGARDE_B/export?format=xlsx)"
+
+echo "-- ce qu'un administrateur ne peut PAS faire"
+# La garde est posee sur le chemin : elle vaut aussi pour les routes qui
+# n'existent pas. C'est le coeur du lot.
+verifier "ecrire dans l'arbre d'un autre" 403 "$(code "$BOCAL_A" PATCH /api/admin/sauvegardes/$ID_SAUVEGARDE_B '{"nom":"volee"}')"
+verifier "  ni le supprimer par la" 403 "$(code "$BOCAL_A" DELETE /api/admin/sauvegardes/$ID_SAUVEGARDE_B)"
+verifier "  ni y poster quoi que ce soit" 403 "$(code "$BOCAL_A" POST /api/admin/sauvegardes/$ID_SAUVEGARDE_B '{}')"
+# Et l'API des membres ne connait toujours pas les roles : 404, pas 403.
+verifier "passer par l'API des membres ne change rien" 404 "$(code "$BOCAL_A" PATCH /api/sauvegardes/$ID_SAUVEGARDE_B '{"nom":"volee"}')"
+verifier "  ni pour lire" 404 "$(code "$BOCAL_A" GET /api/sauvegardes/$ID_SAUVEGARDE_B/contenu)"
+verifier "s'effacer soi-meme par cette route" 400 "$(code "$BOCAL_A" DELETE /api/admin/utilisateurs/$ID_COMPTE_A)"
+
+echo "-- les gestes d'administration sur un compte"
+verifier "plafond hors bornes refuse" 400 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/plafond '{"octets":1,"sauvegardes":1}')"
+verifier "plafond raisonnable accepte" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/plafond '{"octets":4194304,"sauvegardes":20}')"
+verifier "compte inconnu" 404 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/inexistant/plafond '{"octets":4194304,"sauvegardes":20}')"
+verifier "cle invalide refusee" 400 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/mot-de-passe '{"cle":"pas-une-cle"}')"
+
+echo "-- le journal a tout vu"
+code "$BOCAL_A" GET /api/admin/journal > /dev/null
+verifier "la consultation y est" oui "$(contient '"action":"consultation"')"
+verifier "l'export aussi" oui "$(contient '"action":"export"')"
+verifier "et le changement de plafond" oui "$(contient '"action":"plafond"')"
+verifier "avec l'adresse de l'administrateur" oui "$(contient "$EMAIL_A")"
+
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
+verifier "A redevient membre, et la porte se referme" 403 "$(code "$BOCAL_A" GET /api/admin/utilisateurs)"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

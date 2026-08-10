@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FamilyTree — administration</title>
+  <link rel="stylesheet" href="/css/base.css">
+</head>
+<body class="tres-large">
+<main>
+  <h1>Administration</h1>
+  <p id="sousTitre">Les comptes de cette instance, et leurs arbres.</p>
+
+  <!-- Dit à l'administrateur ce qu'il engage, avant qu'il ne clique. -->
+  <div class="bandeau">
+    <strong>Lecture seule.</strong> Vous pouvez consulter et exporter les arbres
+    des autres comptes ; vous ne pouvez pas les modifier — l’API le refuse, pas
+    seulement cette page. <strong>Chaque consultation et chaque export laissent
+    une trace</strong> dans le journal, en bas de page.
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte" id="carteComptes">
+    <h2>Comptes</h2>
+    <div class="defilant">
+      <table class="donnees serree" id="tableComptes">
+        <thead>
+          <tr>
+            <th>Adresse</th><th>Rôle</th><th>Arbres</th><th>Contenu</th>
+            <th>Place</th><th>Dernier accès</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="corpsComptes"><tr><td colspan="7">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte cache" id="carteSauvegardes">
+    <h2 id="titreSauvegardes">Sauvegardes</h2>
+    <div class="defilant">
+      <table class="donnees serree">
+        <thead>
+          <tr><th>Nom</th><th>Personnes</th><th>Liens</th><th>Place</th><th>Modifiée</th><th></th></tr>
+        </thead>
+        <tbody id="corpsSauvegardes"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte cache" id="carteArbre">
+    <div class="bandeau lecture">
+      <strong>Consultation — lecture seule.</strong>
+      <span id="quiArbre"></span>
+    </div>
+    <div class="onglets" id="ongletsTables" role="tablist"></div>
+    <div class="defilant">
+      <table class="donnees serree" id="tableArbre">
+        <thead id="enteteArbre"></thead>
+        <tbody id="corpsArbre"></tbody>
+      </table>
+    </div>
+    <p class="note" id="compteLignes"></p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte" id="carteJournal">
+    <h2>Journal des administrateurs</h2>
+    <p>
+      Toute consultation, tout export et tout geste sur un compte y figurent.
+      <strong>Ce journal ne s’efface pas</strong> : aucune route ne le supprime.
+    </p>
+    <div class="defilant">
+      <table class="donnees serree">
+        <thead><tr><th>Quand</th><th>Qui</th><th>Quoi</th><th>Sur qui</th></tr></thead>
+        <tbody id="corpsJournal"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="message" class="message"></div>
+  <button id="retour" class="lien" type="button">← Revenir à mes arbres</button>
+</main>
+
+<script type="module" src="/js/admin.js"></script>
+</body>
+</html>

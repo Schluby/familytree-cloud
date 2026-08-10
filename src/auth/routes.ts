@@ -64,7 +64,7 @@ function emailValide(valeur: string): boolean {
 }
 
 /** La clé attendue : 32 octets, encodés en base64 par le navigateur. */
-function cleValide(valeur: unknown): Uint8Array | null {
+export function cleValide(valeur: unknown): Uint8Array | null {
   if (typeof valeur !== 'string' || valeur.length > 100) return null;
   try {
     const octets = depuisBase64(valeur);

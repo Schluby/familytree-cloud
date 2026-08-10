@@ -230,3 +230,38 @@ code {
   font-size: .88em;
   color: var(--accent);
 }
+
+/* ------------------------------------------------- page « Administration » */
+
+body.tres-large main { max-width: 68rem; }
+
+/* Ce qu'on engage en ouvrant l'arbre de quelqu'un d'autre, dit avant de le
+   faire — pas dans une page de mentions. */
+.bandeau {
+  border: 1px solid var(--accent);
+  border-left-width: 3px;
+  background: rgba(201, 162, 39, .07);
+  padding: .7rem .9rem;
+  border-radius: 4px;
+  font-size: .86rem;
+  line-height: 1.5;
+  color: var(--encre-douce);
+  margin-bottom: 1rem;
+}
+.bandeau.lecture { margin-bottom: .8rem; }
+.bandeau strong { color: var(--accent); }
+
+/* Les tableaux d'administration débordent : ils défilent dans leur boîte,
+   jamais la page. */
+.defilant { overflow-x: auto; }
+.donnees.serree { font-size: .82rem; white-space: nowrap; }
+.donnees.serree th { width: auto; color: var(--encre-douce); }
+.donnees.serree td { color: var(--encre); }
+
+.actions { display: flex; gap: .6rem; align-items: center; }
+.actions .lien,
+.actions a { margin: 0; font-size: .8rem; white-space: nowrap; }
+.actions a { color: var(--encre-douce); }
+.lien.danger { color: var(--erreur); }
+
+.note { font-size: .8rem; color: var(--encre-douce); margin: .6rem 0 0; }

@@ -73,6 +73,7 @@ const elements = {
   btnInstantane: document.getElementById('btn-instantane'),
   etatEcriture: document.getElementById('etat-ecriture'),
   compte: document.getElementById('compte'),
+  lienAdmin: document.getElementById('lien-admin'),
   btnDeconnexion: document.getElementById('btn-deconnexion'),
   btnPanneau: document.getElementById('btn-panneau'),
   btnFermerPanneau: document.getElementById('btn-fermer-panneau'),
@@ -1989,6 +1990,10 @@ async function dessinerCompte() {
   elements.compte.textContent = compte.nom_affiche || compte.email || '';
   elements.compte.title =
     `${compte.email || ''}${compte.role === 'admin' ? ' · administrateur' : ''}`;
+  // Le lien n'apparaît que pour un admin. Ce n'est pas ce qui protège la page
+  // — c'est `exigerAdmin`, côté serveur — mais un bouton qui mène à un 403 ne
+  // sert personne.
+  if (elements.lienAdmin) elements.lienAdmin.hidden = compte.role !== 'admin';
 }
 
 async function seDeconnecter() {

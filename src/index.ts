@@ -14,6 +14,7 @@
 import { Hono } from 'hono';
 import { routesAuth } from './auth/routes';
 import { routesSauvegardes } from './sauvegardes/routes';
+import { routesAdmin } from './admin/routes';
 import { routesDomaine, santeDuMonde } from './domaine/routes';
 import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import type { Variables } from './intergiciels';
@@ -133,6 +134,15 @@ app.route('/api/auth', routesAuth);
  * -------------------------------------------------------------------------- */
 
 app.route('/api/sauvegardes', routesSauvegardes);
+
+/* --------------------------------------------------------------------------
+ * L'administration : une surface **séparée**, montée avant `/api` pour que
+ * `/api/admin/*` ne tombe jamais dans les routes du domaine. Elle a son propre
+ * intergiciel (`src/admin/intergiciel.ts`) ; les routes de membres, elles,
+ * ignorent qu'un rôle existe.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api/admin', routesAdmin);
 
 /* --------------------------------------------------------------------------
  * Le domaine : l'arbre lui-même, sur le contrat d'adresses de la version

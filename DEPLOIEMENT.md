@@ -198,6 +198,29 @@ Réponse attendue :
 Si `"ok": false` avec `"base":"injoignable"` : les migrations n'ont pas été
 appliquées en ligne (étape 3, ou la permission D1 de l'étape 7).
 
+## Se donner le rôle d'administrateur
+
+**Il n'y a pas de bouton pour ça, et c'est voulu.** Le rôle se donne en SQL,
+une fois, depuis la machine qui a le jeton Cloudflare :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "UPDATE utilisateurs SET role='admin' WHERE email_norm='vous@exemple.fr'"
+```
+
+L'adresse est celle de la colonne `email_norm` : **en minuscules, sans
+espaces**. Créez d'abord le compte normalement par la page d'inscription ; la
+commande ne fait que changer son rôle.
+
+Pourquoi pas depuis l'interface : une route qui promeut un administrateur est
+une route qu'on peut atteindre. Et surtout, pas de « le premier inscrit devient
+admin » — sur une inscription ouverte à qui veut, c'est une course que
+n'importe qui peut gagner.
+
+Pour retirer le rôle, la même commande avec `role='membre'`.
+
+Vérification : reconnectez-vous, et l'icône ⚙ apparaît dans la barre du haut.
+`GET /api/admin/utilisateurs` répond 200 au lieu de 403.
+
 ## Développer en local
 
 ```bash
