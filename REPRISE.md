@@ -6,32 +6,34 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Lots 0 à 5 livrés et en ligne** sur https://familytree.schlub-perso.workers.dev :
-comptes, sauvegardes cloisonnées, domaine porté en TypeScript, interface, et
-exports.
+**Lots 0 à 6 livrés et en ligne** sur https://familytree.schlub-perso.workers.dev :
+comptes, sauvegardes cloisonnées, domaine porté en TypeScript, interface,
+exports, en-têtes de sécurité et page « Vos données ».
 
 **Le portage de `backend/` est complet.** Plus un module ni une vue qui manque,
 et `outils/comparer.mjs` ne tolère plus **aucune** divergence : `ATTENDUES` est
 vide, le score est de 36/36 sur la vraie campagne.
 
-## Le prochain : lot 6 — mise en ligne
+### Une seule chose en attente, et elle attend le calendrier
 
-La plus grande partie est déjà faite sans l'avoir cochée (déploiement branché
-sur le dépôt, migrations en ligne, cron de purge des sessions, verrou optimiste
-par `revision`). **Il reste trois choses :**
+**Relever la consommation d'une semaine** dans le tableau de bord Cloudflare —
+requêtes du Worker, lectures et écritures D1 — et la noter dans `PLAN.md`
+(lot 6, dernière case). Relevé de départ posé le **10/08/2026** : 2 comptes,
+1 sauvegarde. **À faire le 17/08/2026.**
 
-1. **Vérifier les en-têtes** : `Secure` sur le cookie, HSTS, pas de `Server`.
-   Un simple `curl -I` en production, et une vérification de plus dans
-   `outils/essai.sh`.
-2. **Une page « Vos données »** : ce qui est stocké, le fait que les
-   administrateurs peuvent consulter les arbres, tout télécharger (le bouton
-   existe déjà), tout supprimer. C'est la seule vraie nouveauté du lot.
-3. **Mesurer la consommation sur une semaine** et la noter dans `PLAN.md`.
+## Le prochain : lot 7 — administration
 
-Puis le **lot 7 — administration** : `exigerAdmin` dans son propre module,
-`/api/admin/*` en lecture seule et journalisé, le premier admin promu **en
-SQL**. La règle non négociable : les routes de membres ne reçoivent **aucune**
-exception « ou si je suis admin ».
+Un compte `admin` voit **tous** les arbres, en lecture seule. Les colonnes sont
+déjà dans le schéma : rien à migrer.
+
+1. Promouvoir le premier administrateur **en SQL** — jamais depuis l'interface,
+   et surtout pas de « le premier inscrit devient admin ».
+2. `exigerAdmin` dans **son propre module**, et `/api/admin/*` comme surface
+   séparée, en lecture seule, journalisée dans la table `journal_admin`.
+3. La règle non négociable : **les routes de membres ne reçoivent aucune
+   exception.** On n'y ajoute jamais un « ou si je suis admin » — c'est
+   exactement ce que le tableau `SURFACE` et le `WHERE utilisateur_id = ?`
+   protègent depuis le lot 2.
 
 ## Effets de bord à ne pas déclencher
 
@@ -58,6 +60,16 @@ exception « ou si je suis admin ».
 - **Le dézippage est côté navigateur** (`public/js/zip.js`), volontairement :
   un Worker n'a pas le temps de calcul pour ouvrir une archive de dix
   sauvegardes. Ne pas « simplifier » en déplaçant ça sur le serveur.
+- **Les en-têtes de sécurité vivent à deux endroits**, et c'est voulu :
+  [`public/_headers`](public/_headers) pour les fichiers statiques (qui ne
+  passent pas par le Worker, `run_worker_first` ne couvrant que `/api/*`) et
+  `src/index.ts` pour les réponses d'API. **Modifier l'un sans l'autre laisse
+  une moitié du site sans protection** — le harnais vérifie les deux surfaces
+  séparément. Et dans le Worker, il faut **recopier** la réponse : celles qui
+  viennent d'un `fetch` ont des en-têtes immuables, `c.header()` n'y peut rien.
+- La politique de contenu interdit les scripts en ligne. Un `<script>` écrit
+  directement dans une page HTML **ne s'exécutera pas** : passer par un fichier
+  de `public/js/`.
 - `📸` ne crée pas d'instantané mais **une sauvegarde de plus** (copie datée).
   La table `instantanes` existe depuis le lot 0 et **reste vide**.
 - Pas de photos : la pastille de la fiche ne prend qu'une **adresse** `https://…`.
