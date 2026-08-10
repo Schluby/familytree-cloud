@@ -6,9 +6,20 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Lots 0 à 6 livrés et en ligne** sur https://familytree.schlub-perso.workers.dev :
-comptes, sauvegardes cloisonnées, domaine porté en TypeScript, interface,
-exports, en-têtes de sécurité et page « Vos données ».
+**Les sept lots du plan sont livrés et en ligne** sur
+https://familytree.schlub-perso.workers.dev : comptes, sauvegardes cloisonnées,
+domaine porté en TypeScript, interface, exports, en-têtes de sécurité, page
+« Vos données » et administration.
+
+### Une action qui vous revient
+
+**Aucun compte n'est administrateur en production.** Le rôle se donne en SQL,
+volontairement — voir `DEPLOIEMENT.md`, section « Se donner le rôle
+d'administrateur » :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "UPDATE utilisateurs SET role='admin' WHERE email_norm='VOTRE-ADRESSE'"
+```
 
 **Le portage de `backend/` est complet.** Plus un module ni une vue qui manque,
 et `outils/comparer.mjs` ne tolère plus **aucune** divergence : `ATTENDUES` est
@@ -21,19 +32,17 @@ requêtes du Worker, lectures et écritures D1 — et la noter dans `PLAN.md`
 (lot 6, dernière case). Relevé de départ posé le **10/08/2026** : 2 comptes,
 1 sauvegarde. **À faire le 17/08/2026.**
 
-## Le prochain : lot 7 — administration
+## Et après ?
 
-Un compte `admin` voit **tous** les arbres, en lecture seule. Les colonnes sont
-déjà dans le schéma : rien à migrer.
+Le plan est terminé. Ce qui restait « à trancher » et n'a jamais été programmé :
 
-1. Promouvoir le premier administrateur **en SQL** — jamais depuis l'interface,
-   et surtout pas de « le premier inscrit devient admin ».
-2. `exigerAdmin` dans **son propre module**, et `/api/admin/*` comme surface
-   séparée, en lecture seule, journalisée dans la table `journal_admin`.
-3. La règle non négociable : **les routes de membres ne reçoivent aucune
-   exception.** On n'y ajoute jamais un « ou si je suis admin » — c'est
-   exactement ce que le tableau `SURFACE` et le `WHERE utilisateur_id = ?`
-   protègent depuis le lot 2.
+- **Le partage entre membres** (un arbre en lecture seule pour quelqu'un
+  d'autre) — ce serait un lot 8, avec une table `partages`.
+- **La vérification d'adresse par courriel** — impossible sans service d'envoi ;
+  c'est le code de secours qui tient ce rôle.
+- **La table `instantanes`**, créée au lot 0 et **volontairement laissée vide**
+  depuis le lot 4 : `📸` crée une sauvegarde de plus. Elle peut être retirée par
+  une migration `0004` le jour où ça gêne.
 
 ## Effets de bord à ne pas déclencher
 
@@ -70,6 +79,15 @@ déjà dans le schéma : rien à migrer.
 - La politique de contenu interdit les scripts en ligne. Un `<script>` écrit
   directement dans une page HTML **ne s'exécutera pas** : passer par un fichier
   de `public/js/`.
+- **L'administration ne déborde jamais sur les routes de membres.** Ne jamais
+  écrire un « ou si je suis admin » dans `src/intergiciels.ts` ni dans
+  `src/domaine/routes.ts` : ce que peut un admin, il le peut par
+  `/api/admin/*`, et nulle part ailleurs. La lecture seule y est posée **sur le
+  chemin** (`routesAdmin.use('/sauvegardes/*', lectureSeule)`), pas route par
+  route — donc une route d'écriture ajoutée par distraction serait refusée
+  quand même. Ne pas remplacer cette garde par des vérifications locales.
+- **`journal_admin` ne s'efface pas.** Aucune route ne le supprime, et il ne
+  faut pas en ajouter une : un registre qu'on peut nettoyer ne prouve rien.
 - `📸` ne crée pas d'instantané mais **une sauvegarde de plus** (copie datée).
   La table `instantanes` existe depuis le lot 0 et **reste vide**.
 - Pas de photos : la pastille de la fiche ne prend qu'une **adresse** `https://…`.

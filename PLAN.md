@@ -317,35 +317,55 @@ rien et ferme la porte à l'injection.
 retiré**. C'est le bord du réseau qui l'ajoute, après le Worker. Aucun code ne
 peut l'enlever ; il faudrait ne pas être chez Cloudflare.
 
-## Lot 7 — Administration  ☐
+## Lot 7 — Administration  ☑
 
 Un compte `admin` voit **tous** les arbres, en lecture seule. Les colonnes
-nécessaires sont déjà dans [`schema.sql`](schema.sql) : rien à migrer.
+nécessaires étaient déjà dans le schéma : rien à migrer.
 
-- ☐ Promouvoir le premier administrateur **en SQL**
+- ☑ Promouvoir le premier administrateur **en SQL**
   (`UPDATE utilisateurs SET role='admin' WHERE email_norm='…'`) — jamais depuis
-  l'interface, et surtout pas de « le premier inscrit devient admin ».
-- ☐ Intergiciel `exigerAdmin`, dans **son propre module**. Les routes de membres
-  ne reçoivent aucune exception : on n'y ajoute jamais un « ou si je suis
-  admin ».
-- ☐ `GET /api/admin/utilisateurs` (comptes, nombre d'arbres, octets, dernier
-  accès), `GET /api/admin/utilisateurs/<id>/sauvegardes`,
-  `GET /api/admin/sauvegardes/<id>` (le document, en lecture),
-  `GET /api/admin/sauvegardes/<id>/export`.
-- ☐ `POST /api/admin/utilisateurs/<id>/plafond`,
-  `POST /api/admin/utilisateurs/<id>/mot-de-passe` (réinitialisation),
+  l'interface, et surtout pas de « le premier inscrit devient admin ». La marche
+  à suivre est dans [`DEPLOIEMENT.md`](DEPLOIEMENT.md).
+- ☑ Intergiciel `exigerAdmin`, dans **son propre module**
+  ([`src/admin/intergiciel.ts`](src/admin/intergiciel.ts)). Les routes de
+  membres ne reçoivent aucune exception : `src/intergiciels.ts` n'apprend
+  toujours pas qu'un rôle existe.
+- ☑ `GET /api/admin/utilisateurs`, `…/<id>/sauvegardes`,
+  `GET /api/admin/sauvegardes/<id>`, `…/<id>/export` (JSON et `?format=xlsx`).
+- ☑ `POST …/<id>/plafond`, `POST …/<id>/mot-de-passe`,
   `DELETE /api/admin/utilisateurs/<id>`.
-- ☐ **Aucune écriture sur l'arbre d'autrui** : les routes de modification ne
-  savent désigner que la sauvegarde de la session. Vérifié par un test : un
-  admin qui tente un `PATCH` sur la sauvegarde d'un autre reçoit un 403.
-- ☐ Chaque consultation et chaque export écrivent une ligne dans
-  `journal_admin`.
-- ☐ Interface : une vue « Administration » (liste des comptes, leurs arbres),
-  et un bandeau **« consultation — lecture seule »** quand on ouvre l'arbre de
-  quelqu'un d'autre.
+- ☑ **Aucune écriture sur l'arbre d'autrui.**
+- ☑ Chaque consultation, export, changement de plafond, réinitialisation et
+  suppression écrit une ligne dans `journal_admin`. **Aucune route ne l'efface.**
+- ☑ Interface : [`public/admin.html`](public/admin.html) — comptes, arbres,
+  consultation avec bandeau **« consultation — lecture seule »**, et le journal.
+  Le lien ⚙ n'apparaît que pour un administrateur.
 
-*Fini quand :* un admin ouvre l'arbre d'un autre compte, le lit, l'exporte, ne
-peut rien y modifier, et que le journal en porte la trace.
+*Fini.* Un admin ouvre l'arbre d'un autre compte, le lit (les cinq tableaux),
+l'exporte, ne peut rien y modifier, et le journal en porte la trace.
+`outils/essai.sh` est passé à **174 vérifications** — il promeut un compte
+d'essai **en SQL**, comme un vrai premier administrateur, puis le redescend.
+
+**Deux décisions, dont une qui contredit ce plan :**
+
+- **La garde de lecture seule est posée sur le chemin, pas sur les routes.**
+  `routesAdmin.use('/sauvegardes/*', lectureSeule)` refuse tout verbe autre que
+  GET. C'est ce qui la rend vraie pour les routes **qui n'existent pas encore** :
+  ajouter demain un `PATCH` par distraction ne suffirait pas à ouvrir une
+  brèche.
+- **Le 403 demandé plus haut est un 404, et c'est mieux ainsi.** Ce plan
+  demandait qu'« un admin qui tente un `PATCH` sur la sauvegarde d'un autre
+  reçoive un 403 ». L'obtenir aurait demandé d'apprendre le rôle aux routes de
+  membres — c'est-à-dire exactement le « ou si je suis admin » que le point
+  précédent interdit. Les routes de membres restent donc aveugles : elles
+  répondent **404** à tout le monde, admin compris. Le **403** existe, mais là
+  où il a un sens : sur la surface d'administration, où l'existence de la
+  sauvegarde n'est pas un secret. **Les deux sont vérifiés séparément.**
+
+**Consulter, c'est lire des tableaux, pas le document brut.**
+`GET /api/admin/sauvegardes/<id>` renvoie les cinq tableaux d'`exports.ts`. Même
+contenu, mais il n'existe aucun chemin, depuis cette réponse, qui ramène vers
+l'écriture — et la page n'a pas un seul champ modifiable.
 
 ## Tranché
 
