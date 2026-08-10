@@ -651,6 +651,10 @@ async function rechargerVue({ conserverFocus = false } = {}) {
       },
       surLiaisonRapide: (id, evenement) => liaisonRapide(id, evenement),
       surDeport: (id, decalage) => enregistrerDeport(id, decalage),
+      // La vue « Maisons » édite le catalogue en place : elle prévient quand
+      // un nom change (le rail l'affiche) et quand sa propre structure bouge.
+      surReferentielChange: () => chargerUnivers(),
+      surRechargement: () => rechargerVue({ conserverFocus: true }),
     }));
   }
 
@@ -665,6 +669,9 @@ async function rechargerVue({ conserverFocus = false } = {}) {
     // Le moteur ne lit pas l'API : l'année de la campagne lui est descendue,
     // et c'est elle qui transforme les naissances en âges sur les fiches.
     anneeCourante: anneeCourante(),
+    // La vue « Maisons » réutilise le catalogue des types pour les liens de
+    // maison à maison : un « vassal de » veut dire la même chose des deux côtés.
+    typesRelations: etat.referentiels.types_relations || [],
   });
 
   dessinerLegendes();

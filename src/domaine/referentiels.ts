@@ -77,6 +77,10 @@ function ordre(brut: unknown, defaut = 0): number {
   return versEntier(brut) ?? defaut;
 }
 
+function estObjet(valeur: unknown): valeur is Objet {
+  return typeof valeur === 'object' && valeur !== null && !Array.isArray(valeur);
+}
+
 /** `"cle" in patch` — propriété propre uniquement (le patch vient du réseau). */
 function fourni(patch: Objet, cle: string): boolean {
   return Object.hasOwn(patch, cle);
@@ -96,7 +100,114 @@ function choisir(patch: Objet, cle: string, courant: unknown): unknown {
  * Maisons
  * -------------------------------------------------------------------------- */
 
-export const CHAMPS_MAISON = ['label', 'couleur', 'devise', 'categorie', 'ordre'] as const;
+export const CHAMPS_MAISON = [
+  'label',
+  'couleur',
+  'devise',
+  'categorie',
+  'ordre',
+  // Lot 8.E : ce qui fait une maison au-delà de sa couleur.
+  'caracteristiques',
+  'notes',
+  'evenements',
+  'liens',
+] as const;
+
+/**
+ * Les ressources d'une maison, telles que les compte le JDR *Le Trône de Fer*
+ * (Green Ronin) : sept scores, tirés à la création puis dépensés et regagnés
+ * en jeu.
+ *
+ * Elles sont **câblées ici mais pas obligatoires** : une maison qui n'en a
+ * aucune n'écrit rien dans la sauvegarde, et une table qui joue avec d'autres
+ * règles peut laisser le bloc vide et n'utiliser que les notes. Les bornes
+ * (0-100) sont larges exprès — le manuel plafonne certains scores plus bas,
+ * mais une campagne qui gonfle une maison n'a pas à se battre avec sa fiche.
+ */
+export const CARACTERISTIQUES_MAISON = [
+  { id: 'defense', label: 'Défense', aide: 'Fortifications, garnisons, terrain' },
+  { id: 'influence', label: 'Influence', aide: 'Rang, titres, poids à la cour' },
+  { id: 'terres', label: 'Terres', aide: 'Étendue et qualité du domaine' },
+  { id: 'loi', label: 'Loi', aide: 'Ordre public, justice, brigandage' },
+  { id: 'population', label: 'Population', aide: 'Habitants, main-d’œuvre, recrues' },
+  { id: 'pouvoir', label: 'Pouvoir', aide: 'Forces armées mobilisables' },
+  { id: 'richesse', label: 'Richesse', aide: 'Revenus, réserves, commerce' },
+] as const;
+
+const IDS_CARACTERISTIQUES = new Set(CARACTERISTIQUES_MAISON.map((c) => c.id) as string[]);
+
+/**
+ * Les scores. Une caractéristique absente reste absente : `{}` est un état
+ * légitime (« on n'a pas encore tiré cette maison »), différent de tout à zéro.
+ */
+function caracteristiques(brut: unknown, courant: unknown): Objet {
+  const base = estObjet(courant) ? { ...courant } : {};
+  if (!estObjet(brut)) return base;
+  for (const [cle, valeur] of Object.entries(brut)) {
+    if (!IDS_CARACTERISTIQUES.has(cle)) continue;
+    if (valeur === null || valeur === '') {
+      delete base[cle];
+      continue;
+    }
+    const entier = versEntier(valeur);
+    if (entier === null) continue;
+    base[cle] = Math.max(0, Math.min(100, entier));
+  }
+  return base;
+}
+
+/**
+ * L'histoire d'une maison : des événements datés, chacun pouvant citer des
+ * personnes. Ce sont ces citations qui deviennent des liens cliquables dans la
+ * vue « Maisons ».
+ */
+function evenements(brut: unknown): Objet[] {
+  if (!Array.isArray(brut)) return [];
+  return brut
+    .filter(estObjet)
+    .slice(0, 200)
+    .map((entree) => ({
+      annee: texte(entree.annee, 40),
+      titre: texte(entree.titre, 160),
+      texte: texte(entree.texte, 4000),
+      lieu: texte(entree.lieu, 120),
+      personnes: (Array.isArray(entree.personnes) ? entree.personnes : [])
+        .map((id: unknown) => texte(id, 80))
+        .filter(Boolean)
+        .slice(0, 40),
+    }))
+    .filter((entree) => entree.titre || entree.texte);
+}
+
+/**
+ * Les liens d'une maison vers une autre : vassalité, alliance, rivalité. Ils
+ * réutilisent le catalogue des types de liens — un « vassal de » entre deux
+ * maisons veut dire la même chose qu'entre deux personnes, et n'a pas besoin
+ * d'un second catalogue à tenir à jour.
+ */
+function liensMaison(brut: unknown): Objet[] {
+  if (!Array.isArray(brut)) return [];
+  const vus = new Set<string>();
+  const resultat: Objet[] = [];
+  for (const entree of brut) {
+    if (!estObjet(entree)) continue;
+    const maison = texte(entree.maison, 80);
+    const type = texte(entree.type, 80) || 'autre';
+    if (!maison) continue;
+    const cle = `${maison}|${type}`;
+    if (vus.has(cle)) continue; // deux fois « vassal de X » ne dit rien de plus
+    vus.add(cle);
+    resultat.push({
+      maison,
+      type,
+      label: texte(entree.label, 160),
+      notes: texte(entree.notes, 2000),
+      revolu: Boolean(entree.revolu),
+    });
+    if (resultat.length >= 60) break;
+  }
+  return resultat;
+}
 
 /**
  * Fusionne un patch dans une maison existante (ou en crée une).
@@ -125,6 +236,30 @@ export function appliquerMaison(base: Objet | null, patch: Objet): Objet {
   }
   if (fourni(patch, 'ordre')) {
     fiche.ordre = ordre(patch.ordre);
+  }
+
+  // Les quatre champs du lot 8.E ne s'écrivent **que** si on les fournit, et
+  // ils disparaissent de la fiche quand ils sont vides : une maison qui ne s'en
+  // sert pas ressort telle qu'elle est entrée.
+  if (fourni(patch, 'caracteristiques')) {
+    const scores = caracteristiques(patch.caracteristiques, fiche.caracteristiques);
+    if (Object.keys(scores).length) fiche.caracteristiques = scores;
+    else delete fiche.caracteristiques;
+  }
+  if (fourni(patch, 'notes')) {
+    const valeur = texte(patch.notes, 8000);
+    if (valeur) fiche.notes = valeur;
+    else delete fiche.notes;
+  }
+  if (fourni(patch, 'evenements')) {
+    const liste = evenements(patch.evenements);
+    if (liste.length) fiche.evenements = liste;
+    else delete fiche.evenements;
+  }
+  if (fourni(patch, 'liens')) {
+    const liste = liensMaison(patch.liens);
+    if (liste.length) fiche.liens = liste;
+    else delete fiche.liens;
   }
 
   if (!fiche.label) throw new ErreurReferentiel("une maison a besoin d'un nom");
@@ -318,5 +453,8 @@ export function decrireCatalogues(): Objet {
     styles: Object.entries(STYLES).map(([id, label]) => ({ id, label })),
     categories: Object.entries(CATEGORIES).map(([id, label]) => ({ id, label })),
     types_structurants: [...TYPES_STRUCTURANTS],
+    // Les sept ressources d'une maison : le front construit sa grille à partir
+    // d'ici, il ne les recopie pas.
+    caracteristiques_maison: CARACTERISTIQUES_MAISON.map((c) => ({ ...c })),
   };
 }

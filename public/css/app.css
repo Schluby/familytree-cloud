@@ -1000,6 +1000,157 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 
 /* ------------------------------------------------------- vue « tableau » */
 
+/* ----------------------------------------------------------- vue maisons
+ *
+ * Écran partagé : l'histoire à gauche, ce que la maison *est* à droite. Le
+ * partage tient jusqu'à 900 px, en dessous les deux moitiés s'empilent — sur
+ * un téléphone, deux colonnes de 180 px ne sont plus deux colonnes.
+ */
+.vue-maisons {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--fond-2);
+}
+.mz-onglets {
+  display: flex; gap: 2px; padding: 8px 12px 0; flex-wrap: wrap;
+  border-bottom: 1px solid var(--bord); flex: 0 0 auto;
+}
+.mz-onglet {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0; padding: 7px 13px; cursor: pointer;
+  color: var(--texte-doux); font-size: 12px; font-family: inherit;
+}
+.mz-onglet:hover { color: var(--texte); background: var(--fond-3); }
+.mz-onglet.actif {
+  color: var(--texte); background: var(--fond); border-color: var(--bord);
+  border-bottom: 1px solid var(--fond); margin-bottom: -1px; font-weight: 600;
+}
+.mz-onglet-pastille {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--couleur-maison);
+}
+.mz-onglet .nombre {
+  font-size: 10px; color: var(--texte-faible); background: var(--fond-3);
+  border-radius: 9px; padding: 0 6px;
+}
+
+.mz-colonnes { flex: 1; display: flex; min-height: 0; }
+.mz-colonne { flex: 1 1 50%; min-width: 0; overflow-y: auto; padding: 16px 18px 40px; }
+.mz-histoire { border-right: 1px solid var(--bord); }
+.mz-fiche { background: var(--fond); }
+
+.mz-entete { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.mz-entete h2 { font-size: 15px; margin: 0; }
+.mz-entete-bloc { display: flex; align-items: baseline; gap: 10px; }
+.mz-entete-bloc h3 { margin: 0; }
+.mz-entete .bouton { margin-left: auto; }
+.mz-etat { margin-left: auto; font-size: 10.5px; color: var(--texte-faible); }
+.mz-etat.erreur { color: #c0392b; }
+.mz-devise { margin: -6px 0 14px; font-style: italic; color: var(--texte-doux); font-size: 12px; }
+.mz-sous-titre { font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--texte-faible); margin: 22px 0 4px; }
+.mz-aide { font-size: 11px; color: var(--texte-faible); line-height: 1.5; margin: 6px 0 0; }
+.mz-vide { padding: 10px 0; line-height: 1.6; }
+
+.mz-bloc { padding: 14px 0; border-bottom: 1px solid var(--bord); }
+.mz-bloc:last-child { border-bottom: 0; }
+.mz-bloc h3 {
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texte-faible); margin: 0 0 10px;
+}
+.mz-bloc textarea {
+  width: 100%; background: var(--fond-3); border: 1px solid var(--bord);
+  border-radius: 7px; padding: 7px 9px; font-size: 12px; line-height: 1.5;
+  resize: vertical; outline: none; font-family: inherit; color: inherit;
+}
+.mz-bloc textarea:focus { border-color: var(--accent); }
+
+/* Événements : une pastille de date, un titre, un récit, des visages. */
+.mz-evenement {
+  border-left: 2px solid var(--bord-clair);
+  padding: 8px 0 10px 12px; margin-bottom: 4px;
+}
+.mz-evenement-lie { border-left-color: var(--couleur-type); }
+.mz-evenement-lie.revolu { opacity: .6; }
+.mz-evenement-haut { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mz-annee {
+  font-variant-numeric: tabular-nums; font-size: 10.5px; font-weight: 600;
+  color: var(--texte-faible); background: var(--fond-3);
+  border-radius: 9px; padding: 1px 7px; white-space: nowrap;
+}
+.mz-evenement-titre { font-size: 12.5px; font-weight: 600; }
+.mz-lieu { font-size: 10.5px; color: var(--texte-faible); }
+.mz-modifier { margin-left: auto; opacity: 0; padding: 2px 6px; }
+.mz-evenement:hover .mz-modifier, .mz-lien:hover .mz-modifier { opacity: 1; }
+.mz-evenement-texte {
+  margin: 5px 0 0; font-size: 12px; line-height: 1.55; color: var(--texte-doux);
+  white-space: pre-wrap;
+}
+
+/* Une mention : cliquable, à la couleur de la personne ou de la maison. */
+.mz-personnes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.mz-personne {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 20px;
+  padding: 3px 9px; font-size: 11px; color: var(--texte-doux);
+  cursor: pointer; font-family: inherit;
+}
+.mz-personne:hover { border-color: var(--couleur-personne); color: var(--texte); }
+.mz-personne.morte { opacity: .62; }
+.mz-personne-pastille {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--couleur-personne);
+  flex: 0 0 8px;
+}
+.mz-personne-retirable { cursor: default; }
+.mz-retirer {
+  background: none; border: 0; cursor: pointer; color: var(--texte-faible);
+  padding: 0 0 0 2px; font-size: 11px; font-family: inherit;
+}
+.mz-retirer:hover { color: #c0392b; }
+
+/* Caractéristiques : le nom, une jauge, le chiffre. La jauge sert à comparer
+   deux maisons d'un coup d'œil ; le chiffre reste ce qu'on écrit. */
+.mz-caracs { display: flex; flex-direction: column; gap: 7px; }
+.mz-carac { display: flex; align-items: center; gap: 10px; }
+.mz-carac-nom { flex: 0 0 92px; font-size: 11.5px; }
+.mz-jauge {
+  flex: 1; height: 6px; background: var(--fond-3); border-radius: 4px;
+  overflow: hidden; min-width: 40px;
+}
+.mz-jauge-barre { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.mz-carac input {
+  flex: 0 0 58px; text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
+  padding: 4px 6px; font-size: 12px; outline: none; color: inherit;
+}
+.mz-carac input:focus { border-color: var(--accent); }
+
+.mz-rang-ligne { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.mz-rang-titre { flex: 0 0 92px; font-size: 11.5px; color: var(--texte-doux); }
+.mz-rang-vide { font-size: 11px; color: var(--texte-faible); font-style: italic; }
+.mz-rang-ligne .mz-personnes { margin-top: 0; }
+
+.mz-lien {
+  display: flex; align-items: center; gap: 8px; padding: 5px 0;
+  border-bottom: 1px dashed var(--bord); font-size: 12px;
+}
+.mz-lien:last-child { border-bottom: 0; }
+.mz-lien.revolu { opacity: .58; }
+.mz-lien.orphelin .mz-personne { text-decoration: line-through; }
+.mz-lien-type { font-size: 11px; font-weight: 600; }
+.mz-lien-fleche { color: var(--texte-faible); }
+.mz-revolu {
+  font-size: 10px; color: var(--texte-faible); border: 1px solid var(--bord);
+  border-radius: 9px; padding: 0 6px;
+}
+
+@media (max-width: 900px) {
+  .mz-colonnes { flex-direction: column; }
+  .mz-colonne { flex: 0 0 auto; overflow-y: visible; }
+  .mz-colonnes { overflow-y: auto; }
+  .mz-histoire { border-right: 0; border-bottom: 1px solid var(--bord); }
+}
+
 .plan-tableau {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
