@@ -87,10 +87,18 @@
 
         <section class="rail-bloc" id="bloc-liens">
           <h2>Liens</h2>
-          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : nom, couleur, trait, sens.</p>
+          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit ou appui long : nom, couleur, trait, sens.</p>
           <ul class="legende" id="legende-types"></ul>
+          <!-- Les liens révolus (ancien vassal, serment rompu) restent dessinés,
+               en pointillé serré. Cet interrupteur ne garde que le présent. -->
+          <label class="option option-revolus">
+            <input type="checkbox" id="bascule-revolus">
+            <span>Masquer les liens révolus</span>
+          </label>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-nouveau-type" title="Créer un type de lien">＋ Nouveau type</button>
+            <button class="bouton bouton-plat" id="btn-type-historique" hidden
+                    title="Créer le type « Événement historique » — batailles, sièges, serments rompus">＋ Événement</button>
           </div>
         </section>
 

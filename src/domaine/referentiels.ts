@@ -25,6 +25,10 @@ export const CATEGORIES: Record<string, string> = {
   famille: 'Sang & alliances',
   social: 'Liens sociaux',
   politique: 'Liens politiques',
+  // Ajoutée au lot 8 : ce qui *a eu lieu* — une bataille, un siège, un serment
+  // rompu. Ce ne sont pas des relations entre deux personnes, mais des faits
+  // qui les ont mises en présence, et on veut pouvoir les éteindre d'un bloc.
+  historique: 'Événements passés',
   autre: 'Autres liens',
 };
 

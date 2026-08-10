@@ -51,6 +51,10 @@ export function creerEditeurLien(rappels = {}) {
       label: '',
       notes: '',
       secret: false,
+      revolu: false,
+      depuis: '',
+      jusqu_a: '',
+      lieu: '',
     };
     socle.monter(construire(), x, y);
     refs.type?.focus();
@@ -69,6 +73,10 @@ export function creerEditeurLien(rappels = {}) {
       label: arete.label || '',
       notes: arete.notes || '',
       secret: !!arete.secret,
+      revolu: !!arete.revolu,
+      depuis: arete.depuis || '',
+      jusqu_a: arete.jusqu_a || '',
+      lieu: arete.lieu || '',
     };
     socle.monter(construire(), x, y);
   }
@@ -98,6 +106,15 @@ export function creerEditeurLien(rappels = {}) {
       valeur: brouillon.humeur,
       surChangement: (valeur) => {
         brouillon.humeur = valeur ?? HUMEUR_DEFAUT;
+        marquerModifie();
+      },
+    });
+
+    refs.revolu = h('input', {
+      type: 'checkbox',
+      checked: brouillon.revolu,
+      onchange: (evenement) => {
+        brouillon.revolu = evenement.target.checked;
         marquerModifie();
       },
     });
@@ -155,6 +172,13 @@ export function creerEditeurLien(rappels = {}) {
         }),
         h('span', { texte: 'Lien secret (masqué par défaut)' }),
       ]),
+      // Révolu : le lien a existé, il n'existe plus. On ne le supprime pas —
+      // un ancien vassal explique souvent le présent — on l'éteint.
+      h('label', { class: 'option' }, [
+        refs.revolu,
+        h('span', { texte: 'Lien révolu (ancien vassal, serment rompu…)' }),
+      ]),
+      detailsFacultatifs(),
     ]);
 
     const panneau = h('div', { class: 'flottant editeur-lien' }, [
@@ -198,6 +222,42 @@ export function creerEditeurLien(rappels = {}) {
     majEntete();
     if (!creation) definirEtat('Enregistré tout seul');
     return panneau;
+  }
+
+  /**
+   * Ce qu'on ne renseigne presque jamais, replié par défaut : des dates, un
+   * lieu. Déplié, c'est ce qui transforme un lien en événement — « Bataille de
+   * la Néra, 299 AC, à Port-Réal ».
+   *
+   * Replié dès qu'il est vide : ouvrir un lien ordinaire ne doit pas donner
+   * l'impression qu'il reste quatre champs à remplir.
+   */
+  function detailsFacultatifs() {
+    const champ = (cle, libelle, placeholder) =>
+      h('div', { class: 'champ-edit' }, [
+        h('label', { texte: libelle }),
+        h('input', {
+          type: 'text',
+          placeholder,
+          value: brouillon[cle] || '',
+          oninput: (evenement) => {
+            brouillon[cle] = evenement.target.value;
+            marquerModifie();
+          },
+        }),
+      ]);
+
+    const rempli = !!(brouillon.depuis || brouillon.jusqu_a || brouillon.lieu);
+    const bloc = h('details', { class: 'fl-details' }, [
+      h('summary', { texte: 'Détails (dates, lieu)' }),
+      h('div', { class: 'grille-champs' }, [
+        champ('depuis', 'Depuis', '298 AC'),
+        champ('jusqu_a', "Jusqu'à", '301 AC'),
+      ]),
+      champ('lieu', 'Lieu', 'Port-Réal, la Néra…'),
+    ]);
+    if (rempli) bloc.open = true;
+    return bloc;
   }
 
   function groupesDeTypes() {
@@ -252,6 +312,10 @@ export function creerEditeurLien(rappels = {}) {
       label: brouillon.label,
       notes: brouillon.notes,
       secret: brouillon.secret,
+      revolu: brouillon.revolu,
+      depuis: brouillon.depuis,
+      jusqu_a: brouillon.jusqu_a,
+      lieu: brouillon.lieu,
     };
   }
 

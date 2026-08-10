@@ -12,6 +12,7 @@ import { enregistrerRendu } from '../registry.js';
 import { couleurHumeur, ecartHumeur } from '../humeur.js';
 import { surMenuContextuel } from '../dom.js';
 import { ageAffiche, formaterAge } from '../calendrier.js';
+import { rangDe } from '../rangs.js';
 
 const GEO = {
   largeurCarte: 186, // toutes les fiches ont la même taille : voir mesurer()
@@ -374,6 +375,15 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     carte.style.setProperty('--couleur-carte', couleur);
     carte.style.width = `${GEO.largeurCarte}px`;
 
+    // Chef de maison et héritier : ce sont les fiches qu'on cherche des yeux
+    // en premier sur un plan chargé. Elles portent un cadre plus appuyé et
+    // une marque dans le coin, sans changer de taille — la mise en page ne
+    // doit pas dépendre de qui règne.
+    const rang = rangDe(noeud.tags);
+    carte.classList.toggle('rang', !!rang);
+    carte.classList.toggle('rang-chef', rang?.classe === 'chef');
+    carte.classList.toggle('rang-heritier', rang?.classe === 'heritier');
+
     const lignes = [];
     if (noeud.titres?.length) {
       lignes.push(
@@ -408,6 +418,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
 
     carte.innerHTML = `
       <div class="carte-photo ${noeud.avatar ? 'avec-photo' : ''}">${portrait}</div>
+      ${rang ? `<span class="carte-rang" title="${echapper(rang.label)}">${rang.icone}</span>` : ''}
       <div class="carte-entete">
         <span class="carte-nom">${echapper(noeud.label)}</span>
       </div>
@@ -801,7 +812,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
             famille.parents.includes(union.cible)
         );
       }),
-      sociaux: [...sociaux, ...fratriesEloignees].filter((a) => typeVisible(a.type)),
+      sociaux: [...sociaux, ...fratriesEloignees].filter(lienVisible),
       largeur: finale.x1 - finale.x0 + GEO.marge * 2,
       hauteur: finale.y1 - finale.y0 + GEO.marge * 2,
     };
@@ -827,6 +838,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   }
 
   const typeVisible = (type) => !options.typesMasques?.has(type);
+
+  /**
+   * Un lien révolu reste dans la charpente — un mariage rompu a quand même
+   * placé les enfants — mais on peut cesser de le dessiner. C'est le seul
+   * filtre qui porte sur le lien lui-même et non sur son type.
+   */
+  const lienVisible = (arete) =>
+    typeVisible(arete.type) && !(options.masquerRevolus && arete.revolu);
 
   /**
    * Replie le ruban généalogique en tranches empilées.
@@ -1168,7 +1187,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     // --- fratries sans parents connus (accolade au-dessus) ---------------
     const couleurFratrie = couleurType('fratrie', '#a3b18a');
     (disposition.fratries || []).forEach((arete) => {
-      if (!typeVisible(arete.type)) return;
+      if (!lienVisible(arete)) return;
       const a = boites.get(arete.source);
       const b = boites.get(arete.cible);
       if (!a || !b) return;
@@ -1184,7 +1203,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
 
     // --- unions sans descendance -----------------------------------------
     disposition.unions.forEach((union) => {
-      if (!typeVisible(union.type)) return;
+      if (!lienVisible(union)) return;
       const a = boites.get(union.source);
       const b = boites.get(union.cible);
       if (!a || !b) return;
@@ -1210,12 +1229,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       if (arete.dirige) couleursFleches.add(arete.couleur);
       const chemin = `M${depart.x},${depart.y}L${arrivee.x},${arrivee.y}`;
       morceaux.push(
-        `<path class="lien-social${attenue ? ' attenue' : ''}"
+        `<path class="lien-social${attenue ? ' attenue' : ''}${arete.revolu ? ' revolu' : ''}"
                data-lien="${arete.id}"
                d="${chemin}"
                stroke="${arete.couleur}"
-               stroke-dasharray="${arete.style === 'pointille' ? '2 5' : '7 5'}"
-               ${arete.dirige ? `marker-end="url(#fl-${arete.couleur.replace('#', '')})"` : ''} />`
+               stroke-dasharray="${arete.revolu ? '1 6' : arete.style === 'pointille' ? '2 5' : '7 5'}"
+               ${arete.dirige && !arete.revolu ? `marker-end="url(#fl-${arete.couleur.replace('#', '')})"` : ''} />`
       );
       prise(arete, chemin);
     });
@@ -1295,7 +1314,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   function appliquer({ animer = true, cadrer = false } = {}) {
     const typesMasques = options.typesMasques || new Set();
     aretesStructure = payload.aretes || [];
-    aretesVisibles = aretesStructure.filter((arete) => !typesMasques.has(arete.type));
+    aretesVisibles = aretesStructure.filter(lienVisible);
     filtreLiens = typesMasques.size > 0;
     plan.classList.toggle('filtre-liens', filtreLiens);
 
@@ -1446,6 +1465,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         nouvellesOptions.typesMasques ||
         nouvellesOptions.maisonsMasquees ||
         nouvellesOptions.noeudsMasques ||
+        nouvellesOptions.masquerRevolus !== undefined ||
         (nouvellesOptions.couleurPar && nouvellesOptions.couleurPar !== avant)
       ) {
         if (payload) appliquer({ animer: true });

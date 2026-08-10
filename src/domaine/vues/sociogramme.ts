@@ -274,6 +274,12 @@ export class VueSociogramme extends Vue {
         label: rel.label,
         notes: rel.notes,
         secret: rel.secret,
+        // Un lien révolu reste dessiné : c'est le rail qui décide de le montrer
+        // ou non, et un ancien vassal explique souvent le présent.
+        revolu: rel.revolu,
+        depuis: rel.depuis,
+        jusqu_a: rel.jusqu_a,
+        lieu: rel.lieu,
         deduit: Boolean(rel.extra.deduit),
         parallele_rang: rang,
         parallele_total: compteurPaires.get(paire) as number,

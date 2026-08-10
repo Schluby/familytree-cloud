@@ -6,6 +6,7 @@ import { champSuggere } from './autocomplete.js';
 import { anneeDe, ageDe, naissanceDepuisAge } from './calendrier.js';
 import { h } from './dom.js';
 import { curseurHumeur } from './humeur.js';
+import { RANGS, basculerRang, porteLeRang, rangDuTag } from './rangs.js';
 
 /**
  * Régions et châteaux de Westeros, chargés une fois pour toutes les fiches.
@@ -199,7 +200,16 @@ export function creerPanneau(element, rappels = {}) {
         texte: maison.label || 'Sans maison',
       }),
       ...(personne.titres || []).map((titre) => h('span', { class: 'badge', texte: titre })),
-      ...(personne.tags || []).map((tag) => h('span', { class: 'badge', texte: `#${tag}` })),
+      // Un rang n'est pas un tag comme un autre : il se lit d'un coup d'œil.
+      ...(personne.tags || []).map((tag) => {
+        const rang = rangDuTag(tag);
+        return rang
+          ? h('span', {
+              class: `badge badge-rang badge-rang-${rang.classe}`,
+              texte: `${rang.icone} ${rang.label}`,
+            })
+          : h('span', { class: 'badge', texte: `#${tag}` });
+      }),
     ];
 
     return h('div', { class: 'pn-entete' }, [
@@ -333,6 +343,34 @@ export function creerPanneau(element, rappels = {}) {
     ];
   }
 
+  /**
+   * Chef de maison et héritier, en deux boutons.
+   *
+   * Ce sont des tags — ils restent modifiables à la main juste en dessous —
+   * mais les taper exactement pour que la carte les reconnaisse serait un
+   * piège. Les deux s'excluent : on n'est pas à la fois celui qui règne et
+   * celui qui attend.
+   */
+  function champRang() {
+    const boutons = RANGS.map((rang) => {
+      const actif = porteLeRang(brouillon.tags, rang.id);
+      return h('button', {
+        type: 'button',
+        class: `bouton puce-rang puce-rang-${rang.classe} ${actif ? 'actif' : ''}`,
+        texte: `${rang.icone} ${rang.label}`,
+        title: actif ? `Retirer « ${rang.label} »` : `Marquer comme ${rang.label.toLowerCase()}`,
+        onclick: () => {
+          marquerModifie('tags', basculerRang(brouillon.tags, rang.id));
+          dessiner(); // les badges du haut et la carte suivent
+        },
+      });
+    });
+    return h('div', { class: 'champ-edit pleine' }, [
+      h('label', { texte: 'Rang dans la maison' }),
+      h('div', { class: 'rangs-puces' }, boutons),
+    ]);
+  }
+
   function aideAge() {
     const annee = referentiels.meta?.annee_courante;
     if (anneeDe(annee) === null) {
@@ -383,6 +421,7 @@ export function creerPanneau(element, rappels = {}) {
           [1, 2, 3, 4, 5].map((n) => ({ id: n, label: `${n}` }))
         ),
         champListe('titres', 'Titres'),
+        champRang(),
         champListe('tags', 'Tags'),
       ]),
       h('p', { class: 'echelle-aide', texte: aideAge() }),

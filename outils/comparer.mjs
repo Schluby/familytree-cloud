@@ -228,14 +228,36 @@ async function comparerClasseur(chemin) {
  * Les divergences qu'on assume, nommées une par une.
  *
  * Une liste, pas un filtre silencieux : ce qui est ici est connu et justifié,
- * et **tout le reste échoue**. Elle est vide depuis le lot 5, qui a porté
- * `exports.py` et la vue « tableaux » — les deux entrées qui y figuraient
- * n'avaient plus de raison d'être.
+ * et **tout le reste échoue**. Elle a été vide du lot 5 au lot 7 — la preuve
+ * que le portage de `backend/` était fidèle.
+ *
+ * **Le lot 8 la rouvre, et c'est un changement de statut, pas un accident.**
+ * Jusqu'ici, le domaine en ligne était une traduction du domaine local, et
+ * l'outil vérifiait la traduction. Depuis le lot 8, la version en ligne
+ * *avance* : elle connaît des liens révolus et des événements datés que la
+ * version Python ignore. L'outil ne prouve donc plus « c'est la même chose »,
+ * mais « la seule chose qui diffère est ce qu'on a ajouté exprès » — ce qui
+ * reste la question utile, et ce qui fait toujours échouer une régression.
  *
  * Y ajouter une ligne doit rester un acte réfléchi, jamais une façon de faire
  * taire un écart qu'on ne comprend pas.
  */
-const ATTENDUES = [];
+const ATTENDUES = [
+  {
+    chemin: '/api/vue/tableau',
+    // `revolu` et `lieu` sur les liens (lot 8.D). Les colonnes s'ajoutent dans
+    // `exports.ts::tables()`, l'unique endroit qui les décrit — d'où le même
+    // écart sur la vue tableau, le CSV et le classeur Excel.
+    prefixes: ['tables.1.colonnes', 'tables.1.lignes'],
+    raison: 'lot 8.D : colonnes « Révolu » et « Lieu » sur les liens',
+  },
+  {
+    chemin: '/api/referentiels',
+    // La catégorie « Événements passés », que la version locale n'a pas.
+    prefixes: ['categories'],
+    raison: 'lot 8.D : catégorie de liens « historique »',
+  },
+];
 
 function attendue(chemin, ecarts) {
   const regle = ATTENDUES.find((r) => r.chemin === chemin);

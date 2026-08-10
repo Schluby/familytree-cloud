@@ -314,6 +314,12 @@ export const RELATION_CHAMPS = [
   'dirige',
   'depuis',
   'jusqu_a',
+  // Ajoutés au lot 8 : un lien peut être **révolu** (ancien vassal, serment
+  // rompu) sans qu'on sache toujours dire depuis quand — d'où un booléen, et
+  // pas une simple lecture de `jusqu_a`. `lieu` sert aux liens d'événement :
+  // une bataille se rappelle par l'endroit où elle a eu lieu.
+  'revolu',
+  'lieu',
 ] as const;
 
 export const RELATION_CHAMPS_EDITABLES = RELATION_CHAMPS.filter((champ) => champ !== 'id');
@@ -334,6 +340,9 @@ export class Relation {
   dirige: boolean | null = null;
   depuis: string | null = null;
   jusqu_a: string | null = null;
+  /** Le lien a existé, il n'existe plus. Voir `RELATION_CHAMPS`. */
+  revolu = false;
+  lieu = '';
   extra: Objet = {};
 
   static depuisDict(donnees: Objet): Relation {
@@ -353,11 +362,22 @@ export class Relation {
     relation.source = texteOuVide(relation.source);
     relation.cible = texteOuVide(relation.cible);
     relation.secret = Boolean(relation.secret);
+    relation.revolu = Boolean(relation.revolu);
+    relation.lieu = texteOuVide(relation.lieu);
     relation.humeur = echelle.normaliser(relation.humeur) as number;
 
     return relation;
   }
 
+  /**
+   * `revolu` et `lieu` ne s'écrivent que lorsqu'ils portent quelque chose.
+   *
+   * Ce n'est pas de la coquetterie : un document qui n'utilise pas ces champs
+   * doit ressortir **octet pour octet** comme il est entré. C'est ce qui permet
+   * à une sauvegarde d'aller et venir entre la version en ligne et la version
+   * locale sans grossir d'un champ à chaque aller-retour, et c'est ce qui garde
+   * `outils/comparer.mjs` muet sur tout ce qui ne touche pas au lot 8.
+   */
   versDict(): Objet {
     return {
       id: this.id,
@@ -371,6 +391,8 @@ export class Relation {
       dirige: this.dirige,
       depuis: this.depuis,
       jusqu_a: this.jusqu_a,
+      ...(this.revolu ? { revolu: true } : {}),
+      ...(this.lieu ? { lieu: this.lieu } : {}),
       ...this.extra,
     };
   }
@@ -383,7 +405,8 @@ export class Relation {
 
       let valeur: unknown = brut;
       if (champ === 'humeur') valeur = echelle.normaliser(brut);
-      else if (champ === 'secret') valeur = Boolean(brut);
+      else if (champ === 'secret' || champ === 'revolu') valeur = Boolean(brut);
+      else if (champ === 'lieu') valeur = texteOuVide(brut);
 
       const courant = (this as unknown as Objet)[champ];
       if (!memeValeur(courant, valeur)) {

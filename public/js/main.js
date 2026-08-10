@@ -11,6 +11,7 @@ import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
 import { curseurHumeur, definirTable, tableHumeur } from './humeur.js';
 import { ageAffiche, formaterAge } from './calendrier.js';
+import { RANGS, basculerRang, porteLeRang } from './rangs.js';
 import { surMenuContextuel, telecharger } from './dom.js';
 import {
   creerEditeurAnnee,
@@ -36,6 +37,8 @@ const elements = {
   blocLiens: document.getElementById('bloc-liens'),
   blocMaisons: document.getElementById('bloc-maisons'),
   btnNouveauType: document.getElementById('btn-nouveau-type'),
+  btnTypeHistorique: document.getElementById('btn-type-historique'),
+  basculeRevolus: document.getElementById('bascule-revolus'),
   btnNouvelleMaison: document.getElementById('btn-nouvelle-maison'),
   blocEdition: document.getElementById('bloc-edition'),
   groupeCadrage: document.getElementById('groupe-cadrage'),
@@ -109,6 +112,10 @@ const etat = {
   // pas le filtre qu'on avait posé sur l'autre axe.
   filtres: {},
   noeudsMasques: new Set(),
+  // Les liens révolus se voient par défaut, en pointillé serré : un ancien
+  // vassal explique souvent le présent. L'interrupteur du rail ne garde que
+  // ce qui tient encore.
+  masquerRevolus: false,
   couleurPar: 'maison',
   groupePar: 'maison',
   recherche: '',
@@ -654,6 +661,7 @@ async function rechargerVue({ conserverFocus = false } = {}) {
     recherche: etat.recherche,
     typesMasques: etat.typesMasques,
     noeudsMasques: etat.noeudsMasques,
+    masquerRevolus: etat.masquerRevolus,
     // Le moteur ne lit pas l'API : l'année de la campagne lui est descendue,
     // et c'est elle qui transforme les naissances en âges sur les fiches.
     anneeCourante: anneeCourante(),
@@ -853,6 +861,18 @@ function menuCarte(id, evenement) {
       onclick: () =>
         formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { lierA: id }),
     },
+    { separateur: true },
+    // Nommer un chef ou un héritier depuis le plan : c'est là qu'on regarde
+    // une maison, pas dans la fiche.
+    ...RANGS.map((rang) => {
+      const porte = porteLeRang(noeud?.tags, rang.id);
+      return {
+        label: porte ? `Ne plus être ${rang.label.toLowerCase()}` : `Marquer ${rang.label.toLowerCase()}`,
+        icone: rang.icone,
+        detail: porte ? 'posé' : '',
+        onclick: () => definirRang(id, rang.id),
+      };
+    }),
     noeud?.decalage && {
       label: 'Replacer automatiquement',
       icone: '⌖',
@@ -868,6 +888,22 @@ function menuCarte(id, evenement) {
       onclick: () => confirmerSuppressionPersonne(id, evenement),
     },
   ]);
+}
+
+/** Pose ou retire un rang depuis le plan, sans passer par la fiche. */
+async function definirRang(id, rangId) {
+  const noeud = trouverNoeud(id);
+  const tags = basculerRang(noeud?.tags, rangId);
+  try {
+    await Api.majPersonne(id, { tags });
+    if (noeud) noeud.tags = tags;
+    await rechargerVue({ conserverFocus: true });
+    if (panneau.idCourant() === id) {
+      await panneau.afficher(id, { secrets: !!etat.parametres.secrets });
+    }
+  } catch (erreur) {
+    message(`Échec : ${erreur.message}`);
+  }
 }
 
 function confirmerSuppressionPersonne(id, evenement) {
@@ -1527,7 +1563,42 @@ function majMasques() {
   (critere.exclus || []).forEach((id) => etat.noeudsMasques.add(id));
 }
 
+/**
+ * Le type « Événement historique » — une bataille, un siège, un serment rompu.
+ *
+ * Il n'est pas installé d'office dans les sauvegardes existantes : ce serait
+ * ajouter une entrée au catalogue de quelqu'un sans le lui demander. Le bouton
+ * ne se montre que tant qu'aucun type n'est rangé dans cette catégorie, et il
+ * disparaît dès qu'il y en a un — y compris un que l'on aurait nommé soi-même.
+ */
+function manqueTypeHistorique() {
+  return !(etat.referentiels.types_relations || []).some(
+    (type) => type.categorie === 'historique'
+  );
+}
+
+async function creerTypeHistorique() {
+  try {
+    await Api.creerType({
+      label: 'Événement historique',
+      couleur: '#8a7f6a',
+      categorie: 'historique',
+      style: 'pointille',
+      dirige: false,
+    });
+  } catch (erreur) {
+    message(`Création impossible : ${erreur.message}`);
+    return;
+  }
+  await chargerUnivers();
+  await rechargerVue({ conserverFocus: true });
+  astuce(
+    'Type « Événement historique » créé : posez-le sur un lien pour raconter une bataille, avec sa date et son lieu.'
+  );
+}
+
 function dessinerLegendeTypes() {
+  elements.btnTypeHistorique.hidden = !manqueTypeHistorique();
   elements.legendeTypes.replaceChildren(
     ...catalogueTypes().map((type) => {
       const li = document.createElement('li');
@@ -1906,7 +1977,17 @@ function infobulleLien(arete, evenement) {
   sous.textContent = `${source?.label || '?'} ${arete.dirige ? '→' : '↔'} ${cible?.label || '?'}`;
 
   elements.infobulle.append(titre, sous);
-  [arete.label, arete.notes, arete.secret ? '⚑ lien secret' : null]
+  const periode = [arete.depuis && `depuis ${arete.depuis}`, arete.jusqu_a && `jusqu’à ${arete.jusqu_a}`]
+    .filter(Boolean)
+    .join(', ');
+  [
+    arete.revolu ? '⧗ lien révolu' : null,
+    periode || null,
+    arete.lieu ? `⌖ ${arete.lieu}` : null,
+    arete.label,
+    arete.notes,
+    arete.secret ? '⚑ lien secret' : null,
+  ]
     .filter(Boolean)
     .forEach((texte) => {
       const ligne = document.createElement('div');
@@ -1982,6 +2063,12 @@ elements.btnImporterSauvegarde.addEventListener('click', () => editeurSauvegarde
 elements.btnNouveauType.addEventListener('click', (evenement) =>
   editeurType.ouvrirCreation(evenement.clientX, evenement.clientY)
 );
+elements.basculeRevolus.addEventListener('change', (evenement) => {
+  etat.masquerRevolus = evenement.target.checked;
+  etat.moteur?.majOptions({ masquerRevolus: etat.masquerRevolus });
+  dessinerLegendeTypes();
+});
+elements.btnTypeHistorique.addEventListener('click', () => creerTypeHistorique());
 elements.btnNouveauJoueur.addEventListener('click', (evenement) =>
   editeurJoueur.ouvrirCreation(evenement.clientX, evenement.clientY)
 );

@@ -350,6 +350,30 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   font-size: 11px; opacity: .85;
 }
 .carte.joueur .carte-entete { position: relative; }
+
+/* Chef de maison et héritier : cadre plus appuyé et une marque au coin. La
+   taille, elle, ne bouge pas — la mise en page ne doit pas dépendre de qui
+   règne, sinon nommer un chef ferait sauter tout le plan. La couronne du
+   joueur est à droite, la marque de rang à gauche : elles coexistent. */
+.carte.rang-chef { --rang-couleur: #c9a227; }
+.carte.rang-heritier { --rang-couleur: #8fa9c4; }
+.carte.rang .carte-entete {
+  box-shadow: var(--carte-ombre), inset 0 0 0 2px var(--rang-couleur);
+}
+.carte.rang .carte-corps { border-width: 0 2px 2px; border-color: var(--rang-couleur); }
+.carte.rang .carte-photo { border-color: var(--rang-couleur); }
+.carte-rang {
+  position: absolute; top: 32px; left: 4px; z-index: 3;
+  width: 17px; height: 17px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--carte-fond); color: var(--rang-couleur);
+  border: 1px solid var(--rang-couleur);
+  font-size: 10px; line-height: 1;
+  box-shadow: var(--carte-ombre);
+}
+/* De loin, les corps de fiche s'effacent : les rangs, eux, restent lisibles —
+   c'est justement à cette échelle qu'on cherche qui tient quoi. */
+.plan.loin .carte-rang { opacity: 1; }
 /* Deux lignes de nom au maximum : au-delà, le gabarit ne bornerait plus rien. */
 .carte-nom {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -469,6 +493,12 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .lien-social.attenue { opacity: .1; }
 
 /* Filtre de type actif : ce qui reste doit sauter aux yeux. */
+/* Révolu : le trait s'efface sans disparaître. On doit pouvoir lire « ils
+   ont été alliés » sans confondre avec « ils le sont ». */
+.lien-social.revolu { opacity: .38; stroke-width: 1.4px; }
+.lien-social.revolu.survol { opacity: .8; }
+.option-revolus { margin: 8px 0 2px; }
+
 .plan.filtre-liens .lien-social { opacity: 1; stroke-width: 3.2px; }
 .plan.filtre-liens .lien-social.survol { stroke-width: 4.2px; }
 .plan.filtre-liens .lien-social.attenue { opacity: .35; }
@@ -624,6 +654,31 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 body.sombre .badge-vivant { color: #7fd6b2; border-color: #2b5a49; background: #16302a; }
 body.sombre .badge-mort { color: #d99b9b; border-color: #5b3636; background: #2c1c1c; }
 .badge-maison { color: #fff; font-weight: 600; border: 0; }
+/* Rangs : or pour qui règne, argent pour qui attend. Mêmes teintes que les
+   marques posées sur les fiches du plan, pour qu'on les relie sans effort. */
+.badge-rang { font-weight: 600; }
+.badge-rang-chef { color: #8a6d0b; border-color: #d9be62; background: #fbf3d9; }
+.badge-rang-heritier { color: #4a637d; border-color: #a8bed4; background: #eaf1f8; }
+body.sombre .badge-rang-chef { color: #e6c964; border-color: #6a5720; background: #302a15; }
+body.sombre .badge-rang-heritier { color: #a9c3dc; border-color: #3d4f63; background: #1a222c; }
+
+/* Détails d'un lien : repliés tant qu'ils sont vides. */
+.fl-details { margin-top: 4px; }
+.fl-details > summary {
+  cursor: pointer; font-size: 11px; color: var(--texte-faible);
+  padding: 3px 0; user-select: none;
+}
+.fl-details > summary:hover { color: var(--texte); }
+.fl-details .champ-edit { margin-top: 6px; }
+
+.rangs-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce-rang { font-size: 11px; padding: 5px 9px; }
+.puce-rang.actif { font-weight: 600; }
+.puce-rang-chef.actif { color: #8a6d0b; border-color: #d9be62; background: #fbf3d9; }
+.puce-rang-heritier.actif { color: #4a637d; border-color: #a8bed4; background: #eaf1f8; }
+body.sombre .puce-rang-chef.actif { color: #e6c964; border-color: #6a5720; background: #302a15; }
+body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; background: #1a222c; }
+
 .pn-actions { display: flex; gap: 7px; margin-top: 10px; }
 
 .pn-section { padding: 13px 14px; border-bottom: 1px solid var(--bord); }
