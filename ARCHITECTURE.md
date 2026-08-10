@@ -314,6 +314,28 @@ du lot 2, sur 50 requêtes réelles ; palier documenté : **10 ms par requête**
 | `GET /api/sauvegardes/<id>/export` (réindentation) | 5 ms | 5 ms |
 | `GET /api/sauvegardes` (la liste) | 2 ms | 1 ms |
 
+### Et sur un gros arbre — 10/08/2026, lot 3
+
+Le domaine porté, mesuré sur `/api/vue/sociogramme` avec des arbres fabriqués
+(`outils/gros-arbre.mjs`), en production :
+
+| Fiches | CPU médian | CPU max |
+| --- | --- | --- |
+| **72** — la vraie campagne | **6 ms** | 6 ms |
+| 200 | 18 ms | 30 ms |
+| 500 | 27 ms | 35 ms |
+
+Aucune requête n'a échoué sur les 91 relevées. Mais **le budget documenté est
+franchi au-dessus d'une centaine de fiches**, et ce qui tient aujourd'hui tient
+par la tolérance de Cloudflare, pas par contrat.
+
+D'où un déclencheur écrit d'avance plutôt qu'une surprise : **au-delà de ~150
+fiches sur un vrai arbre, on passe au premier repli — les générations calculées
+côté navigateur.** C'est la seule partie super-linéaire du calcul (chaque passe
+relit toutes les filiations), et le payload porte déjà tout ce qu'il faut pour
+les recalculer là-bas. Le second repli, la normalisation des personnes et des
+relations en lignes D1, reste en réserve.
+
 Trois choses à retenir :
 
 - **Ce qui coûte, c'est PBKDF2, pas le document.** Manipuler 75 Ko de JSON est

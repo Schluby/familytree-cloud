@@ -420,6 +420,7 @@ routesDomaine.post('/personnes', async (c) => {
 
     const personne = Personne.depuisDict(donnees);
     dataset.personnes.push(personne);
+    dataset.oublierIndex();
     await enregistrer(c, courant);
     return c.json({ personne: personne.versDict() }, 201);
   } catch (erreur) {
@@ -484,6 +485,7 @@ routesDomaine.delete('/personnes/:id', async (c) => {
   dataset.relations = dataset.relations.filter(
     (r) => r.source !== personneId && r.cible !== personneId
   );
+  dataset.oublierIndex();
   await enregistrer(c, courant);
   return c.json({ supprime: personneId });
 });

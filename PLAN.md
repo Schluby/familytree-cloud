@@ -36,13 +36,18 @@ non par un envoi manuel).
 souris (inscription → code de secours → accueil). Les comptes d'essai ont été
 effacés de la base.
 
+**Lot 3 livré le 10/08/2026** : le domaine tourne en TypeScript, et dit la même
+chose que la version Python — 28/28 à `outils/comparer.mjs` sur la vraie
+campagne. Le harnais est à **100 vérifications**. Prochain lot : l'interface
+(lot 4), qui recopie `web/` sans le réécrire.
+
 **Lot 2 livré le 10/08/2026** : chacun a ses sauvegardes, et personne ne voit
 celles des autres. Le harnais est passé à **83 vérifications** et s'appelle
 désormais `outils/essai.sh` — il couvre les deux lots, et couvrira les suivants.
 La page d'accueil montre un panneau provisoire (créer, importer, copier,
 renommer, exporter, supprimer) en attendant l'interface du lot 4.
 
-Le lot 3 n'a pas commencé.
+Le lot 4 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -135,28 +140,42 @@ téléchargement du `.json`. Temps de CPU mesurés en production : **≤ 11 ms**
 toutes les routes de sauvegardes, contre 14 ms pour l'inscription — le document
 n'est pas ce qui coûte cher.
 
-## Lot 3 — Le domaine, porté en TypeScript  ☐
+## Lot 3 — Le domaine, porté en TypeScript  ☑
 
-Le gros morceau. On porte, module par module, en gardant les mêmes noms qu'en
+Le gros morceau. Porté module par module, en gardant les mêmes noms qu'en
 Python pour que les deux versions se relisent ensemble.
 
-- ☐ `humeur.ts` (l'échelle 1-7, MD/MP, épaisseur) — le plus simple, à faire en
-  premier pour caler la façon de tester.
-- ☐ `models.ts` (Personne, Relation, Dataset, normalisations, `migrations`).
-- ☐ `genealogie.ts` (générations, couples, fratries déduites, surcharges).
-- ☐ `filtres.ts` (variables, segments, dégradé, tests, listes nommées).
-- ☐ `vues/sociogramme.ts` : le payload, à l'octet près.
-- ☐ Les routes qui vont avec : `/api/vue/<id>`, `/api/personnes/*`,
-  `/api/relations/*`, `/api/maisons/*`, `/api/types-relations/*`,
-  `/api/categories/*`, `/api/joueurs/*`, `/api/filtres/*`, `/api/listes/*`,
-  `/api/referentiels`, `/api/lieux`.
-- ☐ **Mesurer le temps CPU** sur un arbre de 500 fiches (le plan gratuit donne
-  10 ms par requête) et **noter le chiffre dans le journal**. C'est le seul
-  palier qui peut mordre. Replis, dans l'ordre : générations calculées côté
-  navigateur, puis normalisation des personnes et relations en lignes D1.
+- ☑ `humeur.ts` (l'échelle 1-7, MD/MP, épaisseur) et `migrations.ts` (celles du
+  **document**, à ne pas confondre avec `migrations/` qui fait bouger le schéma).
+- ☑ `python.ts` : les deux comportements de Python qu'il fallait reproduire —
+  `round()` envoie la moitié **au pair** (12.25 → 12.2), et `int()` tronque vers
+  zéro et **refuse** « 4.5 ». Isolés là, avec leurs contre-exemples.
+- ☑ `models.ts` (Personne, Relation, Dataset, normalisations, `extra` préservé).
+- ☑ `referentiels.ts` (maisons, types, catégories, joueurs, couleurs auto) et
+  `genealogie.ts` (générations, couples, fratries déduites, surcharges).
+- ☑ `filtres.ts` (variables, segments, dégradé, tests, listes nommées).
+- ☑ `vues/sociogramme.ts` + `vues/base.ts`.
+- ☑ Les 35 routes qui vont avec, sur le contrat d'adresses de la version locale.
+- ☑ **Migration `0003` : la sauvegarde active, par compte.** C'est elle qui
+  permet à `/api/personnes/<id>` de ne pas nommer la sauvegarde — donc au
+  lot 4 de reprendre `web/` sans le réécrire.
+- ☑ **`outils/comparer.mjs`** : prend le document de la version Python,
+  l'importe dans la version TypeScript, compare champ par champ. **28/28 sur
+  la vraie campagne**, en local et en production.
+- ☑ **Temps de CPU mesuré**, en production, sur des arbres fabriqués
+  (`outils/gros-arbre.mjs`, `outils/mesurer.mjs`) — voir le journal.
 
-*Fini quand :* pour une même sauvegarde, `/api/vue/sociogramme` renvoie le même
-JSON que la version Python (comparaison automatisée, champ par champ).
+**Deux choses volontairement laissées de côté**, pour ne pas livrer un onglet
+qui plante :
+
+- La vue **« tableaux & exports »** dépend de `exports.py` (CSV, classeur
+  Excel) : elle arrive au **lot 5**, avec lui. C'est la seule divergence de la
+  comparaison, et elle y est **déclarée nommément** — tout autre écart la fait
+  échouer.
+- Les **portraits** : `portraits.ts` refuse une image collée avec un message
+  affichable, là où `photos.py` l'accepte. Décision du 06/08, pas un oubli.
+
+*Fini.* 100/100 au harnais et 28/28 à la comparaison, en local **et** en ligne.
 
 ## Lot 4 — L'interface  ☐
 
@@ -285,6 +304,20 @@ Tranché le **08/08/2026**, pour que « pousser suffise » :
 - **Dépôt Git séparé de l'application locale.** Deux projets, deux dépôts :
   sinon chaque retouche du Python déclencherait une construction Cloudflare.
 
+Tranché le **10/08/2026**, au lot 3 :
+
+- **« Le même JSON » se juge après analyse, pas octet par octet.** Python écrit
+  `4.0` là où JavaScript écrit `4` : les deux disent le même nombre, et le
+  consommateur est un navigateur, qui ne sait pas les distinguer. Exiger
+  l'identité des octets reviendrait à demander à JavaScript d'imiter le
+  formateur de flottants de Python, sans que personne n'y gagne.
+- **La sauvegarde active est par compte**, portée par la session. C'est ce qui
+  permet aux adresses de ne pas la nommer — et donc à `web/` d'être recopié tel
+  quel au lot 4.
+- **L'intergiciel de session est posé route par route**, jamais sur `*` : monté
+  sur `/api`, un `*` exigerait une session pour s'inscrire. La liste des
+  chemins protégés sert aussi d'inventaire de la surface du domaine.
+
 Tranché le **10/08/2026**, au lot 2 :
 
 - **Le nom d'une sauvegarde vit dans sa colonne, pas dans son document.** En
@@ -400,3 +433,30 @@ Tranché le **10/08/2026**, au lot 2 :
   routes neuves répondent 404 sur les points de présence encore à l'ancienne
   version — une vérification a échoué pour ça, et repassait deux minutes plus
   tard. Attendre une minute avant de lancer le harnais.
+- **10/08/2026** — **lot 3 : le domaine, en TypeScript**, en ligne. Les deux
+  versions répondent **la même chose, champ par champ** : 28/28 sur la vraie
+  campagne (72 fiches, 178 liens), dont `/api/dataset` — l'aller-retour complet
+  par les modèles — et les neuf réglages du sociogramme. Le comparateur
+  n'espère pas que les deux bases se ressemblent : il prend le document de
+  Python, l'importe dans le nuage, puis compare.
+  **Le temps de CPU, mesuré en production** (`wrangler tail`, arbres fabriqués
+  par `outils/gros-arbre.mjs`), sur `/api/vue/sociogramme` :
+
+  | Fiches | CPU médian | CPU max | Verdict |
+  | --- | --- | --- | --- |
+  | 72 (vraie campagne) | **6 ms** | 6 ms | dans le budget documenté (10 ms) |
+  | 200 | 18 ms | 30 ms | au-delà, mais sert |
+  | 500 | 27 ms | 35 ms | au-delà, et sert encore |
+
+  **Aucune requête n'a échoué** sur les 91 relevées. Conclusion honnête : la
+  campagne réelle est confortable, et le budget documenté est franchi quelque
+  part **au-dessus d'une centaine de fiches**. Ça marche aujourd'hui parce que
+  Cloudflare tolère les dépassements, pas parce qu'on est dans les clous — donc
+  **le déclencheur du premier repli est posé : au-delà de ~150 fiches sur un
+  vrai arbre, calculer les générations côté navigateur.** C'est la seule partie
+  super-linéaire du calcul, et c'est bien elle que le plan visait en premier.
+  Deux corrections de conception en chemin : `Dataset` garde son index de
+  personnes (il était reconstruit à chaque appel de `personne()`, ce qui est
+  quadratique sur une vue), et l'intergiciel de session est posé **route par
+  route** au lieu d'un `use('*')` — monté sur `/api`, un `*` aurait exigé une
+  session pour s'inscrire.
