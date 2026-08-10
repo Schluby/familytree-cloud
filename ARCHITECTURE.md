@@ -329,6 +329,29 @@ Aucune requête n'a échoué sur les 91 relevées. Mais **le budget documenté e
 franchi au-dessus d'une centaine de fiches**, et ce qui tient aujourd'hui tient
 par la tolérance de Cloudflare, pas par contrat.
 
+Les routes du lot 5, mesurées de la même façon sur un arbre de **200 fiches** :
+
+| Route | CPU médian | CPU max |
+| --- | --- | --- |
+| `/api/export/xlsx` | **32 ms** | 34 ms |
+| `/api/vue/tableau` | 11 ms | 11 ms |
+| `/api/export/csv` | 8 ms | 12 ms |
+| `/api/export/zip` | **4 ms** | 4 ms |
+
+Deux enseignements qui ne s'annulent pas. Le classeur Excel est **la route la
+plus chère de l'application** — sérialiser cinq feuilles en XML puis les
+dégonfler coûte trois fois le budget. Mais c'est un geste **délibéré et rare**
+(quelques clics par séance), pas un chargement de page : le risque n'a pas la
+même forme que pour une vue, qu'on rafraîchit sans y penser. Si la limite
+devenait contraignante, le repli est déjà identifié : écrire le classeur dans
+le navigateur, à partir du payload de `/api/vue/tableau` qui contient déjà
+toutes les cellules.
+
+L'archive complète, elle, coûte **4 ms** : `CompressionStream` est natif, donc
+le dégonflage ne se paie pas en temps de CPU JavaScript. C'est ce qui a fait
+préférer le mode dégonflé au mode « stocké » prévu par le plan — 168 Ko de JSON
+tombent à 10 Ko, gratuitement.
+
 D'où un déclencheur écrit d'avance plutôt qu'une surprise : **au-delà de ~150
 fiches sur un vrai arbre, on passe au premier repli — les générations calculées
 côté navigateur.** C'est la seule partie super-linéaire du calcul (chaque passe
