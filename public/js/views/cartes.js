@@ -10,6 +10,8 @@
 
 import { enregistrerRendu } from '../registry.js';
 import { couleurHumeur, ecartHumeur } from '../humeur.js';
+import { surMenuContextuel } from '../dom.js';
+import { ageAffiche, formaterAge } from '../calendrier.js';
 
 const GEO = {
   largeurCarte: 186, // toutes les fiches ont la même taille : voir mesurer()
@@ -146,6 +148,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   plan.addEventListener('click', (evenement) => {
     // Le clic qui suit un lâcher de liaison ne doit rien déclencher d'autre.
     if (performance.now() - finLiaison < 250) return;
+    if (sortDAppuiLong()) return;
     const liens = liensSous(evenement);
     if (liens.length) {
       contexte.surClicLien?.(liens, evenement);
@@ -156,20 +159,31 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     if (evenement.target === plan || evenement.target === monde) contexte.surFond?.();
   });
 
-  plan.addEventListener('contextmenu', (evenement) => {
-    evenement.preventDefault();
-    const carte = evenement.target.closest?.('.carte');
+  /**
+   * Le routage du menu contextuel, à un point de l'écran. Partagé par le clic
+   * droit et l'appui long : les deux gestes ouvrent exactement le même menu,
+   * il n'y a donc pas un jeu de commandes pour la souris et un pour le doigt.
+   */
+  function ouvrirMenuAu(x, y) {
+    const evenementLocal = { clientX: x, clientY: y };
+    const carte = document.elementFromPoint(x, y)?.closest?.('.carte');
     if (carte) {
-      contexte.surMenuCarte?.(carte.dataset.id, evenement);
+      contexte.surMenuCarte?.(carte.dataset.id, evenementLocal);
       return;
     }
-    const liens = liensSous(evenement);
+    const liens = liensSous(evenementLocal);
     if (liens.length) {
-      contexte.surMenuLien?.(liens, evenement);
+      contexte.surMenuLien?.(liens, evenementLocal);
       return;
     }
-    contexte.surMenuFond?.(evenement, pointMonde(evenement));
-  });
+    contexte.surMenuFond?.(evenementLocal, pointMonde(evenementLocal));
+  }
+
+  // Clic droit à la souris, appui long au doigt : le même menu, le même code.
+  // `sortDAppuiLong()` sert à ignorer le clic produit par le lever du doigt.
+  const sortDAppuiLong = surMenuContextuel(plan, (evenement) =>
+    ouvrirMenuAu(evenement.clientX, evenement.clientY)
+  );
 
   // --------------------------------------------- déplacer une fiche (ctrl)
   let deport = null;
@@ -318,11 +332,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
           evenement.stopPropagation();
           if (evenement.ctrlKey || evenement.metaKey) return; // c'était un déport
           if (performance.now() - finDeplacement < 250) return;
+          if (sortDAppuiLong()) return; // le menu long-press vient de s'ouvrir
           if (evenement.shiftKey) {
             contexte.surLiaisonRapide?.(noeud.id, evenement);
             return;
           }
-          contexte.surSelection?.(noeud.id, noeud);
+          // L'événement part avec : quand un lien est armé, c'est lui qui dit
+          // où poser l'éditeur, et le doigt n'a ni Maj ni glisser à offrir.
+          contexte.surSelection?.(noeud.id, noeud, evenement);
         });
         coucheCartes.append(carte);
         cartes.set(noeud.id, carte);
@@ -363,7 +380,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         `<div class="carte-titre">${echapper(noeud.titres[0])}</div>`
       );
     }
-    if (noeud.naissance || noeud.lieu) {
+    // L'âge plutôt que l'année de naissance : c'est ce qu'on relit en jeu.
+    // L'année reste en infobulle, et pour un mort l'âge est celui qu'il avait.
+    const age = ageAffiche(noeud, options.anneeCourante);
+    if (age !== null) {
+      lignes.push(ligneInfo('✳', 'Âge', formaterAge(age), noeud.lieu, noeud.naissance));
+    } else if (noeud.naissance || noeud.lieu) {
       lignes.push(ligneInfo('✳', 'Naissance', noeud.naissance, noeud.lieu));
     }
     if (noeud.statut === 'mort') {
@@ -401,10 +423,11 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     });
   }
 
-  function ligneInfo(icone, libelle, valeur, lieu) {
+  function ligneInfo(icone, libelle, valeur, lieu, infobulle = '') {
     if (!valeur && !lieu) return '';
+    const titre = infobulle ? ` title="${echapper(`Né en ${infobulle}`)}"` : '';
     return `
-      <div class="carte-ligne">
+      <div class="carte-ligne"${titre}>
         <span class="ic">${icone}</span>
         <span class="lib">${libelle}</span>
         <span class="val">${echapper(valeur || '—')}</span>

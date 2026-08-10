@@ -5,6 +5,7 @@
  */
 
 import { Api } from './api.js';
+import { anneeDe, decalerAnnee, naissanceDepuisAge } from './calendrier.js';
 import { h, creerFlottant, choisirFichier } from './dom.js';
 import { DEFAUT as HUMEUR_DEFAUT, curseurHumeur } from './humeur.js';
 import { estArchive, lireArchive } from './zip.js';
@@ -1110,6 +1111,113 @@ function definirEtat(refs, texte, classe = '') {
   if (!refs.etat) return;
   refs.etat.textContent = texte;
   refs.etat.className = `fl-etat ${classe}`;
+}
+
+// ==========================================================================
+//  Année courante de la campagne
+//
+//  Une date, une seule, d'où découlent tous les âges. Elle s'avance entre deux
+//  séances : c'est le seul champ à toucher pour que la campagne entière
+//  vieillisse — aucun âge n'est stocké, donc aucun ne peut rester en arrière.
+//
+//  Le format est libre (« 300 AC », « 1482 ») : il suffit qu'un nombre s'y
+//  trouve. Ce qui l'entoure est conservé tel quel quand on avance d'un an.
+// ==========================================================================
+
+export function creerEditeurAnnee(rappels = {}) {
+  const socle = creerFlottant();
+  let brouillon = '';
+  let refs = {};
+
+  function ouvrir(x, y) {
+    brouillon = rappels.annee?.() || '';
+    socle.monter(construire(), x, y);
+    refs.annee.select();
+  }
+
+  /** Avance ou recule, en gardant l'habillage (« 300 AC » → « 301 AC »). */
+  function decaler(pas) {
+    refs.annee.value = decalerAnnee(refs.annee.value, pas);
+    brouillon = refs.annee.value;
+    majApercu();
+  }
+
+  function majApercu() {
+    const annee = anneeDe(brouillon);
+    refs.apercu.textContent =
+      annee === null
+        ? 'Aucun nombre lisible : les âges resteront vides.'
+        : `Quelqu’un né en ${naissanceDepuisAge(20, brouillon)} aura 20 ans.`;
+  }
+
+  function construire() {
+    refs = { etat: h('span', { class: 'fl-etat' }) };
+
+    refs.annee = h('input', {
+      type: 'text',
+      value: brouillon,
+      placeholder: '300 AC',
+      oninput: (evenement) => {
+        brouillon = evenement.target.value;
+        majApercu();
+      },
+      onkeydown: (evenement) => {
+        if (evenement.key === 'Enter') {
+          evenement.preventDefault();
+          valider();
+        }
+      },
+    });
+    refs.apercu = h('span', {});
+
+    const panneau = h('div', { class: 'flottant editeur-referentiel' }, [
+      entete('Année de la campagne', socle.fermer),
+      h('div', { class: 'fl-corps' }, [
+        h('div', { class: 'champ-edit' }, [
+          h('label', { texte: 'Nous sommes en' }),
+          h('div', { class: 'annee-reglage' }, [
+            h('button', {
+              class: 'bouton bouton-icone',
+              type: 'button',
+              texte: '−1',
+              title: 'Reculer d’un an',
+              onclick: () => decaler(-1),
+            }),
+            refs.annee,
+            h('button', {
+              class: 'bouton bouton-icone',
+              type: 'button',
+              texte: '+1',
+              title: 'Avancer d’un an — toute la campagne vieillit',
+              onclick: () => decaler(1),
+            }),
+          ]),
+        ]),
+        h('p', { class: 'fl-aide' }, [refs.apercu]),
+        h('p', {
+          class: 'fl-aide',
+          texte:
+            'Les âges ne sont enregistrés nulle part : ils se déduisent de cette date et de l’année de naissance de chacun. Avancer la date les avance tous.',
+        }),
+      ]),
+      pied(refs, { valider, libelle: 'Enregistrer' }),
+    ]);
+    majApercu();
+    return panneau;
+  }
+
+  async function valider() {
+    definirEtat(refs, 'Enregistrement…');
+    try {
+      const reponse = await Api.majAnnee(brouillon.trim());
+      socle.fermer();
+      rappels.surChangement?.(reponse.meta || {});
+    } catch (erreur) {
+      definirEtat(refs, erreur.message, 'erreur');
+    }
+  }
+
+  return { ouvrir, fermer: socle.fermer };
 }
 
 // ==========================================================================

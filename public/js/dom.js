@@ -61,6 +61,107 @@ export function choisirFichier(accept = '.json') {
   });
 }
 
+/* ---------------------------------------------------------- menu contextuel
+ *
+ * Tout ce qui s'ouvre au clic droit doit s'ouvrir à l'appui long : sans ça,
+ * l'application est consultable au doigt mais pas modifiable. Le geste tactile
+ * n'est pas laissé au navigateur — le plan est en `touch-action: none` pour
+ * que le doigt déplace la vue, ce qui supprime aussi le menu système.
+ */
+
+const DUREE_APPUI = 480; // ms
+const TOLERANCE_APPUI = 12; // px : au-delà, le doigt fait défiler, pas un menu
+
+/**
+ * Le doigt qui se lève après un appui long produit encore une salve
+ * d'événements souris de compatibilité, à l'endroit exact où le menu vient de
+ * s'ouvrir. Sans ce filtre, le menu se refermerait aussitôt (le `mousedown`
+ * passe pour un clic extérieur) — ou pire, activerait l'entrée tombée sous le
+ * doigt.
+ */
+export function etoufferSalveSouris() {
+  const types = ['mousedown', 'mouseup', 'click'];
+  const bloquer = (evenement) => {
+    evenement.preventDefault();
+    // `stopImmediatePropagation`, pas `stopPropagation` : la fermeture au clic
+    // extérieur des panneaux flottants écoute **le même nœud** (`document`, en
+    // capture), et seul l'arrêt immédiat la court-circuite. Avec l'autre, le
+    // menu se refermait dans la milliseconde où le doigt se levait.
+    evenement.stopImmediatePropagation();
+    evenement.stopPropagation();
+  };
+  types.forEach((type) => document.addEventListener(type, bloquer, true));
+
+  const rendreLaMain = () => {
+    document.removeEventListener('pointerup', rendreLaMain, true);
+    document.removeEventListener('pointercancel', rendreLaMain, true);
+    // La salve suit le lever du doigt : on la laisse passer, puis on rouvre.
+    setTimeout(() => types.forEach((t) => document.removeEventListener(t, bloquer, true)), 60);
+  };
+  document.addEventListener('pointerup', rendreLaMain, true);
+  document.addEventListener('pointercancel', rendreLaMain, true);
+  setTimeout(rendreLaMain, 4000); // filet : un doigt finit toujours par se lever
+}
+
+/**
+ * Câble `action` sur le clic droit **et** sur l'appui long. `action` reçoit un
+ * objet portant `clientX` / `clientY` : les deux gestes désignent un point, et
+ * les menus ne demandent rien d'autre.
+ *
+ * Renvoie `sortDAppuiLong()`, vrai depuis le déclenchement d'un appui long
+ * jusqu'au geste suivant : le clic qui vient est le lever du doigt, pas un
+ * choix. On le borne au **geste**, jamais à une durée — sinon un enchaînement
+ * rapide (appui long, « Relier à… », touche sur l'autre fiche) verrait sa
+ * deuxième touche avalée par le minuteur.
+ */
+export function surMenuContextuel(element, action) {
+  let appui = null;
+  let appuiLongDeclenche = false;
+
+  element.addEventListener('contextmenu', (evenement) => {
+    evenement.preventDefault();
+    action(evenement);
+  });
+
+  const annuler = () => {
+    if (!appui) return;
+    clearTimeout(appui.minuterie);
+    appui = null;
+  };
+
+  // La souris est exclue : elle a son clic droit, et un bouton maintenu une
+  // demi-seconde est un glisser qui commence, pas une demande de menu.
+  element.addEventListener('pointerdown', (evenement) => {
+    annuler();
+    appuiLongDeclenche = false; // un nouveau geste commence : la page est tournée
+    if (evenement.pointerType === 'mouse') return;
+    if (evenement.isPrimary === false) return; // second doigt : c'est un zoom
+    const { clientX: x, clientY: y } = evenement;
+    appui = {
+      x,
+      y,
+      minuterie: setTimeout(() => {
+        appui = null;
+        appuiLongDeclenche = true;
+        navigator.vibrate?.(18); // le geste est reçu, avant même de lever
+        etoufferSalveSouris();
+        action({ clientX: x, clientY: y, preventDefault() {} });
+      }, DUREE_APPUI),
+    };
+  });
+
+  element.addEventListener('pointermove', (evenement) => {
+    if (!appui) return;
+    if (Math.hypot(evenement.clientX - appui.x, evenement.clientY - appui.y) > TOLERANCE_APPUI) {
+      annuler();
+    }
+  });
+  element.addEventListener('pointerup', annuler);
+  element.addEventListener('pointercancel', annuler);
+
+  return () => appuiLongDeclenche;
+}
+
 /** Place un panneau près de (x, y) sans jamais le laisser sortir de l'écran. */
 export function placer(element, x, y, { marge = 10, decalage = 2 } = {}) {
   element.style.left = '0px';

@@ -3,6 +3,7 @@
 
 import { Api } from './api.js';
 import { champSuggere } from './autocomplete.js';
+import { anneeDe, ageDe, naissanceDepuisAge } from './calendrier.js';
 import { h } from './dom.js';
 import { curseurHumeur } from './humeur.js';
 
@@ -277,6 +278,69 @@ export function creerPanneau(element, rappels = {}) {
     return h('div', { class: 'champ-edit pleine' }, [h('label', { texte: 'Lieu' }), champ]);
   }
 
+  /**
+   * L'âge et l'année de naissance : deux façons de saisir la même chose.
+   *
+   * Seule l'**année de naissance** est enregistrée. Taper un âge la calcule,
+   * taper une année recalcule l'âge — et comme rien n'est stocké en double, les
+   * âges de toute la campagne avancent d'un coup quand le MJ pousse la date.
+   *
+   * Pour un mort, l'âge se compte jusqu'à son décès, pas jusqu'à aujourd'hui :
+   * c'est l'âge qu'il avait, et il n'en aura pas d'autre.
+   */
+  function champsAgeEtNaissance() {
+    const anneeCourante = referentiels.meta?.annee_courante || '';
+    // L'année de référence : celle de la mort pour un mort daté, sinon celle
+    // de la campagne.
+    const reference = () =>
+      brouillon.statut === 'mort' && anneeDe(brouillon.deces) !== null
+        ? brouillon.deces
+        : anneeCourante;
+    const utilisable = () => anneeDe(reference()) !== null;
+
+    const champNaissance = h('input', {
+      type: 'text',
+      placeholder: '263 AC',
+      value: brouillon.naissance ?? '',
+      oninput: (evenement) => {
+        marquerModifie('naissance', evenement.target.value);
+        champAge.value = ageDe(evenement.target.value, reference()) ?? '';
+      },
+    });
+
+    const champAge = h('input', {
+      type: 'number',
+      placeholder: utilisable() ? '17' : '—',
+      value: ageDe(brouillon.naissance, reference()) ?? '',
+      oninput: (evenement) => {
+        const age = Number.parseInt(evenement.target.value, 10);
+        const naissance = Number.isFinite(age) ? naissanceDepuisAge(age, reference()) : null;
+        champNaissance.value = naissance ?? '';
+        marquerModifie('naissance', naissance ?? '');
+      },
+    });
+    if (!utilisable()) champAge.disabled = true;
+
+    const libelleAge =
+      brouillon.statut === 'mort' && anneeDe(brouillon.deces) !== null ? 'Âge à sa mort' : 'Âge';
+
+    return [
+      h('div', { class: 'champ-edit' }, [h('label', { texte: libelleAge }), champAge]),
+      h('div', { class: 'champ-edit' }, [
+        h('label', { texte: 'Naissance' }),
+        champNaissance,
+      ]),
+    ];
+  }
+
+  function aideAge() {
+    const annee = referentiels.meta?.annee_courante;
+    if (anneeDe(annee) === null) {
+      return 'Âge : réglez d’abord l’année de la campagne (📅 dans la barre du haut) — sans elle, seule l’année de naissance se saisit.';
+    }
+    return `Âge : calculé sur ${annee}, l’année courante de la campagne. Saisir l’un remplit l’autre, et avancer la date vieillit tout le monde d’un coup.`;
+  }
+
   function champSelection(cle, libelle, options) {
     const select = h('select', {
       onchange: (evenement) => marquerModifie(cle, evenement.target.value),
@@ -306,7 +370,7 @@ export function creerPanneau(element, rappels = {}) {
           { id: 'mort', label: 'Mort' },
           { id: 'inconnu', label: 'Inconnu' },
         ]),
-        champTexte('naissance', 'Naissance'),
+        ...champsAgeEtNaissance(),
         champTexte('deces', 'Décès'),
         // Tout ce qui sert d'axe de filtre doit s'éditer ici. La génération
         // est la seule qui se déduisait de l'arbre sans qu'on puisse la
@@ -321,6 +385,7 @@ export function creerPanneau(element, rappels = {}) {
         champListe('titres', 'Titres'),
         champListe('tags', 'Tags'),
       ]),
+      h('p', { class: 'echelle-aide', texte: aideAge() }),
       h('p', {
         class: 'echelle-aide',
         texte: donnees.photo
@@ -415,10 +480,18 @@ export function creerPanneau(element, rappels = {}) {
   // frappe, et le serveur écrit en base dans la foulée. Il n'y a donc rien à
   // « enregistrer » ensuite, et rien à perdre en fermant l'onglet.
 
-  /** Champs qui changent le dessin : les seuls à valoir un redessin du plan. */
+  /**
+   * Champs qui changent le dessin : les seuls à valoir un redessin du plan.
+   *
+   * `naissance` et `deces` y sont depuis que les fiches affichent un **âge** :
+   * sans eux, on tapait « 13 ans » et la carte continuait d'en afficher 11.
+   * (`notes`, `titres` et `lieu` restent dehors : ils se voient aussi sur la
+   * carte, mais on les saisit par paragraphes, et recharger la vue à chaque
+   * pause de frappe coûterait un aller-retour pour rien.)
+   */
   const CHAMPS_VISIBLES = new Set([
     'prenom', 'nom', 'surnom', 'maison', 'statut', 'importance', 'couleur',
-    'tags', 'relations_joueurs', 'avatar',
+    'tags', 'relations_joueurs', 'avatar', 'naissance', 'deces',
   ]);
 
   const enAttente = () => Object.keys(aEnvoyer).length > 0;

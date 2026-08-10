@@ -130,8 +130,20 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .bouton-icone { padding: 5px 10px; }
 .bouton-plat { background: transparent; border-color: transparent; }
 .bouton-plat:hover { background: var(--fond-3); border-color: var(--bord); }
-.bouton .ico { opacity: .75; margin-right: 2px; }
+.bouton .ico { opacity: .75; margin-right: 4px; }
 .bouton:disabled { opacity: .45; cursor: default; }
+/* Le seul bouton de la barre basse qui *écrit* : il se distingue des commandes
+   de cadrage, qui ne font que regarder. */
+/* L'année de campagne : lue souvent, changée rarement. Quand elle manque, elle
+   se signale — sans elle, aucune fiche n'affiche d'âge. */
+#btn-annee { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#btn-annee.sans-annee { color: var(--texte-faible); font-style: italic; }
+.annee-reglage { display: flex; align-items: center; gap: 6px; }
+.annee-reglage input { flex: 1; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
+
+.bouton-creer { color: var(--accent-fonce); font-weight: 600; }
+.bouton-creer:hover { background: var(--accent-doux); border-color: var(--accent); }
+.bouton-creer .ico { opacity: 1; }
 
 /* ------------------------------------------------------------------ rail */
 
@@ -221,7 +233,13 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   background-size: 26px 26px;
 }
 
-.plan { position: absolute; inset: 0; overflow: hidden; cursor: grab; }
+/* `touch-action: none` : le doigt déplace le plan, il ne fait pas défiler la
+   page. Contrepartie assumée — le menu long-press du navigateur disparaît, et
+   c'est `surMenuContextuel` qui le remplace (voir js/dom.js). */
+.plan {
+  position: absolute; inset: 0; overflow: hidden; cursor: grab;
+  touch-action: none; -webkit-tap-highlight-color: transparent;
+}
 .plan:active { cursor: grabbing; }
 .monde { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .liens { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -275,6 +293,9 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   display: flex; flex-direction: column;   /* le corps remplit la hauteur commune */
   padding-top: 34px;                 /* espace du portrait */
   cursor: pointer;
+  /* Un appui long sur une fiche ouvre notre menu : ni sélection de texte, ni
+     bulle « copier », ni loupe iOS ne doivent venir s'y superposer. */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   transition: left .55s cubic-bezier(.4, 0, .2, 1),
               top .55s cubic-bezier(.4, 0, .2, 1),
               opacity .25s ease, filter .2s ease;
@@ -1017,12 +1038,14 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 
 /* ------------------------------------------------------------ téléphone
  *
- * Passe minimale, et assumée comme telle : le but est de **consulter** un
- * arbre depuis un téléphone. Éditer demande le clic droit et le glisser, qui
- * n'ont pas d'équivalent tactile — c'est dit dans le rail plutôt que subi.
+ * L'arbre s'édite au doigt depuis le lot 8 : l'appui long ouvre le même menu
+ * que le clic droit (fiche, lien, fond), « ＋ Profil » crée quelqu'un sans
+ * viser, et un lien armé se termine d'une simple touche. Restent à la souris
+ * le glisser d'une fiche et la poignée ＋.
  *
  * Les deux volets deviennent des tiroirs plein écran, ouverts par ☰ et 👤 ;
- * la barre du haut ne garde que ce qui sert sans souris.
+ * la barre du haut ne garde que ce qui sert sans souris — dont le thème, qui
+ * y a été remonté depuis la barre basse.
  */
 @media (max-width: 760px) {
   .btn-telephone { display: inline-flex; }
@@ -1055,7 +1078,19 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   .rail.ouvert, .panneau.ouvert { transform: translateX(0); }
   .rail.replie { margin-left: 0; }
 
-  /* La barre de cadrage sert au doigt : elle reste, mais serrée. */
-  .barre-basse { flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
-  #zoom-curseur { width: 90px; }
+  /* Tiroirs fermés : hors de l'écran, mais ils comptaient encore dans la
+     largeur de défilement — on pouvait faire glisser la page vers le vide. */
+  .corps { overflow: hidden; }
+
+  /* La barre basse sert au doigt, mais elle ne doit pas manger le tiers de
+     l'écran : les commandes de cadrage passent en icônes, seul « ＋ Profil »
+     — le seul bouton qui écrit — garde son libellé. */
+  .barre-basse { flex-wrap: nowrap; gap: 2px; padding: 5px 7px; max-width: calc(100vw - 20px); }
+  .barre-basse .bouton { padding: 6px 7px; }
+  .barre-basse #btn-ajuster .lib,
+  .barre-basse #btn-focus .lib { display: none; }
+  .barre-basse .bouton .ico { margin-right: 0; }
+  #btn-nouveau-profil { flex: 0 0 auto; }
+  #zoom-curseur { width: 68px; }
+  .separateur-vertical { margin: 0 1px; }
 }

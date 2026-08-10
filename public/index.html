@@ -41,7 +41,10 @@
         </label>
         <a id="lien-document" class="bouton" target="_blank" rel="noopener"
            title="Ouvrir le document de campagne dans un nouvel onglet">📜 Document</a>
+        <!-- L'année courante : c'est d'elle que tous les âges se déduisent. -->
+        <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
+        <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
         <span class="groupe-compte">
           <span class="compte" id="compte" title="Compte connecté">…</span>
           <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden>⚙</a>
@@ -59,7 +62,7 @@
       <aside class="rail" id="rail">
         <section class="rail-bloc">
           <h2>Sauvegardes</h2>
-          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit : renommer, dupliquer, télécharger.</p>
+          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit ou appui long : renommer, dupliquer, télécharger.</p>
           <ul class="liste-sauvegardes" id="liste-sauvegardes"></ul>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-nouvelle-sauvegarde" title="Créer une sauvegarde">＋ Nouvelle</button>
@@ -113,14 +116,16 @@
         <section class="rail-bloc" id="bloc-edition">
           <h2>Édition</h2>
           <ul class="rail-astuces">
-            <li><b>Clic droit</b> sur une fiche : ouvrir, relier, supprimer.</li>
-            <li><b>Clic droit</b> dans le vide : nouveau profil.</li>
+            <li><b>Clic droit</b> — ou <b>appui long</b> au doigt — sur une fiche : ouvrir, relier, supprimer.</li>
+            <li><b>Clic droit</b> ou <b>appui long</b> dans le vide : nouveau profil.</li>
+            <li><b>＋ Profil</b>, en bas de l’écran : créer quelqu’un sans viser.</li>
+            <li><b>Relier à…</b> puis un simple clic (ou une touche) sur l’autre fiche.</li>
             <li><b>Poignée ＋</b> sous une fiche : glisser vers une autre pour créer un lien.</li>
             <li><b>Maj + clic</b> sur deux fiches : les relier sans quitter la vue.</li>
             <li><b>Ctrl + glisser</b> une fiche : la repositionner à la main.</li>
             <li><b>Clic</b> sur un lien : changer son type et son humeur.</li>
           </ul>
-          <p class="rail-aide astuce-telephone">Sur téléphone, l’arbre se <b>consulte</b> : le clic droit et le glisser n’ont pas d’équivalent tactile. Pour modifier, ouvrez la page sur un écran large.</p>
+          <p class="rail-aide astuce-telephone">Au doigt, l’<b>appui long</b> remplace le clic droit : il ouvre le même menu sur une fiche, sur un lien ou dans le vide. Seuls le glisser d’une fiche et la poignée ＋ demandent une souris.</p>
         </section>
 
         <section class="rail-bloc">
@@ -136,12 +141,19 @@
         <div class="astuce-scene" id="astuce-scene" hidden></div>
 
         <div class="barre-basse">
+          <!-- Créer quelqu'un sans passer par le clic droit : c'est le geste le
+               plus fréquent, et le seul qui n'avait pas de bouton. -->
+          <button class="bouton bouton-plat bouton-creer" id="btn-nouveau-profil"
+                  title="Créer un profil — il apparaît sur le plan sans quitter la vue">
+            <span class="ico">＋</span><span class="lib">Profil</span>
+          </button>
+          <span class="separateur-vertical"></span>
           <span class="groupe-cadrage" id="groupe-cadrage">
             <button class="bouton bouton-plat" id="btn-ajuster" title="Tout afficher">
-              <span class="ico">⤢</span> Ajuster
+              <span class="ico">⤢</span><span class="lib">Ajuster</span>
             </button>
             <button class="bouton bouton-plat" id="btn-focus" title="Centrer sur la personne sélectionnée">
-              <span class="ico">◎</span> Focus
+              <span class="ico">◎</span><span class="lib">Focus</span>
             </button>
             <span class="separateur-vertical"></span>
             <button class="bouton bouton-icone" id="zoom-moins" title="Dézoomer">−</button>
@@ -149,9 +161,6 @@
             <button class="bouton bouton-icone" id="zoom-plus" title="Zoomer">+</button>
             <span class="separateur-vertical"></span>
           </span>
-          <button class="bouton bouton-plat" id="btn-theme" title="Thème clair / sombre">
-            <span class="ico">◐</span> Thème
-          </button>
         </div>
       </main>
 

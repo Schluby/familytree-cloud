@@ -66,6 +66,7 @@ export const routesDomaine = new Hono<{ Bindings: Env; Variables: Variables }>()
 const SURFACE = [
   '/referentiels',
   '/dataset',
+  '/meta',
   '/vues',
   '/vue/*',
   '/personnes',
@@ -387,6 +388,47 @@ routesDomaine.get('/dataset', async (c) => {
   const courant = await monde(c);
   if (courant instanceof Response) return courant;
   return c.json(courant.dataset.versDict());
+});
+
+/**
+ * L'année courante de la campagne — la seule clé de `meta` que l'application
+ * sache écrire.
+ *
+ * Elle est **volontairement du texte libre**, au même format que le champ
+ * « Naissance » d'une fiche (« 300 AC ») : Westeros ne compte pas les années
+ * comme nous, et un `number` obligerait à trancher une convention que la table
+ * n'a pas forcément adoptée. Ce qui compte, c'est qu'on puisse en extraire un
+ * entier — c'est lui qui fait les âges, côté navigateur.
+ *
+ * Le reste de `meta` (titre, univers, document…) vient du fichier de
+ * sauvegarde et ne s'édite pas ici : ce n'est pas un oubli.
+ */
+routesDomaine.patch('/meta', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+  const corps = await corpsDe(c);
+
+  if (!Object.hasOwn(corps, 'annee_courante')) {
+    return c.json({ erreur: 'rien à modifier : seule « annee_courante » est éditable' }, 400);
+  }
+
+  const brut = corps.annee_courante;
+  if (brut === null || brut === '') {
+    delete courant.dataset.meta.annee_courante;
+  } else {
+    const texte = String(brut).trim().slice(0, 40);
+    if (!/-?\d/.test(texte)) {
+      return c.json({ erreur: "l'année doit contenir un nombre (« 300 AC », « 1482 »…)" }, 400);
+    }
+    courant.dataset.meta.annee_courante = texte;
+  }
+
+  try {
+    await enregistrer(c, courant);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+  return c.json({ meta: courant.dataset.meta });
 });
 
 /* --------------------------------------------------------------------------

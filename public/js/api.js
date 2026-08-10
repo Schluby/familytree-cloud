@@ -87,6 +87,13 @@ export const Api = {
   vues: () => requete('/api/vues'),
   vue: (id, parametres) => requete(`/api/vue/${id}${versQuery(parametres)}`),
 
+  /** L'année courante de la campagne : la seule clé de `meta` qui s'écrit. */
+  majAnnee: (annee) =>
+    requete('/api/meta', {
+      method: 'PATCH',
+      body: JSON.stringify({ annee_courante: annee }),
+    }),
+
   // ------------------------------------------------------------- le compte
   moi: () => requete('/api/auth/moi'),
   deconnexion: () => requete('/api/auth/deconnexion', { method: 'POST' }),

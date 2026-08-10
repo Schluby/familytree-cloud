@@ -10,8 +10,10 @@ import { obtenirRendu } from './registry.js';
 import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
 import { curseurHumeur, definirTable, tableHumeur } from './humeur.js';
-import { telecharger } from './dom.js';
+import { ageAffiche, formaterAge } from './calendrier.js';
+import { surMenuContextuel, telecharger } from './dom.js';
 import {
+  creerEditeurAnnee,
   creerEditeurCategorie,
   creerEditeurJoueur,
   creerEditeurFiltre,
@@ -59,6 +61,7 @@ const elements = {
   panneauListe: document.getElementById('panneau-liste'),
   panneauFiche: document.getElementById('panneau-fiche'),
   ongletFiche: document.getElementById('onglet-fiche'),
+  btnNouveauProfil: document.getElementById('btn-nouveau-profil'),
   btnAjuster: document.getElementById('btn-ajuster'),
   btnFocus: document.getElementById('btn-focus'),
   btnTheme: document.getElementById('btn-theme'),
@@ -66,6 +69,7 @@ const elements = {
   zoomMoins: document.getElementById('zoom-moins'),
   zoomPlus: document.getElementById('zoom-plus'),
   lienDocument: document.getElementById('lien-document'),
+  btnAnnee: document.getElementById('btn-annee'),
   blocJoueurs: document.getElementById('bloc-joueurs'),
   listeJoueurs: document.getElementById('liste-joueurs'),
   btnNouveauJoueur: document.getElementById('btn-nouveau-joueur'),
@@ -193,6 +197,19 @@ const editeurCategorieRapide = creerEditeurCategorie({
   },
 });
 
+// Changer l'année recalcule tous les âges : la vue et la fiche ouverte
+// repartent du serveur, sinon on lirait des âges d'avant la bascule.
+const editeurAnnee = creerEditeurAnnee({
+  annee: () => anneeCourante(),
+  surChangement: async (meta) => {
+    etat.referentiels = { ...etat.referentiels, meta };
+    dessinerAnnee();
+    await rechargerVue({ conserverFocus: true });
+    if (etat.selection) await panneau.afficher(etat.selection, { secrets: !!etat.parametres.secrets });
+    astuce(`Nous sommes en ${meta.annee_courante || '—'} : les âges ont suivi.`);
+  },
+});
+
 const editeurType = creerEditeurType({
   types: () => etat.referentiels.types_relations || [],
   catalogues: () => etat.referentiels,
@@ -276,7 +293,26 @@ async function chargerUnivers() {
   elements.univers.textContent = meta.sauvegarde || meta.titre || '';
   elements.univers.title = meta.titre || '';
   elements.lienDocument.href = meta.document || DOCUMENT_PAR_DEFAUT;
+  dessinerAnnee();
   remplirSelecteurCouleur();
+}
+
+/* ------------------------------------------------------- année de campagne
+ *
+ * Une seule date, gardée dans la sauvegarde, d'où se déduisent tous les âges.
+ * L'avancer d'un an vieillit toute la campagne — c'est le geste que le MJ fait
+ * entre deux séances, et il n'a qu'un champ à changer.
+ */
+
+const anneeCourante = () => etat.referentiels.meta?.annee_courante || '';
+
+function dessinerAnnee() {
+  const annee = anneeCourante();
+  elements.btnAnnee.textContent = annee ? `📅 ${annee}` : '📅 Année…';
+  elements.btnAnnee.title = annee
+    ? `Année courante de la campagne : ${annee}. Les âges des fiches en découlent — cliquez pour l’avancer.`
+    : 'Aucune année de campagne : les fiches n’affichent que leur année de naissance. Cliquez pour la régler.';
+  elements.btnAnnee.classList.toggle('sans-annee', !annee);
 }
 
 function message(texte) {
@@ -342,10 +378,7 @@ async function dessinerSauvegardes() {
       li.addEventListener('click', () => {
         if (!fiche.actif) ouvrirSauvegarde(fiche.id);
       });
-      li.addEventListener('contextmenu', (evenement) => {
-        evenement.preventDefault();
-        menuSauvegarde(fiche, evenement);
-      });
+      surMenuContextuel(li, (evenement) => menuSauvegarde(fiche, evenement));
       return li;
     })
   );
@@ -583,7 +616,15 @@ async function rechargerVue({ conserverFocus = false } = {}) {
 
   if (!etat.moteur) {
     etat.moteur = adapterMoteur(fabrique(elements.scene, {
-      surSelection: (id) => selectionner(id),
+      // Un lien armé se termine au clic simple : au doigt, il n'y a ni Maj ni
+      // glisser, et l'appui long a déjà servi à choisir « Relier à… ».
+      surSelection: (id, noeud, evenement) => {
+        if (etat.lienEnAttente) {
+          liaisonRapide(id, evenement);
+          return;
+        }
+        selectionner(id);
+      },
       surFond: () => annulerLiaisonRapide(),
       surSurvolLien: (arete, evenement) => infobulleLien(arete, evenement),
       surFinSurvol: () => masquerInfobulle(),
@@ -613,6 +654,9 @@ async function rechargerVue({ conserverFocus = false } = {}) {
     recherche: etat.recherche,
     typesMasques: etat.typesMasques,
     noeudsMasques: etat.noeudsMasques,
+    // Le moteur ne lit pas l'API : l'année de la campagne lui est descendue,
+    // et c'est elle qui transforme les naissances en âges sur les fiches.
+    anneeCourante: anneeCourante(),
   });
 
   dessinerLegendes();
@@ -707,13 +751,18 @@ function astuce(texte) {
   elements.astuce.textContent = texte || '';
 }
 
-/** Maj + clic : on arme une fiche, le clic suivant crée le lien. */
+/**
+ * On arme une fiche, la suivante crée le lien. Trois chemins y mènent :
+ * Maj + clic, « Relier à… » du menu contextuel, et l'appui long au doigt. Une
+ * fois armé, un **clic simple** suffit à désigner l'autre bout — sans quoi le
+ * geste serait impossible sur un téléphone, qui n'a ni Maj ni glisser.
+ */
 function liaisonRapide(id, evenement) {
   if (!etat.lienEnAttente) {
     etat.lienEnAttente = id;
     etat.moteur?.marquerEnAttente(id);
     astuce(
-      `Départ : ${trouverNoeud(id)?.label || id} — Maj + clic sur une autre fiche pour créer le lien (Échap pour annuler).`
+      `Départ : ${trouverNoeud(id)?.label || id} — touchez (ou cliquez) une autre fiche pour créer le lien. Échap ou « Vue générale » pour annuler.`
     );
     return;
   }
@@ -724,7 +773,20 @@ function liaisonRapide(id, evenement) {
   const source = etat.lienEnAttente;
   annulerLiaisonRapide();
   masquerInfobulle();
-  editeurLien.ouvrirCreation({ source, cible: id }, evenement.clientX, evenement.clientY);
+  // Sans événement (menu, appui long), l'éditeur se pose sur la fiche visée.
+  const point = pointDe(evenement, id);
+  editeurLien.ouvrirCreation({ source, cible: id }, point.x, point.y);
+}
+
+/** Le point d'ancrage d'un panneau : celui du geste, sinon celui de la fiche. */
+function pointDe(evenement, id) {
+  if (evenement && Number.isFinite(evenement.clientX)) {
+    return { x: evenement.clientX, y: evenement.clientY };
+  }
+  const position = etat.moteur?.positionDe?.(id);
+  const scene = elements.scene.getBoundingClientRect();
+  if (position) return { x: scene.left + position.x, y: scene.top + position.y };
+  return { x: scene.left + scene.width / 2, y: scene.top + scene.height / 3 };
 }
 
 function annulerLiaisonRapide() {
@@ -1043,14 +1105,18 @@ function itemPersonne(noeud) {
   nom.textContent = noeud.label;
   const meta = document.createElement('div');
   meta.className = 'item-meta';
+  // L'âge d'abord — c'est ce qu'on cherche en pleine partie ; l'année de
+  // naissance reste en infobulle sur la ligne.
+  const age = ageAffiche(noeud, anneeCourante());
   meta.textContent =
     [
-      noeud.naissance || '',
+      age !== null ? formaterAge(age) : noeud.naissance || '',
       noeud.statut === 'mort' && noeud.deces ? `† ${noeud.deces}` : '',
     ]
       .filter(Boolean)
       .join('  ·  ') ||
     [noeud.maison_label, noeud.statut === 'mort' ? '†' : ''].filter(Boolean).join('  ·  ');
+  if (noeud.naissance) ligne.title = `Né en ${noeud.naissance}`;
   corps.append(nom, meta);
 
   ligne.append(avatar, corps);
@@ -1146,10 +1212,7 @@ function dessinerJoueurs() {
         const boite = li.getBoundingClientRect();
         editeurJoueur.ouvrirModification(joueur, boite.right + 8, boite.top);
       });
-      li.addEventListener('contextmenu', (evenement) => {
-        evenement.preventDefault();
-        menuJoueur(joueur, evenement);
-      });
+      surMenuContextuel(li, (evenement) => menuJoueur(joueur, evenement));
       return li;
     })
   );
@@ -1505,10 +1568,7 @@ function dessinerLegendeTypes() {
         etat.moteur?.majOptions({ typesMasques: etat.typesMasques });
         majStats();
       });
-      li.addEventListener('contextmenu', (evenement) => {
-        evenement.preventDefault();
-        menuType(type, evenement);
-      });
+      surMenuContextuel(li, (evenement) => menuType(type, evenement));
       return li;
     })
   );
@@ -1598,10 +1658,7 @@ function dessinerAxes() {
         appliquerCouleurPar(axe.id);
       });
       if (axe.fiche) {
-        bouton.addEventListener('contextmenu', (evenement) => {
-          evenement.preventDefault();
-          menuFiltrePersonnalise(axe.fiche, evenement);
-        });
+        surMenuContextuel(bouton, (evenement) => menuFiltrePersonnalise(axe.fiche, evenement));
       }
       return bouton;
     })
@@ -1660,10 +1717,7 @@ function dessinerFiltre() {
         etat.moteur?.majOptions({ noeudsMasques: etat.noeudsMasques });
       });
       if (critere.menu) {
-        li.addEventListener('contextmenu', (evenement) => {
-          evenement.preventDefault();
-          critere.menu(entree, evenement);
-        });
+        surMenuContextuel(li, (evenement) => critere.menu(entree, evenement));
       }
       return li;
     })
@@ -1942,6 +1996,10 @@ elements.btnNouveauFiltre.addEventListener('click', (evenement) =>
   editeurFiltre.ouvrirCreation(evenement.clientX, evenement.clientY)
 );
 
+elements.btnAnnee.addEventListener('click', (evenement) => {
+  const boite = evenement.currentTarget.getBoundingClientRect();
+  editeurAnnee.ouvrir(boite.left, boite.bottom + 6);
+});
 elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
 // Sur écran large, ☰ replie le rail. Sur téléphone, les deux volets sont des
 // tiroirs qui couvrent la scène : ouvrir l'un ferme l'autre, sinon on empile
@@ -1958,6 +2016,12 @@ elements.btnPanneau.addEventListener('click', () => {
 elements.btnFermerPanneau.addEventListener('click', () =>
   elements.panneauVolet.classList.remove('ouvert')
 );
+// Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
+// pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
+elements.btnNouveauProfil.addEventListener('click', (evenement) => {
+  const boite = evenement.currentTarget.getBoundingClientRect();
+  formulairePersonne.ouvrir(boite.left, boite.top - 12, {});
+});
 elements.btnAjuster.addEventListener('click', () => etat.moteur?.recentrer());
 elements.btnFocus.addEventListener('click', () => {
   if (etat.selection) etat.moteur?.focus(etat.selection);
