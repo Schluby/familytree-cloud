@@ -1,0 +1,2071 @@
+/* Point d'entrée : orchestre l'API, le moteur de rendu et les panneaux.
+ *
+ * Rien ici n'est spécifique au sociogramme : la liste des vues vient de
+ * /api/vues, le module de rendu est chargé d'après `payload.rendu`, et les
+ * contrôles du rail sont générés à partir des paramètres déclarés par la vue.
+ */
+
+import { Api } from './api.js';
+import { obtenirRendu } from './registry.js';
+import { creerPanneau } from './panel.js';
+import { creerMenu } from './menu.js';
+import { curseurHumeur, definirTable, tableHumeur } from './humeur.js';
+import { telecharger } from './dom.js';
+import {
+  creerEditeurCategorie,
+  creerEditeurJoueur,
+  creerEditeurFiltre,
+  creerEditeurLien,
+  creerEditeurMaison,
+  creerEditeurSauvegarde,
+  creerEditeurType,
+  creerFormulairePersonne,
+} from './editeurs.js';
+
+const elements = {
+  univers: document.getElementById('univers'),
+  filVue: document.getElementById('fil-vue'),
+  filSeparateur: document.getElementById('fil-separateur'),
+  filFocus: document.getElementById('fil-focus'),
+  listeVues: document.getElementById('liste-vues'),
+  listeSauvegardes: document.getElementById('liste-sauvegardes'),
+  btnNouvelleSauvegarde: document.getElementById('btn-nouvelle-sauvegarde'),
+  btnImporterSauvegarde: document.getElementById('btn-importer-sauvegarde'),
+  blocLiens: document.getElementById('bloc-liens'),
+  blocMaisons: document.getElementById('bloc-maisons'),
+  btnNouveauType: document.getElementById('btn-nouveau-type'),
+  btnNouvelleMaison: document.getElementById('btn-nouvelle-maison'),
+  blocEdition: document.getElementById('bloc-edition'),
+  groupeCadrage: document.getElementById('groupe-cadrage'),
+  selecteurCouleur: document.getElementById('selecteur-couleur'),
+  selecteurGroupe: document.getElementById('selecteur-groupe'),
+  recherche: document.getElementById('recherche'),
+  btnVueGenerale: document.getElementById('btn-vue-generale'),
+  btnRail: document.getElementById('btn-rail'),
+  rail: document.getElementById('rail'),
+  scene: document.getElementById('scene'),
+  message: document.getElementById('scene-message'),
+  infobulle: document.getElementById('infobulle'),
+  astuce: document.getElementById('astuce-scene'),
+  legendeTypes: document.getElementById('legende-types'),
+  legendeMaisons: document.getElementById('legende-maisons'),
+  titreFiltre: document.getElementById('titre-filtre'),
+  btnNouveauFiltre: document.getElementById('btn-nouveau-filtre'),
+  axesFiltre: document.getElementById('axes-filtre'),
+  aideFiltre: document.getElementById('aide-filtre'),
+  optionsVue: document.getElementById('options-vue'),
+  stats: document.getElementById('stats'),
+  listePersonnes: document.getElementById('liste-personnes'),
+  panneauListe: document.getElementById('panneau-liste'),
+  panneauFiche: document.getElementById('panneau-fiche'),
+  ongletFiche: document.getElementById('onglet-fiche'),
+  btnAjuster: document.getElementById('btn-ajuster'),
+  btnFocus: document.getElementById('btn-focus'),
+  btnTheme: document.getElementById('btn-theme'),
+  zoomCurseur: document.getElementById('zoom-curseur'),
+  zoomMoins: document.getElementById('zoom-moins'),
+  zoomPlus: document.getElementById('zoom-plus'),
+  lienDocument: document.getElementById('lien-document'),
+  blocJoueurs: document.getElementById('bloc-joueurs'),
+  listeJoueurs: document.getElementById('liste-joueurs'),
+  btnNouveauJoueur: document.getElementById('btn-nouveau-joueur'),
+  btnTelecharger: document.getElementById('btn-telecharger'),
+  btnInstantane: document.getElementById('btn-instantane'),
+  etatEcriture: document.getElementById('etat-ecriture'),
+  compte: document.getElementById('compte'),
+  btnDeconnexion: document.getElementById('btn-deconnexion'),
+  btnPanneau: document.getElementById('btn-panneau'),
+  btnFermerPanneau: document.getElementById('btn-fermer-panneau'),
+  panneauVolet: document.getElementById('panneau'),
+  aidePlafonds: document.getElementById('aide-plafonds'),
+};
+
+// Le document de campagne : celui de Maxime par défaut, mais chaque sauvegarde
+// peut pointer ailleurs via `meta.document` — un autre univers, un autre doc.
+// Même palette que le moteur de rendu pour les générations.
+const COULEURS_GENERATION = ['#a8559f', '#8265c0', '#5b7fc4', '#2f97a8', '#2f9e78'];
+
+const DOCUMENT_PAR_DEFAUT =
+  'https://docs.google.com/document/d/1A_vnCVjB8EmC1uJHGS_SWfnewpjLfU5J/edit?usp=drivesdk&ouid=108401150327151060336&rtpof=true&sd=true';
+
+const etat = {
+  vues: [],
+  vueCourante: null,
+  sauvegardes: [],
+  referentiels: { maisons: [], joueurs: [], types_relations: [] },
+  parametres: {},
+  payload: null,
+  moteur: null,
+  // `null` = « tout est coché ». Sinon, l'ensemble des seuls éléments visibles.
+  typesVisibles: null,
+  typesMasques: new Set(),
+  // Un filtre par critère de couleur : `null` = tout est visible, sinon
+  // l'ensemble des seules classes retenues. Changer de couleur ne perd donc
+  // pas le filtre qu'on avait posé sur l'autre axe.
+  filtres: {},
+  noeudsMasques: new Set(),
+  couleurPar: 'maison',
+  groupePar: 'maison',
+  recherche: '',
+  selection: null,
+  lienEnAttente: null,
+  compte: null,
+  plafonds: null,
+  // Joueur en cours d'édition rapide : la liste de droite devient une
+  // grille d'humeurs envers lui.
+  joueurActif: null,
+};
+
+const modulesCharges = new Map();
+
+const panneau = creerPanneau(elements.panneauFiche, {
+  surNavigation: (id) => selectionner(id),
+  surCentrage: (id) => etat.moteur?.focus(id),
+  surVueGenerale: () => vueGenerale(),
+  surFermeture: () => vueGenerale(),
+  surOuverture: () => basculerOnglet('fiche'),
+  surEnregistrement: () => rechargerVue({ conserverFocus: true }),
+});
+
+const menu = creerMenu();
+
+const editeurLien = creerEditeurLien({
+  types: () => etat.referentiels.types_relations || [],
+  nomDe: (id) => trouverNoeud(id)?.label || id,
+  surChangement: () => rechargerVue({ conserverFocus: true }),
+});
+
+const editeurFiltre = creerEditeurFiltre({
+  surChangement: async (fiche, mode) => {
+    // L'axe est relevé *avant* de recharger : en repeuplant le sélecteur,
+    // `chargerUnivers` retombe déjà sur « maison » quand l'axe a disparu, et
+    // on ne saurait plus qu'il faut redessiner.
+    const axeAvant = etat.couleurPar;
+    await chargerUnivers();
+    if (mode === 'suppression') {
+      // Le filtre n'existe plus : sa sélection de segments non plus.
+      delete etat.filtres[`filtre:${fiche.supprime}`];
+      if (axeAvant === `filtre:${fiche.supprime}`) await appliquerCouleurPar('maison');
+      else remplirSelecteurCouleur();
+      return;
+    }
+    await appliquerCouleurPar(`filtre:${fiche.id}`);
+  },
+});
+
+const editeurSauvegarde = creerEditeurSauvegarde({
+  // Renommer ne change que l'étiquette ; créer ou importer change de monde.
+  surChangement: (fiche, mode) =>
+    mode === 'renommage' ? chargerUnivers() : ouvrirSauvegarde(fiche.id),
+  surErreur: (texte) => message(texte),
+});
+
+// Le catalogue a changé : couleurs, libellés, parfois l'appartenance des
+// fiches. `rechargerVue` recharge aussi les référentiels, tout suit.
+const surReferentielChange = () => rechargerVue({ conserverFocus: true });
+
+const editeurMaison = creerEditeurMaison({
+  maisons: () => etat.referentiels.maisons || [],
+  categories: () => etat.referentiels.categories_maisons || [],
+  // « ＋ Nouvelle catégorie… » depuis le formulaire d'une maison : on crée la
+  // catégorie, on recharge le catalogue, et on rouvre la maison dessus.
+  creerCategorie: (x, y, brouillonMaison) => {
+    editeurCategorieRapide.ouvrirCreation(x, y);
+    reprendreMaisonApresCategorie = brouillonMaison;
+  },
+  surChangement: surReferentielChange,
+});
+
+// Deux instances pour ne pas fermer le formulaire de maison en ouvrant celui
+// de la catégorie : chacune a son socle flottant.
+let reprendreMaisonApresCategorie = null;
+const editeurCategorieRapide = creerEditeurCategorie({
+  categories: () => etat.referentiels.categories_maisons || [],
+  surChangement: async (fiche) => {
+    await chargerUnivers();
+    const maison = reprendreMaisonApresCategorie;
+    reprendreMaisonApresCategorie = null;
+    if (maison && fiche?.id) {
+      editeurMaison.ouvrirModification({ ...maison, categorie: fiche.id }, 200, 160);
+    }
+    await rechargerVue({ conserverFocus: true });
+  },
+});
+
+const editeurType = creerEditeurType({
+  types: () => etat.referentiels.types_relations || [],
+  catalogues: () => etat.referentiels,
+  surChangement: surReferentielChange,
+});
+
+const editeurCategorie = creerEditeurCategorie({
+  categories: () => etat.referentiels.categories_maisons || [],
+  surChangement: surReferentielChange,
+});
+
+const editeurJoueur = creerEditeurJoueur({
+  joueurs: () => etat.referentiels.joueurs || [],
+  personnes: () => (etat.payload?.noeuds || []).map((n) => ({ id: n.id, label: n.label })),
+  surFiche: (id) => selectionner(id),
+  surChangement: async (fiche, mode) => {
+    if (mode === 'suppression' && etat.joueurActif === fiche.supprime) quitterJoueur();
+    await chargerUnivers();
+    await rechargerVue({ conserverFocus: true });
+  },
+});
+
+const formulairePersonne = creerFormulairePersonne({
+  maisons: () => etat.referentiels.maisons || [],
+  nomDe: (id) => trouverNoeud(id)?.label || id,
+  // Créer quelqu'un ne doit pas faire quitter la vue en cours : on épingle le
+  // nouveau venu pour qu'il apparaisse là où l'on travaille, et on ouvre sa
+  // fiche sans toucher au cadrage.
+  surCreation: async (personne, { lierA, x, y }) => {
+    etat.moteur?.epingler(personne.id);
+    await rechargerVue({ conserverFocus: true });
+    if (lierA) {
+      editeurLien.ouvrirCreation({ source: lierA, cible: personne.id }, x, y);
+      return;
+    }
+    elements.ongletFiche.disabled = false;
+    await panneau.afficher(personne.id, { secrets: !!etat.parametres.secrets });
+  },
+});
+
+// --------------------------------------------------------------- amorçage
+
+async function demarrer() {
+  appliquerTheme(localStorage.getItem('familytree-theme') || 'clair');
+  message('Chargement…');
+  // Le compte d'abord : c'est lui qui dit si la session tient encore, et un
+  // 401 renvoie à la connexion avant qu'on ait affiché un arbre vide.
+  await dessinerCompte();
+  try {
+    etat.vues = (await Api.vues()).vues;
+    dessinerListeVues();
+    // Un compte neuf n'a aucune sauvegarde, et le domaine répond 409 tant
+    // qu'il n'y en a pas une. On dessine quand même le rail : c'est là que se
+    // trouvent « ＋ Nouvelle » et « ⤒ Importer ».
+    await dessinerSauvegardes();
+    if (!etat.sauvegardes.length) {
+      elements.rail.classList.remove('replie');
+      message(
+        'Aucune sauvegarde pour l’instant. Dans le panneau de gauche : ' +
+          '« ＋ Nouvelle » pour partir d’un monde vide, « ⤒ Importer » pour ' +
+          'reprendre un fichier .json exporté.'
+      );
+      return;
+    }
+    await chargerUnivers();
+    await choisirVue(etat.vues[0]?.id);
+  } catch (erreur) {
+    message(`Impossible de contacter l'API : ${erreur.message}`);
+  }
+}
+
+/** Tout ce qui dépend de la sauvegarde active : maisons, types, joueurs… */
+async function chargerUnivers() {
+  const [referentiels] = await Promise.all([Api.referentiels(), dessinerSauvegardes()]);
+  etat.referentiels = referentiels;
+  definirTable(referentiels.humeurs);
+  panneau.definirReferentiels(referentiels);
+  // C'est la sauvegarde ouverte qui nomme l'en-tête : c'est elle qu'on
+  // manipule. Le titre de l'univers reste en infobulle.
+  const meta = referentiels.meta || {};
+  elements.univers.textContent = meta.sauvegarde || meta.titre || '';
+  elements.univers.title = meta.titre || '';
+  elements.lienDocument.href = meta.document || DOCUMENT_PAR_DEFAUT;
+  remplirSelecteurCouleur();
+}
+
+function message(texte) {
+  elements.message.hidden = !texte;
+  elements.message.textContent = texte || '';
+}
+
+// ---------------------------------------------------------- sauvegardes
+
+const pluriel = (nombre, mot) => `${nombre} ${mot}${nombre > 1 ? 's' : ''}`;
+
+const resumeContenu = (fiche) =>
+  `${pluriel(fiche.personnes, 'personne')} · ${pluriel(fiche.relations, 'lien')}`;
+
+const poids = (octets) => `${Math.max(1, Math.round((octets || 0) / 1024))} Ko`;
+
+/** Les plafonds sont ceux du compte : les afficher évite la mauvaise surprise. */
+function dessinerPlafonds() {
+  if (!elements.aidePlafonds) return;
+  const plafonds = etat.plafonds;
+  if (!plafonds) {
+    elements.aidePlafonds.textContent = '';
+    return;
+  }
+  const total = etat.sauvegardes.reduce((somme, fiche) => somme + (fiche.taille || 0), 0);
+  elements.aidePlafonds.textContent =
+    `${etat.sauvegardes.length} / ${plafonds.sauvegardes} sauvegardes · ` +
+    `${poids(total)} utilisés, ${poids(plafonds.octets)} par sauvegarde.`;
+}
+
+async function dessinerSauvegardes() {
+  let reponse;
+  try {
+    reponse = await Api.sauvegardes();
+  } catch (erreur) {
+    elements.listeSauvegardes.replaceChildren();
+    return;
+  }
+  etat.sauvegardes = reponse.sauvegardes;
+  etat.plafonds = reponse.plafonds || null;
+  dessinerPlafonds();
+  elements.listeSauvegardes.replaceChildren(
+    ...etat.sauvegardes.map((fiche) => {
+      const li = document.createElement('li');
+      li.className = `sauvegarde ${fiche.actif ? 'actif' : ''}`;
+      li.dataset.id = fiche.id;
+      li.title = `${poids(fiche.taille)} — modifiée le ${(fiche.modifie || '').replace('T', ' à ')}`;
+
+      const pastille = document.createElement('span');
+      pastille.className = 'sv-pastille';
+
+      const corps = document.createElement('div');
+      corps.className = 'sv-corps';
+      const nom = document.createElement('div');
+      nom.className = 'sv-nom';
+      nom.textContent = fiche.nom;
+      const meta = document.createElement('div');
+      meta.className = 'sv-meta';
+      meta.textContent = resumeContenu(fiche);
+      corps.append(nom, meta);
+
+      li.append(pastille, corps);
+      li.addEventListener('click', () => {
+        if (!fiche.actif) ouvrirSauvegarde(fiche.id);
+      });
+      li.addEventListener('contextmenu', (evenement) => {
+        evenement.preventDefault();
+        menuSauvegarde(fiche, evenement);
+      });
+      return li;
+    })
+  );
+}
+
+/** Changer de sauvegarde = changer de monde : on repart de la vue générale. */
+async function ouvrirSauvegarde(identifiant) {
+  message('Ouverture de la sauvegarde…');
+  try {
+    await Api.activerSauvegarde(identifiant);
+  } catch (erreur) {
+    message(`Impossible d'ouvrir : ${erreur.message}`);
+    return;
+  }
+  annulerLiaisonRapide();
+  etat.selection = null;
+  etat.typesVisibles = null;
+  etat.filtres = {};
+  etat.recherche = '';
+  elements.recherche.value = '';
+  elements.filSeparateur.hidden = true;
+  elements.filFocus.textContent = '';
+  panneau.fermer();
+  elements.ongletFiche.disabled = true;
+  basculerOnglet('liste');
+  await chargerUnivers();
+  await choisirVue(etat.vueCourante?.id || etat.vues[0]?.id);
+}
+
+function menuSauvegarde(fiche, evenement) {
+  const exporter = (format, parametres = {}) =>
+    telecharger(Api.urlExport(format, { sauvegarde: fiche.id, ...parametres }));
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: fiche.nom },
+    { texte: `${resumeContenu(fiche)} · ${poids(fiche.taille)}` },
+    !fiche.actif && {
+      label: 'Ouvrir cette sauvegarde',
+      icone: '▸',
+      onclick: () => ouvrirSauvegarde(fiche.id),
+    },
+    {
+      label: 'Renommer…',
+      icone: '✎',
+      onclick: () =>
+        editeurSauvegarde.ouvrirRenommage(fiche, evenement.clientX, evenement.clientY),
+    },
+    {
+      label: 'Dupliquer…',
+      icone: '⧉',
+      detail: 'avant de tout casser',
+      onclick: () =>
+        editeurSauvegarde.ouvrirCreation(evenement.clientX, evenement.clientY, {
+          depuis: fiche.id,
+          nomSource: fiche.nom,
+        }),
+    },
+    { separateur: true },
+    {
+      label: 'Télécharger la sauvegarde',
+      icone: '⤓',
+      detail: '.json',
+      onclick: () => exporter('json'),
+    },
+    { texte: 'Le classeur Excel et les CSV arrivent avec la vue « Tableaux & exports ».' },
+    { separateur: true },
+    {
+      label: 'Supprimer la sauvegarde',
+      icone: '🗑',
+      danger: true,
+      disabled: etat.sauvegardes.length <= 1,
+      onclick: () => confirmerSuppressionSauvegarde(fiche, evenement),
+    },
+  ]);
+}
+
+function confirmerSuppressionSauvegarde(fiche, evenement) {
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: `Supprimer « ${fiche.nom} » ?` },
+    {
+      texte: `${pluriel(fiche.personnes, 'personne')} et ${pluriel(
+        fiche.relations,
+        'lien'
+      )} seront perdus. La suppression est définitive : rien n’est mis à la corbeille.`,
+    },
+    { separateur: true },
+    { label: 'Annuler', icone: '↩', onclick: () => {} },
+    {
+      label: 'Télécharger d’abord',
+      icone: '⤓',
+      onclick: () => telecharger(Api.urlExport('json', { sauvegarde: fiche.id })),
+    },
+    {
+      label: 'Supprimer définitivement',
+      icone: '🗑',
+      danger: true,
+      onclick: async () => {
+        try {
+          const reponse = await Api.supprimerSauvegarde(fiche.id);
+          if (fiche.actif) await ouvrirSauvegarde(reponse.actif);
+          else await dessinerSauvegardes();
+        } catch (erreur) {
+          message(`Suppression impossible : ${erreur.message}`);
+        }
+      },
+    },
+  ]);
+}
+
+// ------------------------------------------------------------------ vues
+
+function dessinerListeVues() {
+  elements.listeVues.replaceChildren(
+    ...etat.vues.map((vue) => {
+      const li = document.createElement('li');
+      li.title = vue.description;
+      li.dataset.vue = vue.id;
+      const icone = document.createElement('span');
+      icone.className = 'vue-icone';
+      icone.textContent = vue.icone;
+      const libelle = document.createElement('span');
+      libelle.textContent = vue.label;
+      li.append(icone, libelle);
+      li.addEventListener('click', () => choisirVue(vue.id));
+      return li;
+    })
+  );
+}
+
+/**
+ * Les axes disponibles, dans l'ordre. Une seule source pour le sélecteur du
+ * haut et les pastilles du rail : un filtre créé apparaît des deux côtés.
+ */
+function listeAxes() {
+  return [
+    { id: 'maison', label: 'Maison', court: 'Maison' },
+    { id: 'categorie', label: 'Catégorie de maison', court: 'Catégorie' },
+    { id: 'generation', label: 'Génération', court: 'Génération' },
+    { id: 'statut', label: 'Statut (vivant / mort)', court: 'Statut' },
+    { id: 'joueurs', label: 'Humeur envers les joueurs (moyenne)', court: 'Humeur' },
+    ...(etat.referentiels.joueurs || []).map((joueur) => ({
+      id: `joueur:${joueur.id}`,
+      label: `Humeur envers ${joueur.nom}`,
+      court: joueur.nom,
+      couleur: joueur.couleur,
+    })),
+    // Les filtres sur mesure sont des axes comme les autres : une fois créés,
+    // ils vivent dans la même liste.
+    ...(etat.referentiels.filtres || []).map((filtre) => ({
+      id: `filtre:${filtre.id}`,
+      label: `⚙ ${filtre.label}`,
+      court: filtre.label,
+      fiche: filtre,
+    })),
+  ];
+}
+
+function remplirSelecteurCouleur() {
+  const options = listeAxes();
+  elements.selecteurCouleur.replaceChildren(
+    ...options.map((option) => {
+      const noeud = document.createElement('option');
+      noeud.value = option.id;
+      noeud.textContent = option.label;
+      return noeud;
+    })
+  );
+  // La liste est reconstruite à chaque changement de sauvegarde (les joueurs
+  // changent) : l'écouteur, lui, est posé une seule fois plus bas.
+  elements.selecteurCouleur.value = etat.couleurPar;
+  if (elements.selecteurCouleur.selectedIndex < 0) {
+    elements.selecteurCouleur.selectedIndex = 0;
+    etat.couleurPar = elements.selecteurCouleur.value;
+  }
+}
+
+async function choisirVue(vueId) {
+  const vue = etat.vues.find((v) => v.id === vueId);
+  if (!vue) return;
+  etat.vueCourante = vue;
+  etat.parametres = {};
+  (vue.parametres || []).forEach((parametre) => {
+    if (parametre.defaut !== undefined) etat.parametres[parametre.id] = parametre.defaut;
+  });
+  elements.filVue.textContent = vue.label;
+  [...elements.listeVues.children].forEach((li) =>
+    li.classList.toggle('actif', li.dataset.vue === vueId)
+  );
+  dessinerOptions(vue);
+  majCapacites(vue);
+  etat.moteur?.detruire();
+  etat.moteur = null;
+  await rechargerVue();
+}
+
+async function rechargerVue({ conserverFocus = false } = {}) {
+  if (!etat.vueCourante) return;
+  message('Chargement de la vue…');
+  let payload;
+  try {
+    // Les référentiels repartent avec la vue : leurs compteurs (membres d'une
+    // maison, liens d'un type) bougent à chaque édition, et c'est sur eux que
+    // s'appuient le rail et les confirmations de suppression.
+    const [vue, referentiels] = await Promise.all([
+      Api.vue(etat.vueCourante.id, etat.parametres),
+      Api.referentiels(),
+    ]);
+    payload = vue;
+    etat.referentiels = referentiels;
+    definirTable(referentiels.humeurs);
+    panneau.definirReferentiels(referentiels);
+  } catch (erreur) {
+    message(`Erreur : ${erreur.message}`);
+    return;
+  }
+  message('');
+  etat.payload = payload;
+  // Un filtre sur mesure se recalcule sur les données : elles viennent de
+  // changer, ses segments aussi.
+  if (etat.couleurPar.startsWith('filtre:')) {
+    await chargerApplicationFiltre(etat.couleurPar.slice(7));
+  }
+  majMasques();
+
+  const fabrique = await chargerMoteur(payload);
+  if (!fabrique) {
+    message(`Aucun moteur de rendu pour « ${payload.rendu} ».`);
+    return;
+  }
+
+  if (!etat.moteur) {
+    etat.moteur = adapterMoteur(fabrique(elements.scene, {
+      surSelection: (id) => selectionner(id),
+      surFond: () => annulerLiaisonRapide(),
+      surSurvolLien: (arete, evenement) => infobulleLien(arete, evenement),
+      surFinSurvol: () => masquerInfobulle(),
+      surZoom: (k) => {
+        elements.zoomCurseur.value = Math.round(k * 100);
+      },
+      surDisposition: (info) => majStats(info),
+      surMenuCarte: (id, evenement) => menuCarte(id, evenement),
+      surMenuFond: (evenement) => menuFond(evenement),
+      surMenuLien: (aretes, evenement) => menuLien(aretes, evenement),
+      surClicLien: (aretes, evenement) => modifierLien(aretes, evenement),
+      surLiaison: ({ source, cible }, evenement) => {
+        masquerInfobulle();
+        if (cible) editeurLien.ouvrirCreation({ source, cible }, evenement.clientX, evenement.clientY);
+        else
+          formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { lierA: source });
+      },
+      surLiaisonRapide: (id, evenement) => liaisonRapide(id, evenement),
+      surDeport: (id, decalage) => enregistrerDeport(id, decalage),
+    }));
+  }
+
+  etat.moteur.rendre(payload, {
+    couleurPar: etat.couleurPar,
+    couleursCategories: couleursCategories(),
+    couleursNoeuds: couleursNoeuds(),
+    recherche: etat.recherche,
+    typesMasques: etat.typesMasques,
+    noeudsMasques: etat.noeudsMasques,
+  });
+
+  dessinerLegendes();
+  dessinerJoueurs();
+  dessinerListePersonnes();
+  majStats();
+  // Les compteurs du rail suivent ce que contient réellement la sauvegarde.
+  dessinerSauvegardes();
+
+  if (conserverFocus && etat.selection) etat.moteur.focus(etat.selection, { animer: false });
+}
+
+/**
+ * Un moteur n'implémente que ce qui a du sens pour lui : une grille ne zoome
+ * pas, un rendu 3D n'épinglera peut-être rien. On complète le contrat avec
+ * des fonctions vides pour que l'orchestrateur puisse appeler sans se méfier.
+ */
+const MOTEUR_MUET = {
+  rendre() {},
+  majOptions() {},
+  focus() {},
+  recentrer() {},
+  detruire() {},
+  zoomer() {},
+  definirZoom() {},
+  marquerEnAttente() {},
+  epingler() {},
+  recolorer() {},
+};
+
+function adapterMoteur(moteur) {
+  return { ...MOTEUR_MUET, ...moteur };
+}
+
+/** N'affiche que les contrôles que la vue courante sait honorer. */
+function majCapacites(vue) {
+  const capacites = new Set(vue?.capacites || []);
+  elements.blocLiens.hidden = !capacites.has('legende');
+  elements.blocMaisons.hidden = !capacites.has('legende');
+  elements.blocEdition.hidden = !capacites.has('edition');
+  elements.groupeCadrage.hidden = !capacites.has('zoom');
+}
+
+async function chargerMoteur(payload) {
+  const dejaLa = obtenirRendu(payload);
+  if (dejaLa) return dejaLa;
+  const nom = payload.rendu;
+  if (modulesCharges.has(nom)) return obtenirRendu(payload);
+  try {
+    await import(`./views/${nom}.js`);
+    modulesCharges.set(nom, true);
+  } catch (erreur) {
+    console.error(`Module de rendu « ${nom} » introuvable`, erreur);
+    return null;
+  }
+  return obtenirRendu(payload);
+}
+
+// -------------------------------------------------------------- sélection
+
+async function selectionner(id) {
+  etat.selection = id;
+  const noeud = trouverNoeud(id);
+  elements.filSeparateur.hidden = false;
+  elements.filFocus.textContent = noeud?.label || id;
+  elements.ongletFiche.disabled = false;
+  etat.moteur?.epingler(null); // nouvelle vue : plus rien d'épinglé
+  etat.moteur?.focus(id);
+  masquerInfobulle();
+  majListeActive();
+  majStats();
+  await panneau.afficher(id, { secrets: !!etat.parametres.secrets });
+}
+
+function vueGenerale() {
+  annulerLiaisonRapide();
+  etat.selection = null;
+  elements.filSeparateur.hidden = true;
+  elements.filFocus.textContent = '';
+  panneau.fermer();
+  elements.ongletFiche.disabled = true;
+  basculerOnglet('liste');
+  etat.moteur?.recentrer();
+  majListeActive();
+  majStats();
+}
+
+// ------------------------------------------------------------- liaison rapide
+
+function astuce(texte) {
+  elements.astuce.hidden = !texte;
+  elements.astuce.textContent = texte || '';
+}
+
+/** Maj + clic : on arme une fiche, le clic suivant crée le lien. */
+function liaisonRapide(id, evenement) {
+  if (!etat.lienEnAttente) {
+    etat.lienEnAttente = id;
+    etat.moteur?.marquerEnAttente(id);
+    astuce(
+      `Départ : ${trouverNoeud(id)?.label || id} — Maj + clic sur une autre fiche pour créer le lien (Échap pour annuler).`
+    );
+    return;
+  }
+  if (etat.lienEnAttente === id) {
+    annulerLiaisonRapide();
+    return;
+  }
+  const source = etat.lienEnAttente;
+  annulerLiaisonRapide();
+  masquerInfobulle();
+  editeurLien.ouvrirCreation({ source, cible: id }, evenement.clientX, evenement.clientY);
+}
+
+function annulerLiaisonRapide() {
+  if (!etat.lienEnAttente) return;
+  etat.lienEnAttente = null;
+  etat.moteur?.marquerEnAttente(null);
+  astuce('');
+}
+
+/** Ctrl + glisser : on mémorise l'écart à la position calculée. */
+async function enregistrerDeport(id, decalage) {
+  try {
+    await Api.majPersonne(id, { decalage });
+    const noeud = trouverNoeud(id);
+    if (noeud) noeud.decalage = decalage;
+  } catch (erreur) {
+    message(`Position non enregistrée : ${erreur.message}`);
+  }
+}
+
+async function reinitialiserDeport(id) {
+  const noeud = trouverNoeud(id);
+  if (noeud) noeud.decalage = null;
+  try {
+    await Api.majPersonne(id, { decalage: null });
+  } catch (erreur) {
+    message(`Échec : ${erreur.message}`);
+  }
+  await rechargerVue({ conserverFocus: true });
+}
+
+// ------------------------------------------------------------- édition rapide
+
+/** Liens réels (les fratries déduites n'existent pas dans le jeu de données). */
+function liensReelsDe(id) {
+  return (etat.payload?.aretes || []).filter(
+    (arete) => !arete.deduit && (arete.source === id || arete.cible === id)
+  );
+}
+
+function libelleLien(arete) {
+  const source = trouverNoeud(arete.source)?.label || arete.source;
+  const cible = trouverNoeud(arete.cible)?.label || arete.cible;
+  return `${source} ${arete.dirige ? '→' : '↔'} ${cible}`;
+}
+
+function menuCarte(id, evenement) {
+  const noeud = trouverNoeud(id);
+  const liens = liensReelsDe(id).length;
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: noeud?.label || id, couleur: noeud?.couleur },
+    { label: 'Ouvrir la fiche', icone: '▤', onclick: () => selectionner(id) },
+    { label: 'Centrer sur cette personne', icone: '◎', onclick: () => etat.moteur?.focus(id) },
+    { separateur: true },
+    {
+      label: etat.lienEnAttente === id ? 'Annuler le départ du lien' : 'Relier à…',
+      icone: '⤳',
+      detail: 'Maj + clic',
+      onclick: () => liaisonRapide(id, evenement),
+    },
+    {
+      label: 'Nouveau profil relié…',
+      icone: '＋',
+      onclick: () =>
+        formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { lierA: id }),
+    },
+    noeud?.decalage && {
+      label: 'Replacer automatiquement',
+      icone: '⌖',
+      detail: 'Ctrl + glisser',
+      onclick: () => reinitialiserDeport(id),
+    },
+    { separateur: true },
+    {
+      label: 'Supprimer le profil',
+      icone: '🗑',
+      detail: liens ? `${liens} lien${liens > 1 ? 's' : ''}` : '',
+      danger: true,
+      onclick: () => confirmerSuppressionPersonne(id, evenement),
+    },
+  ]);
+}
+
+function confirmerSuppressionPersonne(id, evenement) {
+  const noeud = trouverNoeud(id);
+  const liens = liensReelsDe(id).length;
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: `Supprimer ${noeud?.label || id} ?` },
+    {
+      texte: liens
+        ? `${liens} lien${liens > 1 ? 's seront supprimés' : ' sera supprimé'} avec le profil. Action définitive.`
+        : 'Action définitive.',
+    },
+    { separateur: true },
+    { label: 'Annuler', icone: '↩', onclick: () => {} },
+    {
+      label: 'Supprimer définitivement',
+      icone: '🗑',
+      danger: true,
+      onclick: async () => {
+        try {
+          await Api.supprimerPersonne(id);
+        } catch (erreur) {
+          message(`Suppression impossible : ${erreur.message}`);
+          return;
+        }
+        if (etat.selection === id) vueGenerale();
+        await rechargerVue({ conserverFocus: true });
+      },
+    },
+  ]);
+}
+
+function menuFond(evenement) {
+  const deplacees = (etat.payload?.noeuds || []).filter((noeud) => noeud.decalage);
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: etat.referentiels.meta?.sauvegarde || etat.referentiels.meta?.titre || 'Plan' },
+    {
+      label: 'Nouveau profil…',
+      icone: '＋',
+      onclick: () => formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, {}),
+    },
+    deplacees.length && {
+      label: 'Replacer toutes les fiches',
+      icone: '⌖',
+      detail: `${deplacees.length} déplacée${deplacees.length > 1 ? 's' : ''}`,
+      onclick: async () => {
+        await Promise.all(
+          deplacees.map((noeud) => {
+            noeud.decalage = null;
+            return Api.majPersonne(noeud.id, { decalage: null });
+          })
+        );
+        await rechargerVue({ conserverFocus: true });
+      },
+    },
+    { separateur: true },
+    { label: 'Vue générale', icone: '⇱', onclick: () => vueGenerale() },
+    { label: 'Ajuster à l’écran', icone: '⤢', onclick: () => etat.moteur?.recentrer() },
+  ]);
+}
+
+function menuLien(aretes, evenement) {
+  if (aretes.length > 1) return choisirLien(aretes, evenement, menuLien);
+  const arete = aretes[0];
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: libelleLien(arete), couleur: arete.couleur },
+    {
+      label: 'Modifier le lien…',
+      icone: '✎',
+      detail: arete.type_label,
+      onclick: () =>
+        editeurLien.ouvrirModification(arete, evenement.clientX, evenement.clientY),
+    },
+    { separateur: true },
+    {
+      label: 'Supprimer le lien',
+      icone: '🗑',
+      danger: true,
+      onclick: async () => {
+        try {
+          await Api.supprimerRelation(arete.id);
+          await rechargerVue({ conserverFocus: true });
+        } catch (erreur) {
+          message(`Suppression impossible : ${erreur.message}`);
+        }
+      },
+    },
+  ]);
+}
+
+function modifierLien(aretes, evenement) {
+  if (aretes.length > 1) return choisirLien(aretes, evenement, modifierLien);
+  masquerInfobulle();
+  editeurLien.ouvrirModification(aretes[0], evenement.clientX, evenement.clientY);
+}
+
+/** Les connecteurs se superposent : on demande lequel avant d'éditer. */
+function choisirLien(aretes, evenement, suite) {
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: `${aretes.length} liens à cet endroit` },
+    ...aretes.map((arete) => ({
+      label: libelleLien(arete),
+      icone: '—',
+      detail: arete.type_label,
+      onclick: () => suite([arete], evenement),
+    })),
+  ]);
+}
+
+// ---------------------------------------------------------------- onglets
+
+function basculerOnglet(nom) {
+  document.querySelectorAll('.pn-onglets .onglet').forEach((bouton) =>
+    bouton.classList.toggle('actif', bouton.dataset.onglet === nom)
+  );
+  elements.panneauListe.hidden = nom !== 'liste';
+  elements.panneauFiche.hidden = nom !== 'fiche';
+}
+
+document.querySelectorAll('.pn-onglets .onglet').forEach((bouton) => {
+  bouton.addEventListener('click', () => {
+    if (bouton.disabled) return;
+    basculerOnglet(bouton.dataset.onglet);
+  });
+});
+
+// ------------------------------------------------------- liste des personnes
+
+const GROUPES = {
+  maison: {
+    cle: (noeud) => noeud.maison,
+    label: (noeud) => noeud.maison_label || 'Sans maison',
+    couleur: (noeud) => noeud.couleur,
+  },
+  generation: {
+    cle: (noeud) => String(noeud.generation ?? 0),
+    label: (noeud) => `Génération ${(noeud.generation ?? 0) + 1}`,
+    couleur: () => null,
+  },
+  statut: {
+    cle: (noeud) => noeud.statut,
+    label: (noeud) =>
+      ({ vivant: 'Vivants', mort: 'Morts', inconnu: 'Statut inconnu' }[noeud.statut]),
+    couleur: () => null,
+  },
+  aucun: { cle: () => '', label: () => '', couleur: () => null },
+};
+
+function dessinerListePersonnes() {
+  const noeuds = [...(etat.payload?.noeuds || [])];
+  const requete = etat.recherche.trim().toLowerCase();
+  const filtres = requete
+    ? noeuds.filter((noeud) =>
+        [noeud.label, noeud.surnom, noeud.maison_label, (noeud.tags || []).join(' ')]
+          .join(' ')
+          .toLowerCase()
+          .includes(requete)
+      )
+    : noeuds;
+
+  const groupeur = GROUPES[etat.groupePar] || GROUPES.maison;
+  const groupes = new Map();
+  filtres
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .forEach((noeud) => {
+      const cle = groupeur.cle(noeud);
+      if (!groupes.has(cle)) {
+        groupes.set(cle, { label: groupeur.label(noeud), couleur: groupeur.couleur(noeud), noeuds: [] });
+      }
+      groupes.get(cle).noeuds.push(noeud);
+    });
+
+  const fragment = document.createDocumentFragment();
+  if (!filtres.length) {
+    const vide = document.createElement('p');
+    vide.className = 'vide';
+    vide.style.padding = '14px';
+    vide.textContent = 'Aucune personne ne correspond.';
+    fragment.append(vide);
+  }
+
+  [...groupes.entries()]
+    .sort((a, b) => b[1].noeuds.length - a[1].noeuds.length)
+    .forEach(([, groupe]) => {
+      if (groupe.label) {
+        const titre = document.createElement('div');
+        titre.className = 'groupe-titre';
+        if (groupe.couleur) {
+          const barre = document.createElement('span');
+          barre.className = 'barre-couleur';
+          barre.style.background = groupe.couleur;
+          titre.append(barre);
+        }
+        const texte = document.createElement('span');
+        texte.textContent = groupe.label;
+        const nombre = document.createElement('span');
+        nombre.className = 'nombre';
+        nombre.textContent = groupe.noeuds.length;
+        titre.append(texte, nombre);
+        fragment.append(titre);
+      }
+      groupe.noeuds.forEach((noeud) => fragment.append(itemPersonne(noeud)));
+    });
+
+  elements.listePersonnes.replaceChildren(fragment);
+  majListeActive();
+}
+
+function itemPersonne(noeud) {
+  const ligne = document.createElement('div');
+  ligne.className = `item-personne ${noeud.statut === 'mort' ? 'mort' : ''}`;
+  ligne.dataset.id = noeud.id;
+
+  const avatar = document.createElement('span');
+  avatar.className = `item-avatar ${noeud.avatar ? 'avec-photo' : ''}`;
+  avatar.style.background = noeud.couleur;
+  if (noeud.avatar) {
+    const image = document.createElement('img');
+    image.src = noeud.avatar;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.addEventListener('error', () => {
+      image.remove();
+      avatar.textContent = noeud.initiales;
+    });
+    avatar.append(image);
+  } else {
+    avatar.textContent = noeud.initiales;
+  }
+
+  const corps = document.createElement('div');
+  corps.className = 'item-corps';
+  const nom = document.createElement('div');
+  nom.className = 'item-nom';
+  nom.textContent = noeud.label;
+  const meta = document.createElement('div');
+  meta.className = 'item-meta';
+  meta.textContent =
+    [
+      noeud.naissance || '',
+      noeud.statut === 'mort' && noeud.deces ? `† ${noeud.deces}` : '',
+    ]
+      .filter(Boolean)
+      .join('  ·  ') ||
+    [noeud.maison_label, noeud.statut === 'mort' ? '†' : ''].filter(Boolean).join('  ·  ');
+  corps.append(nom, meta);
+
+  ligne.append(avatar, corps);
+
+  if (etat.joueurActif) {
+    // En mode « regard d'un joueur », la ligne porte un curseur d'humeur :
+    // le clic sur le nom ouvre encore la fiche, le reste note.
+    ligne.classList.add('avec-humeur');
+    corps.addEventListener('click', () => selectionner(noeud.id));
+    avatar.addEventListener('click', () => selectionner(noeud.id));
+    ligne.append(
+      curseurHumeur({
+        valeur: noeud.notes_joueurs?.[etat.joueurActif]?.note ?? null,
+        effacable: true,
+        surChangement: (valeur) => noterHumeur(noeud.id, valeur),
+      })
+    );
+  } else {
+    ligne.addEventListener('click', () => selectionner(noeud.id));
+  }
+  return ligne;
+}
+
+function majListeActive() {
+  elements.listePersonnes.querySelectorAll('.item-personne').forEach((ligne) =>
+    ligne.classList.toggle('actif', ligne.dataset.id === etat.selection)
+  );
+}
+
+// ----------------------------------------------------------------- joueurs
+//
+// Le rail liste la table. Cliquer un joueur bascule l'application dans son
+// regard : les cartes prennent la couleur de l'humeur qu'on lui porte, et la
+// liste de droite devient une grille où l'on note d'un clic, sans ouvrir
+// chaque fiche. Cliquer le nom d'un personnage ouvre quand même sa fiche.
+
+function dessinerJoueurs() {
+  const joueurs = etat.referentiels.joueurs || [];
+  elements.listeJoueurs.replaceChildren(
+    ...joueurs.map((joueur) => {
+      const li = document.createElement('li');
+      li.className = `joueur-rail ${etat.joueurActif === joueur.id ? 'actif' : ''}`;
+      li.title = [
+        joueur.personnage ? `${joueur.nom} — ${joueur.personnage}` : joueur.nom,
+        'Clic : ouvre sa fiche et note les humeurs envers lui. Clic droit : menu.',
+      ].join(' · ');
+
+      const pastille = document.createElement('span');
+      pastille.className = 'legende-pastille';
+      pastille.style.background = joueur.couleur || '#7a7f87';
+
+      const corps = document.createElement('div');
+      corps.className = 'joueur-rail-corps';
+      const nom = document.createElement('div');
+      nom.className = 'joueur-rail-nom';
+      nom.textContent = joueur.nom;
+      corps.append(nom);
+      if (joueur.personnage) {
+        const perso = document.createElement('div');
+        perso.className = 'joueur-rail-perso';
+        perso.textContent = joueur.personnage;
+        corps.append(perso);
+      }
+
+      // Le raccourci vers son personnage : la fiche s'ouvre et le plan se
+      // resserre sur son réseau — sa fiche *et* ses liens, d'un seul geste.
+      const versFiche = document.createElement('button');
+      versFiche.className = 'bouton bouton-icone joueur-rail-fiche';
+      versFiche.type = 'button';
+      versFiche.textContent = joueur.personne_id ? '⌖' : '⌖?';
+      versFiche.title = joueur.personne_id
+        ? `Ouvrir ${joueur.personnage || 'son personnage'} et son réseau`
+        : 'Aucune fiche liée — cliquer pour en choisir une';
+      versFiche.addEventListener('click', (evenement) => {
+        evenement.stopPropagation();
+        if (joueur.personne_id) {
+          selectionner(joueur.personne_id);
+          return;
+        }
+        const boite = li.getBoundingClientRect();
+        editeurJoueur.ouvrirModification(joueur, boite.right + 8, boite.top);
+      });
+
+      li.append(pastille, corps, versFiche);
+      // Un clic fait les deux : la liste de droite passe dans son regard (pour
+      // noter vite) et sa fiche s'ouvre sous la main, sans passer par un menu.
+      li.addEventListener('click', () => {
+        if (etat.joueurActif === joueur.id) {
+          quitterJoueur();
+          return;
+        }
+        basculerJoueur(joueur.id);
+        const boite = li.getBoundingClientRect();
+        editeurJoueur.ouvrirModification(joueur, boite.right + 8, boite.top);
+      });
+      li.addEventListener('contextmenu', (evenement) => {
+        evenement.preventDefault();
+        menuJoueur(joueur, evenement);
+      });
+      return li;
+    })
+  );
+  if (!joueurs.length) {
+    const vide = document.createElement('li');
+    vide.className = 'vide';
+    vide.textContent = 'Personne autour de la table.';
+    elements.listeJoueurs.append(vide);
+  }
+}
+
+function basculerJoueur(id) {
+  if (etat.joueurActif === id) {
+    quitterJoueur();
+    return;
+  }
+  etat.joueurActif = id;
+  appliquerCouleurPar(`joueur:${id}`);
+}
+
+function quitterJoueur() {
+  etat.joueurActif = null;
+  appliquerCouleurPar('maison');
+}
+
+/** id de catégorie -> couleur, pour que le moteur n'ait pas à lire l'API. */
+function couleursCategories() {
+  const table = {};
+  (etat.referentiels.categories_maisons || []).forEach((categorie) => {
+    table[categorie.id] = categorie.couleur;
+  });
+  return table;
+}
+
+/**
+ * id de personne -> couleur de son segment, pour l'axe « filtre sur mesure ».
+ * Le moteur ne saura jamais ce qu'est un segment : il reçoit des couleurs.
+ */
+function couleursNoeuds() {
+  const application = etat.applicationFiltre;
+  if (!application) return {};
+  const parSegment = {};
+  application.segments.forEach((segment) => {
+    parSegment[segment.id] = segment.couleur;
+  });
+  const table = {};
+  Object.entries(application.noeuds || {}).forEach(([id, segment]) => {
+    table[id] = parSegment[segment] || '#8a8f98';
+  });
+  return table;
+}
+
+/**
+ * Charge l'application d'un filtre sur mesure (segments, appartenance,
+ * exclus). Le calcul vit côté serveur : c'est lui qui sait lire une personne.
+ */
+async function chargerApplicationFiltre(id) {
+  if (!id) {
+    etat.applicationFiltre = null;
+    return;
+  }
+  try {
+    etat.applicationFiltre = await Api.applicationFiltre(id);
+  } catch (erreur) {
+    etat.applicationFiltre = null;
+    message(`Filtre « ${id} » illisible : ${erreur.message}`);
+  }
+}
+
+async function appliquerCouleurPar(mode) {
+  etat.couleurPar = mode;
+  elements.selecteurCouleur.value = mode;
+  // Un filtre sur mesure a besoin de son calcul avant de pouvoir colorer.
+  await chargerApplicationFiltre(mode.startsWith('filtre:') ? mode.slice(7) : null);
+  // Chaque axe garde son propre filtre : on recalcule les masques du nouveau.
+  majMasques();
+  etat.moteur?.majOptions({
+    couleurPar: mode,
+    couleursCategories: couleursCategories(),
+    couleursNoeuds: couleursNoeuds(),
+    noeudsMasques: etat.noeudsMasques,
+  });
+  dessinerJoueurs();
+  dessinerFiltre();
+  dessinerListePersonnes();
+}
+
+function menuJoueur(joueur, evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  menu.ouvrir(x, y, [
+    { titre: joueur.nom, couleur: joueur.couleur },
+    { texte: joueur.personnage ? `joue ${joueur.personnage}` : 'aucun personnage renseigné' },
+    {
+      label: 'Modifier ce joueur…',
+      icone: '✎',
+      detail: 'nom, personnage, couleur',
+      onclick: () => editeurJoueur.ouvrirModification(joueur, x, y),
+    },
+    { label: 'Nouveau joueur…', icone: '＋', onclick: () => editeurJoueur.ouvrirCreation(x, y) },
+    { separateur: true },
+    {
+      label: 'Retirer ce joueur…',
+      icone: '🗑',
+      danger: true,
+      detail: 'efface les humeurs qui le visent',
+      onclick: () => editeurJoueur.ouvrirSuppression(joueur, x, y),
+    },
+  ]);
+}
+
+/** Note l'humeur d'un personnage envers le joueur actif, sans ouvrir sa fiche. */
+async function noterHumeur(personneId, valeur) {
+  const noeud = trouverNoeud(personneId);
+  const notes = { ...(noeud?.notes_joueurs || {}) };
+  const precedent = notes[etat.joueurActif] || { note: null, commentaire: '' };
+  notes[etat.joueurActif] = { ...precedent, note: valeur };
+  try {
+    await Api.majPersonne(personneId, { relations_joueurs: notes });
+    if (noeud) noeud.notes_joueurs = notes;
+    etat.moteur?.recolorer();
+  } catch (erreur) {
+    message(`Erreur : ${erreur.message}`);
+  }
+}
+
+// ---------------------------------------------------------------- légendes
+
+function dessinerLegendes() {
+  dessinerLegendeTypes();
+  dessinerFiltre();
+}
+
+/**
+ * Un clic isole, les suivants élargissent, et tout décocher revient à tout
+ * afficher. `null` signifie « aucun filtre » — c'est l'état de départ.
+ */
+function basculerFiltre(visibles, id) {
+  if (!visibles) return new Set([id]);
+  const suivant = new Set(visibles);
+  if (suivant.has(id)) suivant.delete(id);
+  else suivant.add(id);
+  return suivant.size ? suivant : null;
+}
+
+/**
+ * Le rail liste TOUT le catalogue, pas seulement ce que la vue affiche : une
+ * maison qu'on vient de créer doit apparaître avant d'avoir son premier
+ * membre. Les comptes, eux, viennent bien de ce qui est affiché.
+ */
+function catalogue(cle, clePayload) {
+  const affiches = new Map(
+    (etat.payload?.legende?.[clePayload] || []).map((entree) => [entree.id, entree.nombre])
+  );
+  return (etat.referentiels[cle] || [])
+    .map((fiche) => ({ ...fiche, nombre: affiches.get(fiche.id) || 0 }))
+    .sort((a, b) => b.nombre - a.nombre || a.label.localeCompare(b.label));
+}
+
+const catalogueTypes = () => catalogue('types_relations', 'types');
+const catalogueMaisons = () => catalogue('maisons', 'maisons');
+
+/**
+ * Le critère décrit l'axe de couleur courant : comment ranger un nœud, quelles
+ * classes lister dans le rail, et ce que le clic droit propose. Ajouter un axe
+ * (couleur + filtre + légende) tient donc en une entrée de cette fonction.
+ */
+function critereCourant() {
+  const mode = etat.couleurPar;
+
+  // Filtre sur mesure : tout vient du serveur (segments, appartenance,
+  // exclusions). Le rail les liste comme n'importe quel autre axe.
+  if (mode.startsWith('filtre:')) {
+    const id = mode.slice(7);
+    const fiche = (etat.referentiels.filtres || []).find((f) => f.id === id);
+    const application = etat.applicationFiltre;
+    const parNoeud = application?.noeuds || {};
+    return {
+      cle: mode,
+      titre: fiche?.label || 'Filtre sur mesure',
+      aide: application
+        ? `${application.variable?.label || ''} — un clic isole un segment. Clic droit : régler.`
+        : 'Calcul en cours…',
+      classeDe: (noeud) => parNoeud[noeud.id] ?? '—',
+      // Ce qui échoue aux tests n'est pas un segment : c'est hors sujet, et
+      // ça reste masqué quels que soient les segments cochés.
+      exclus: application?.exclus || [],
+      entrees: (application?.segments || []).map((segment) => ({
+        id: segment.id,
+        label: segment.label,
+        couleur: segment.couleur,
+      })),
+      menu: (entree, evenement) => menuFiltrePersonnalise(fiche, evenement),
+      creer: (evenement) => editeurFiltre.ouvrirCreation(evenement.clientX, evenement.clientY),
+      libelleCreer: '＋ Nouveau filtre',
+    };
+  }
+
+  if (mode === 'generation') {
+    const maximum = Math.max(0, ...(etat.payload?.noeuds || []).map((n) => n.generation || 0));
+    return {
+      cle: 'generation',
+      titre: 'Générations',
+      aide: 'Un clic isole une génération, les suivants l’élargissent.',
+      classeDe: (noeud) => String(noeud.generation || 0),
+      entrees: Array.from({ length: maximum + 1 }, (_, index) => ({
+        id: String(index),
+        label: `Génération ${index + 1}`,
+        couleur: COULEURS_GENERATION[index % COULEURS_GENERATION.length],
+      })),
+    };
+  }
+
+  if (mode === 'statut') {
+    return {
+      cle: 'statut',
+      titre: 'Statut',
+      aide: 'Un clic ne garde que les vivants — ou que les morts.',
+      classeDe: (noeud) => noeud.statut || 'inconnu',
+      entrees: [
+        { id: 'vivant', label: 'Vivant', couleur: '#3fa877' },
+        { id: 'mort', label: 'Mort', couleur: '#9a6a6a' },
+        { id: 'inconnu', label: 'Statut inconnu', couleur: '#8a8f98' },
+      ],
+    };
+  }
+
+  if (mode === 'joueurs' || mode.startsWith('joueur:')) {
+    const joueur = mode.startsWith('joueur:') ? mode.slice(7) : null;
+    const humeurDe = (noeud) =>
+      joueur
+        ? noeud.notes_joueurs?.[joueur]?.note ?? null
+        : noeud.note_joueurs_moyenne
+        ? Math.round(noeud.note_joueurs_moyenne)
+        : null;
+    return {
+      cle: mode,
+      titre: joueur ? 'Humeur envers ce joueur' : 'Humeur moyenne',
+      aide: 'Un clic ne garde que ceux qui éprouvent cela.',
+      classeDe: (noeud) => String(humeurDe(noeud) ?? 'aucune'),
+      entrees: [
+        ...tableHumeur().map((cran) => ({
+          id: String(cran.valeur),
+          label: `${cran.valeur} — ${cran.label.toLowerCase()}`,
+          couleur: cran.couleur,
+        })),
+        { id: 'aucune', label: 'Pas encore rencontré', couleur: '#9aa3ae' },
+      ],
+    };
+  }
+
+  if (mode === 'categorie') {
+    return {
+      cle: 'categorie',
+      titre: 'Catégories',
+      aide: 'Regroupements de maisons. Clic droit : renommer, recolorer.',
+      classeDe: (noeud) => noeud.categorie || '',
+      entrees: [
+        ...(etat.referentiels.categories_maisons || []).map((categorie) => ({
+          id: categorie.id,
+          label: categorie.label,
+          couleur: categorie.couleur,
+          fiche: categorie,
+        })),
+        { id: '', label: 'Sans catégorie', couleur: '#8a8f98' },
+      ],
+      menu: (entree, evenement) =>
+        entree.fiche ? menuCategorie(entree.fiche, evenement) : menuCategories(evenement),
+      creer: (evenement) => editeurCategorie.ouvrirCreation(evenement.clientX, evenement.clientY),
+      libelleCreer: '＋ Nouvelle catégorie',
+    };
+  }
+
+  return {
+    cle: 'maison',
+    titre: 'Maisons',
+    aide: 'Un clic isole une maison, un clic droit la modifie.',
+    classeDe: (noeud) => noeud.maison,
+    entrees: catalogueMaisons().map((maison) => ({
+      id: maison.id,
+      label: maison.label,
+      couleur: maison.couleur,
+      fiche: maison,
+    })),
+    menu: (entree, evenement) => menuMaison(entree.fiche, evenement),
+    creer: (evenement) => editeurMaison.ouvrirCreation(evenement.clientX, evenement.clientY),
+    libelleCreer: '＋ Nouvelle maison',
+  };
+}
+
+/**
+ * Le moteur ne connaît que des ensembles masqués : on les dérive ici. Les
+ * types se masquent par type ; les personnes, elles, se masquent par id —
+ * c'est ce qui permet de filtrer sur n'importe quel critère sans que le
+ * moteur ait à savoir ce qu'est une génération ou une humeur.
+ */
+function majMasques() {
+  etat.typesMasques = etat.typesVisibles
+    ? new Set(catalogueTypes().map((t) => t.id).filter((id) => !etat.typesVisibles.has(id)))
+    : new Set();
+
+  const critere = critereCourant();
+  const visibles = etat.filtres[critere.cle] || null;
+  etat.noeudsMasques = visibles
+    ? new Set(
+        (etat.payload?.noeuds || [])
+          .filter((noeud) => !visibles.has(critere.classeDe(noeud)))
+          .map((noeud) => noeud.id)
+      )
+    : new Set();
+  // Les tests d'un filtre sur mesure passent avant les segments : ce qui ne
+  // les passe pas n'a rien à faire sur le plan.
+  (critere.exclus || []).forEach((id) => etat.noeudsMasques.add(id));
+}
+
+function dessinerLegendeTypes() {
+  elements.legendeTypes.replaceChildren(
+    ...catalogueTypes().map((type) => {
+      const li = document.createElement('li');
+      li.className = `${etat.typesMasques.has(type.id) ? 'eteint' : ''} ${
+        type.nombre ? '' : 'inutilise'
+      }`;
+      li.title = type.nombre
+        ? `${type.label} — ${type.nombre} lien(s) affiché(s). Clic droit pour le modifier.`
+        : `${type.label} — aucun lien affiché. Clic droit pour le modifier.`;
+
+      const trait = document.createElement('span');
+      trait.className = 'legende-trait';
+      trait.style.borderTopColor = type.couleur;
+      trait.style.borderTopStyle =
+        type.style === 'tirets' ? 'dashed' : type.style === 'pointille' ? 'dotted' : 'solid';
+
+      const libelle = document.createElement('span');
+      libelle.textContent = type.label;
+
+      const nombre = document.createElement('span');
+      nombre.className = 'nombre';
+      nombre.textContent = type.nombre;
+
+      li.append(trait, libelle);
+      if (type.dirige) {
+        const fleche = document.createElement('span');
+        fleche.className = 'fleche';
+        fleche.textContent = '→';
+        li.append(fleche);
+      }
+      li.append(nombre);
+
+      li.addEventListener('click', () => {
+        if (!type.nombre) return; // isoler un type absent ne montrerait rien
+        etat.typesVisibles = basculerFiltre(etat.typesVisibles, type.id);
+        majMasques();
+        dessinerLegendeTypes();
+        etat.moteur?.majOptions({ typesMasques: etat.typesMasques });
+        majStats();
+      });
+      li.addEventListener('contextmenu', (evenement) => {
+        evenement.preventDefault();
+        menuType(type, evenement);
+      });
+      return li;
+    })
+  );
+}
+
+function menuType(type, evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  const structurant = (etat.referentiels.types_structurants || []).includes(type.id);
+  menu.ouvrir(x, y, [
+    { titre: type.label, couleur: type.couleur },
+    {
+      texte: `${type.liens ?? 0} lien(s) dans la sauvegarde · ${
+        type.dirige ? 'orienté' : 'réciproque'
+      } · ${type.style}`,
+    },
+    {
+      label: 'Modifier ce type…',
+      icone: '✎',
+      detail: 'nom, couleur, trait',
+      onclick: () => editeurType.ouvrirModification(type, x, y),
+    },
+    { label: 'Nouveau type de lien…', icone: '＋', onclick: () => editeurType.ouvrirCreation(x, y) },
+    { separateur: true },
+    {
+      label: 'Supprimer ce type…',
+      icone: '🗑',
+      danger: true,
+      disabled: structurant,
+      detail: structurant ? 'structure l’arbre' : '',
+      onclick: () => editeurType.ouvrirSuppression(type, x, y),
+    },
+  ]);
+}
+
+function menuMaison(maison, evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  menu.ouvrir(x, y, [
+    { titre: maison.label, couleur: maison.couleur },
+    {
+      texte: maison.devise
+        ? `« ${maison.devise} » · ${maison.personnes ?? 0} personne(s)`
+        : `${maison.personnes ?? 0} personne(s) dans la sauvegarde`,
+    },
+    {
+      label: 'Modifier cette maison…',
+      icone: '✎',
+      detail: 'nom, couleur, devise',
+      onclick: () => editeurMaison.ouvrirModification(maison, x, y),
+    },
+    { label: 'Nouvelle maison…', icone: '＋', onclick: () => editeurMaison.ouvrirCreation(x, y) },
+    { separateur: true },
+    {
+      label: 'Supprimer cette maison…',
+      icone: '🗑',
+      danger: true,
+      disabled: (etat.referentiels.maisons || []).length <= 1,
+      onclick: () => editeurMaison.ouvrirSuppression(maison, x, y),
+    },
+  ]);
+}
+
+/**
+ * Le bloc « Filtre » du rail suit l'axe de couleur choisi en haut à droite :
+ * maisons, générations, statut, humeur envers un joueur, catégories. Il liste
+ * tout le catalogue (une classe vide reste visible, en grisé) et chaque entrée
+ * filtre le plan.
+ */
+/**
+ * Les axes en pastilles, dans le bloc lui-même : un filtre qu'on vient de
+ * créer se rappelle d'un clic, sans repasser par la liste du haut.
+ */
+function dessinerAxes() {
+  elements.axesFiltre.replaceChildren(
+    ...listeAxes().map((axe) => {
+      const bouton = document.createElement('button');
+      bouton.type = 'button';
+      bouton.className = `axe-puce ${etat.couleurPar === axe.id ? 'actif' : ''} ${
+        axe.fiche ? 'sur-mesure' : ''
+      }`;
+      bouton.textContent = axe.court;
+      bouton.title = axe.fiche
+        ? `${axe.label} — filtre sur mesure. Clic droit : régler, supprimer.`
+        : axe.label;
+      if (axe.couleur) bouton.style.setProperty('--couleur-axe', axe.couleur);
+      bouton.addEventListener('click', () => {
+        etat.joueurActif = axe.id.startsWith('joueur:') ? axe.id.slice(7) : null;
+        appliquerCouleurPar(axe.id);
+      });
+      if (axe.fiche) {
+        bouton.addEventListener('contextmenu', (evenement) => {
+          evenement.preventDefault();
+          menuFiltrePersonnalise(axe.fiche, evenement);
+        });
+      }
+      return bouton;
+    })
+  );
+}
+
+function dessinerFiltre() {
+  const critere = critereCourant();
+  const visibles = etat.filtres[critere.cle] || null;
+
+  const effectifs = new Map();
+  (etat.payload?.noeuds || []).forEach((noeud) => {
+    const classe = critere.classeDe(noeud);
+    effectifs.set(classe, (effectifs.get(classe) || 0) + 1);
+  });
+
+  dessinerAxes();
+  // Le titre du bloc ne bouge pas : c'est « Filtre » qui reste, l'axe qui
+  // défile. Sinon on cherche « le filtre » et on ne trouve que « Maisons ».
+  elements.titreFiltre.textContent = 'Filtre';
+  elements.aideFiltre.textContent = `${critere.titre} — ${critere.aide
+    .charAt(0)
+    .toLowerCase()}${critere.aide.slice(1)}`;
+  elements.btnNouvelleMaison.hidden = !critere.creer;
+  if (critere.creer) elements.btnNouvelleMaison.textContent = critere.libelleCreer;
+
+  elements.legendeMaisons.replaceChildren(
+    ...critere.entrees.map((entree) => {
+      const nombre = effectifs.get(entree.id) || 0;
+      const li = document.createElement('li');
+      const eteint = visibles && !visibles.has(entree.id);
+      li.className = `${eteint ? 'eteint' : ''} ${nombre ? '' : 'inutilise'}`;
+      li.title = nombre
+        ? `${entree.label} — ${pluriel(nombre, 'fiche')} affichée${nombre > 1 ? 's' : ''}.`
+        : `${entree.label} — personne pour l’instant.`;
+
+      const pastille = document.createElement('span');
+      pastille.className = 'legende-pastille';
+      pastille.style.background = entree.couleur;
+
+      const libelle = document.createElement('span');
+      libelle.textContent = entree.label;
+
+      const compte = document.createElement('span');
+      compte.className = 'nombre';
+      compte.textContent = nombre;
+
+      li.append(pastille, libelle, compte);
+      li.addEventListener('click', () => {
+        if (!nombre && !visibles) return; // isoler une classe vide ne montrerait rien
+        etat.filtres[critere.cle] = basculerFiltre(visibles, entree.id);
+        majMasques();
+        dessinerFiltre();
+        // Pas de majStats() ici : le moteur rappelle `surDisposition` avec le
+        // compte réellement affiché, et c'est lui qui a raison.
+        etat.moteur?.majOptions({ noeudsMasques: etat.noeudsMasques });
+      });
+      if (critere.menu) {
+        li.addEventListener('contextmenu', (evenement) => {
+          evenement.preventDefault();
+          critere.menu(entree, evenement);
+        });
+      }
+      return li;
+    })
+  );
+}
+
+// Compatibilité : plusieurs endroits appelaient encore l'ancien nom.
+const dessinerLegendeMaisons = dessinerFiltre;
+
+function menuCategories(evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  menu.ouvrir(x, y, [
+    { titre: 'Sans catégorie' },
+    { texte: 'Les maisons qu’on n’a pas encore rangées.' },
+    {
+      label: 'Nouvelle catégorie…',
+      icone: '＋',
+      onclick: () => editeurCategorie.ouvrirCreation(x, y),
+    },
+  ]);
+}
+
+function menuFiltrePersonnalise(fiche, evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  const application = etat.applicationFiltre;
+  menu.ouvrir(x, y, [
+    { titre: fiche?.label || 'Filtre sur mesure' },
+    {
+      texte: application
+        ? `${application.variable?.label} · ${pluriel(
+            application.segments?.length || 0,
+            'segment'
+          )} · ${pluriel(application.retenus || 0, 'personne')} retenue${
+            (application.retenus || 0) > 1 ? 's' : ''
+          }`
+        : '—',
+    },
+    {
+      label: 'Régler ce filtre…',
+      icone: '⚙',
+      detail: 'variable, segments, dégradé, tests',
+      onclick: () => editeurFiltre.ouvrirModification(fiche, x, y),
+    },
+    { label: 'Nouveau filtre…', icone: '＋', onclick: () => editeurFiltre.ouvrirCreation(x, y) },
+    { separateur: true },
+    {
+      label: 'Supprimer ce filtre…',
+      icone: '🗑',
+      danger: true,
+      detail: 'aucune donnée n’est touchée',
+      onclick: () => editeurFiltre.ouvrirSuppression(fiche, x, y),
+    },
+  ]);
+}
+
+function menuCategorie(categorie, evenement) {
+  const { clientX: x, clientY: y } = evenement;
+  menu.ouvrir(x, y, [
+    { titre: categorie.label, couleur: categorie.couleur },
+    {
+      texte: `${pluriel(categorie.maisons ?? 0, 'maison')} · ${pluriel(
+        categorie.personnes ?? 0,
+        'personne'
+      )}`,
+    },
+    {
+      label: 'Modifier cette catégorie…',
+      icone: '✎',
+      detail: 'nom, couleur',
+      onclick: () => editeurCategorie.ouvrirModification(categorie, x, y),
+    },
+    {
+      label: 'Nouvelle catégorie…',
+      icone: '＋',
+      onclick: () => editeurCategorie.ouvrirCreation(x, y),
+    },
+    { separateur: true },
+    {
+      label: 'Supprimer cette catégorie…',
+      icone: '🗑',
+      danger: true,
+      detail: 'les maisons restent, sans catégorie',
+      onclick: () => editeurCategorie.ouvrirSuppression(categorie, x, y),
+    },
+  ]);
+}
+
+/**
+ * Les options du rail sont générées à partir des paramètres déclarés par la
+ * vue : une vue qui ajoute une case n'a rien à toucher ici. Les paramètres
+ * `multi` (types, maisons, statuts) ne sont pas repris — ce sont les légendes
+ * et le bloc « Filtre » qui les pilotent ; `recherche`, `focus` et
+ * `profondeur` ont déjà leurs commandes ailleurs.
+ */
+function dessinerOptions(vue) {
+  const parametres = (vue.parametres || []).filter((parametre) =>
+    ['bool', 'entier'].includes(parametre.type)
+  );
+
+  elements.optionsVue.replaceChildren(
+    ...parametres.map((parametre) => {
+      if (parametre.type === 'entier') {
+        const champ = document.createElement('input');
+        champ.type = 'number';
+        champ.min = parametre.min ?? 0;
+        champ.max = parametre.max ?? 99;
+        champ.value = etat.parametres[parametre.id] ?? parametre.defaut ?? 0;
+        champ.addEventListener('change', () => {
+          etat.parametres[parametre.id] = Number(champ.value);
+          rechargerVue({ conserverFocus: true });
+        });
+        const ligne = document.createElement('label');
+        ligne.className = 'option';
+        const texte = document.createElement('span');
+        texte.textContent = parametre.label;
+        ligne.append(texte, champ);
+        return ligne;
+      }
+
+      const case_ = document.createElement('input');
+      case_.type = 'checkbox';
+      case_.checked = !!(etat.parametres[parametre.id] ?? parametre.defaut);
+      case_.addEventListener('change', () => {
+        etat.parametres[parametre.id] = case_.checked;
+        rechargerVue({ conserverFocus: true });
+      });
+      const ligne = document.createElement('label');
+      ligne.className = 'option';
+      const texte = document.createElement('span');
+      texte.textContent = parametre.label;
+      ligne.append(case_, texte);
+      return ligne;
+    })
+  );
+}
+
+function majStats(info) {
+  const stats = etat.payload?.stats;
+  if (!stats) return;
+  const noeud = etat.selection ? trouverNoeud(etat.selection) : null;
+  if (noeud) {
+    elements.stats.innerHTML = `
+      <b>${echapper(noeud.label)}</b><br>
+      ${noeud.degre} lien(s) direct(s)<br>
+      <span style="color:var(--texte-faible)">${echapper(noeud.maison_label)} · génération ${
+      (noeud.generation ?? 0) + 1
+    }</span>`;
+    return;
+  }
+  const masquees = [
+    etat.typesMasques.size ? pluriel(etat.typesMasques.size, 'type') : '',
+    etat.noeudsMasques.size ? pluriel(etat.noeudsMasques.size, 'fiche') : '',
+  ].filter(Boolean);
+  const masques = masquees.length
+    ? `<br><span style="color:var(--texte-faible)">${masquees.join(
+        ' et '
+      )} hors du filtre</span>`
+    : '';
+  elements.stats.innerHTML = `<b>${info?.personnes ?? stats.personnes}</b> personnes affichées<br><b>${
+    stats.liens
+  }</b> liens · densité ${stats.densite}${masques}`;
+}
+
+function echapper(texte) {
+  return String(texte ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+// -------------------------------------------------------------- infobulle
+
+function infobulleLien(arete, evenement) {
+  if (!arete) return;
+  const source = trouverNoeud(arete.source);
+  const cible = trouverNoeud(arete.cible);
+  elements.infobulle.replaceChildren();
+
+  const titre = document.createElement('div');
+  titre.className = 'ib-titre';
+  titre.textContent = arete.type_label;
+  titre.style.color = arete.couleur;
+
+  const sous = document.createElement('div');
+  sous.className = 'ib-sous';
+  sous.textContent = `${source?.label || '?'} ${arete.dirige ? '→' : '↔'} ${cible?.label || '?'}`;
+
+  elements.infobulle.append(titre, sous);
+  [arete.label, arete.notes, arete.secret ? '⚑ lien secret' : null]
+    .filter(Boolean)
+    .forEach((texte) => {
+      const ligne = document.createElement('div');
+      ligne.className = 'ib-ligne';
+      ligne.textContent = texte;
+      elements.infobulle.append(ligne);
+    });
+
+  elements.infobulle.hidden = false;
+  const scene = elements.scene.getBoundingClientRect();
+  const boite = elements.infobulle.getBoundingClientRect();
+  let x = evenement.clientX - scene.left + 16;
+  let y = evenement.clientY - scene.top + 16;
+  if (x + boite.width > scene.width) x = scene.width - boite.width - 12;
+  if (y + boite.height > scene.height) y = evenement.clientY - scene.top - boite.height - 14;
+  elements.infobulle.style.left = `${Math.max(6, x)}px`;
+  elements.infobulle.style.top = `${Math.max(6, y)}px`;
+}
+
+function masquerInfobulle() {
+  elements.infobulle.hidden = true;
+}
+
+function trouverNoeud(id) {
+  return (etat.payload?.noeuds || []).find((noeud) => noeud.id === id);
+}
+
+// ------------------------------------------------------------------ thème
+
+function appliquerTheme(nom) {
+  document.body.classList.toggle('sombre', nom === 'sombre');
+  localStorage.setItem('familytree-theme', nom);
+}
+
+// ---------------------------------------------------------------- événements
+
+elements.recherche.addEventListener('input', (evenement) => {
+  etat.recherche = evenement.target.value;
+  etat.moteur?.majOptions({ recherche: etat.recherche });
+  dessinerListePersonnes();
+});
+elements.recherche.addEventListener('keydown', (evenement) => {
+  if (evenement.key === 'Enter') {
+    const premier = elements.listePersonnes.querySelector('.item-personne');
+    if (premier) selectionner(premier.dataset.id);
+  }
+  if (evenement.key === 'Escape') {
+    elements.recherche.value = '';
+    etat.recherche = '';
+    etat.moteur?.majOptions({ recherche: '' });
+    dessinerListePersonnes();
+  }
+});
+
+elements.selecteurGroupe.addEventListener('change', (evenement) => {
+  etat.groupePar = evenement.target.value;
+  dessinerListePersonnes();
+});
+
+elements.selecteurCouleur.addEventListener('change', (evenement) => {
+  const mode = evenement.target.value;
+  // Choisir « Humeur envers X » à la main revient au même que cliquer le
+  // joueur dans le rail : les deux commandes doivent rester d'accord.
+  etat.joueurActif = mode.startsWith('joueur:') ? mode.slice(7) : null;
+  appliquerCouleurPar(mode);
+});
+
+elements.btnNouvelleSauvegarde.addEventListener('click', (evenement) =>
+  editeurSauvegarde.ouvrirCreation(evenement.clientX, evenement.clientY, {})
+);
+elements.btnImporterSauvegarde.addEventListener('click', () => editeurSauvegarde.importer());
+
+elements.btnNouveauType.addEventListener('click', (evenement) =>
+  editeurType.ouvrirCreation(evenement.clientX, evenement.clientY)
+);
+elements.btnNouveauJoueur.addEventListener('click', (evenement) =>
+  editeurJoueur.ouvrirCreation(evenement.clientX, evenement.clientY)
+);
+// Le bouton du bloc « Filtre » crée ce que l'axe courant sait créer.
+elements.btnNouvelleMaison.addEventListener('click', (evenement) =>
+  critereCourant().creer?.(evenement)
+);
+
+// Le ＋ du titre ne dépend pas de l'axe courant : sans lui, on ne pourrait
+// créer son premier filtre qu'en étant déjà sur un filtre.
+elements.btnNouveauFiltre.addEventListener('click', (evenement) =>
+  editeurFiltre.ouvrirCreation(evenement.clientX, evenement.clientY)
+);
+
+elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
+// Sur écran large, ☰ replie le rail. Sur téléphone, les deux volets sont des
+// tiroirs qui couvrent la scène : ouvrir l'un ferme l'autre, sinon on empile
+// deux panneaux plein écran sans savoir lequel on regarde.
+elements.btnRail.addEventListener('click', () => {
+  elements.rail.classList.toggle('replie');
+  elements.rail.classList.toggle('ouvert');
+  elements.panneauVolet.classList.remove('ouvert');
+});
+elements.btnPanneau.addEventListener('click', () => {
+  elements.panneauVolet.classList.toggle('ouvert');
+  elements.rail.classList.remove('ouvert');
+});
+elements.btnFermerPanneau.addEventListener('click', () =>
+  elements.panneauVolet.classList.remove('ouvert')
+);
+elements.btnAjuster.addEventListener('click', () => etat.moteur?.recentrer());
+elements.btnFocus.addEventListener('click', () => {
+  if (etat.selection) etat.moteur?.focus(etat.selection);
+});
+elements.btnTheme.addEventListener('click', () =>
+  appliquerTheme(document.body.classList.contains('sombre') ? 'clair' : 'sombre')
+);
+elements.zoomMoins.addEventListener('click', () => etat.moteur?.zoomer(0.75));
+elements.zoomPlus.addEventListener('click', () => etat.moteur?.zoomer(1.35));
+elements.zoomCurseur.addEventListener('input', (evenement) =>
+  etat.moteur?.definirZoom(Number(evenement.target.value) / 100)
+);
+
+// ------------------------------------------------ le compte et les données
+//
+// En ligne, il n'y a rien à enregistrer : chaque modification est écrite en
+// base tout de suite. Ce qui reste de l'ancien groupe « Enregistrer », c'est
+// savoir qui l'on est, sortir ses données, et pouvoir mettre une copie de
+// côté avant de tout casser.
+
+/** Le compte connecté, dans la barre du haut. */
+async function dessinerCompte() {
+  try {
+    const reponse = await Api.moi();
+    etat.compte = reponse.compte || reponse;
+  } catch (erreur) {
+    return; // 401 : `Api` a déjà renvoyé vers la page de connexion.
+  }
+  const compte = etat.compte || {};
+  elements.compte.textContent = compte.nom_affiche || compte.email || '';
+  elements.compte.title =
+    `${compte.email || ''}${compte.role === 'admin' ? ' · administrateur' : ''}`;
+}
+
+async function seDeconnecter() {
+  try {
+    await Api.deconnexion();
+  } catch (erreur) {
+    // Peu importe : la session est de toute façon inutilisable ici.
+  }
+  location.href = '/connexion.html';
+}
+
+const sauvegardeActive = () => etat.sauvegardes.find((fiche) => fiche.actif) || null;
+
+/** « Tout télécharger » : le fichier de la sauvegarde ouverte, réimportable. */
+function toutTelecharger() {
+  const fiche = sauvegardeActive();
+  if (!fiche) {
+    message('Aucune sauvegarde ouverte à télécharger.');
+    return;
+  }
+  telecharger(Api.urlExport('json', { sauvegarde: fiche.id }));
+  astuce(`Téléchargement de « ${fiche.nom} »…`);
+}
+
+/**
+ * Instantané : en ligne, une copie datée *est* une sauvegarde de plus. Pas de
+ * table à part, pas de route à écrire, et la restauration se fait en ouvrant
+ * la copie — ce qui se voit dans le rail au lieu de se deviner.
+ */
+async function prendreInstantane() {
+  const fiche = sauvegardeActive();
+  if (!fiche) {
+    message('Aucune sauvegarde ouverte.');
+    return;
+  }
+  const horodatage = new Date().toISOString().slice(0, 16).replace('T', ' à ');
+  const nom = `${fiche.nom} — ${horodatage}`;
+  elements.etatEcriture.textContent = 'Copie en cours…';
+  try {
+    await Api.creerSauvegarde({ nom, depuis: fiche.id, contenu: 'copie' });
+    await dessinerSauvegardes();
+    elements.etatEcriture.textContent = '';
+    astuce(`Copie datée rangée dans les sauvegardes : « ${nom} ».`);
+  } catch (erreur) {
+    elements.etatEcriture.textContent = '';
+    message(`Copie impossible : ${erreur.message}`);
+  }
+}
+
+elements.btnTelecharger.addEventListener('click', () => toutTelecharger());
+elements.btnInstantane.addEventListener('click', () => prendreInstantane());
+elements.btnDeconnexion.addEventListener('click', () => seDeconnecter());
+
+document.addEventListener('keydown', (evenement) => {
+  const saisie = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+  // Ctrl+S est un réflexe, et il ne disparaît pas parce que le serveur a
+  // changé. Plutôt que de laisser le navigateur proposer d'enregistrer la
+  // page, on répond à la question que le geste pose vraiment.
+  if ((evenement.ctrlKey || evenement.metaKey) && evenement.key.toLowerCase() === 's') {
+    evenement.preventDefault();
+    astuce('Déjà enregistré — en ligne, chaque modification part tout de suite.');
+    return;
+  }
+  if (evenement.key === 'Escape' && !saisie) {
+    // Une liaison en attente s'annule seule, sans quitter la vue en cours.
+    if (etat.lienEnAttente) annulerLiaisonRapide();
+    else vueGenerale();
+  }
+  if (evenement.key === '/' && !saisie) {
+    evenement.preventDefault();
+    elements.recherche.focus();
+  }
+});
+
+// Poignée de mise au point : `familyTree.etat`, `familyTree.moteur.focus('id')`…
+window.familyTree = {
+  etat,
+  get moteur() {
+    return etat.moteur;
+  },
+  selectionner,
+  vueGenerale,
+  rechargerVue,
+};
+
+demarrer();

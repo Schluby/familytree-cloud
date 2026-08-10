@@ -1,65 +1,192 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FamilyTree — vos sauvegardes</title>
-  <link rel="stylesheet" href="/css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FamilyTree — Sociogramme</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚔</text></svg>">
 </head>
-<body class="haut">
-<main class="large">
-  <div class="entete">
-    <div>
-      <h1>FamilyTree</h1>
-      <p id="salutation">Chargement…</p>
+<body>
+  <div class="application">
+
+    <header class="barre-haut">
+      <div class="marque">
+        <span class="marque-icone">⚔</span>
+        <div>
+          <div class="marque-titre">FamilyTree</div>
+          <div class="marque-univers" id="univers">…</div>
+        </div>
+      </div>
+
+      <div class="fil-ariane">
+        <span class="fil-vue" id="fil-vue">Sociogramme</span>
+        <span class="fil-separateur" id="fil-separateur" hidden>›</span>
+        <span class="fil-focus" id="fil-focus"></span>
+      </div>
+
+      <div class="barre-controles">
+        <!-- Pas de bouton « Enregistrer » : en ligne, chaque modification est
+             écrite en base tout de suite. Il ne reste que sortir ses données. -->
+        <span class="groupe-enregistrement" id="groupe-enregistrement">
+          <button id="btn-telecharger" class="bouton" title="Télécharger la sauvegarde ouverte (.json) — réimportable ici comme dans la version locale">
+            ⤓ Tout télécharger
+          </button>
+          <button id="btn-instantane" class="bouton bouton-icone" title="Prendre un instantané — une copie datée de la sauvegarde ouverte">📸</button>
+          <span class="etat-ecriture" id="etat-ecriture"></span>
+        </span>
+        <label class="champ champ-couleur">
+          <span>Couleur &amp; filtre</span>
+          <select id="selecteur-couleur"></select>
+        </label>
+        <a id="lien-document" class="bouton" target="_blank" rel="noopener"
+           title="Ouvrir le document de campagne dans un nouvel onglet">📜 Document</a>
+        <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
+        <span class="groupe-compte">
+          <span class="compte" id="compte" title="Compte connecté">…</span>
+          <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter">⏻</button>
+        </span>
+        <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer le panneau de gauche">☰</button>
+        <button id="btn-panneau" class="bouton bouton-icone btn-telephone" title="Afficher/masquer la liste des personnes">👤</button>
+      </div>
+    </header>
+
+    <div class="corps">
+
+      <!-- Rail gauche : vues, légendes, filtres -->
+      <aside class="rail" id="rail">
+        <section class="rail-bloc">
+          <h2>Sauvegardes</h2>
+          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit : renommer, dupliquer, télécharger.</p>
+          <ul class="liste-sauvegardes" id="liste-sauvegardes"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-nouvelle-sauvegarde" title="Créer une sauvegarde">＋ Nouvelle</button>
+            <button class="bouton bouton-plat" id="btn-importer-sauvegarde" title="Charger un fichier .json exporté">⤒ Importer</button>
+          </div>
+          <p class="rail-aide" id="aide-plafonds"></p>
+        </section>
+
+        <section class="rail-bloc">
+          <h2>Vues</h2>
+          <ul class="liste-vues" id="liste-vues"></ul>
+        </section>
+
+        <section class="rail-bloc bloc-joueurs" id="bloc-joueurs">
+          <h2>Joueurs</h2>
+          <p class="rail-aide">Cliquer un joueur : les cartes prennent la couleur de son humeur et la liste de droite s’édite d’un clic. Clic droit : modifier.</p>
+          <ul class="liste-joueurs" id="liste-joueurs"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-nouveau-joueur" title="Ajouter un joueur">＋ Nouveau joueur</button>
+          </div>
+        </section>
+
+        <section class="rail-bloc" id="bloc-liens">
+          <h2>Liens</h2>
+          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : nom, couleur, trait, sens.</p>
+          <ul class="legende" id="legende-types"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-nouveau-type" title="Créer un type de lien">＋ Nouveau type</button>
+          </div>
+        </section>
+
+        <section class="rail-bloc" id="bloc-maisons">
+          <div class="rail-bloc-entete">
+            <h2 id="titre-filtre">Filtre</h2>
+            <button class="bouton bouton-icone btn-entete" id="btn-nouveau-filtre"
+                    title="Créer un filtre sur mesure (variable, segments, dégradé, tests)">＋</button>
+          </div>
+          <div class="axes-filtre" id="axes-filtre"></div>
+          <p class="rail-aide" id="aide-filtre">Maisons — un clic isole une maison, un clic droit la modifie.</p>
+          <ul class="legende legende-maisons" id="legende-maisons"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-nouvelle-maison" title="Créer une entrée sur cet axe">＋ Nouvelle maison</button>
+          </div>
+        </section>
+
+        <section class="rail-bloc">
+          <h2>Options</h2>
+          <div class="options" id="options-vue"></div>
+        </section>
+
+        <section class="rail-bloc" id="bloc-edition">
+          <h2>Édition</h2>
+          <ul class="rail-astuces">
+            <li><b>Clic droit</b> sur une fiche : ouvrir, relier, supprimer.</li>
+            <li><b>Clic droit</b> dans le vide : nouveau profil.</li>
+            <li><b>Poignée ＋</b> sous une fiche : glisser vers une autre pour créer un lien.</li>
+            <li><b>Maj + clic</b> sur deux fiches : les relier sans quitter la vue.</li>
+            <li><b>Ctrl + glisser</b> une fiche : la repositionner à la main.</li>
+            <li><b>Clic</b> sur un lien : changer son type et son humeur.</li>
+          </ul>
+          <p class="rail-aide astuce-telephone">Sur téléphone, l’arbre se <b>consulte</b> : le clic droit et le glisser n’ont pas d’équivalent tactile. Pour modifier, ouvrez la page sur un écran large.</p>
+        </section>
+
+        <section class="rail-bloc">
+          <h2>Sélection</h2>
+          <div id="stats" class="stats">…</div>
+        </section>
+      </aside>
+
+      <!-- Scène : la vue courante s'y monte -->
+      <main class="scene" id="scene">
+        <div class="scene-vide" id="scene-message" hidden></div>
+        <div class="infobulle" id="infobulle" hidden></div>
+        <div class="astuce-scene" id="astuce-scene" hidden></div>
+
+        <div class="barre-basse">
+          <span class="groupe-cadrage" id="groupe-cadrage">
+            <button class="bouton bouton-plat" id="btn-ajuster" title="Tout afficher">
+              <span class="ico">⤢</span> Ajuster
+            </button>
+            <button class="bouton bouton-plat" id="btn-focus" title="Centrer sur la personne sélectionnée">
+              <span class="ico">◎</span> Focus
+            </button>
+            <span class="separateur-vertical"></span>
+            <button class="bouton bouton-icone" id="zoom-moins" title="Dézoomer">−</button>
+            <input type="range" id="zoom-curseur" min="10" max="160" value="60" title="Zoom">
+            <button class="bouton bouton-icone" id="zoom-plus" title="Zoomer">+</button>
+            <span class="separateur-vertical"></span>
+          </span>
+          <button class="bouton bouton-plat" id="btn-theme" title="Thème clair / sombre">
+            <span class="ico">◐</span> Thème
+          </button>
+        </div>
+      </main>
+
+      <!-- Panneau droit : liste des personnes / fiche -->
+      <aside class="panneau" id="panneau">
+        <div class="pn-onglets">
+          <button class="onglet actif" data-onglet="liste">Personnes</button>
+          <button class="onglet" data-onglet="fiche" id="onglet-fiche" disabled>Fiche</button>
+          <button class="bouton bouton-icone btn-fermer-volet btn-telephone" id="btn-fermer-panneau" title="Fermer">✕</button>
+        </div>
+
+        <div class="pn-vue" id="panneau-liste">
+          <div class="liste-entete">
+            <div class="champ-recherche">
+              <span class="loupe">⌕</span>
+              <input id="recherche" type="search" placeholder="Rechercher…" autocomplete="off">
+            </div>
+            <label class="champ champ-groupe">
+              <span>Grouper par</span>
+              <select id="selecteur-groupe">
+                <option value="maison">Maison</option>
+                <option value="generation">Génération</option>
+                <option value="statut">Statut</option>
+                <option value="aucun">Rien (A→Z)</option>
+              </select>
+            </label>
+          </div>
+          <div class="liste-personnes" id="liste-personnes"></div>
+        </div>
+
+        <div class="pn-vue" id="panneau-fiche" hidden></div>
+      </aside>
+
     </div>
-    <button id="deconnexion" class="lien" type="button">Se déconnecter</button>
   </div>
 
-  <div class="carte" id="panneau" hidden>
-    <div class="rangee">
-      <label for="nom">Nouvelle sauvegarde
-        <input id="nom" type="text" maxlength="120" autocomplete="off"
-               placeholder="Le nom de votre monde">
-      </label>
-      <button id="creer" class="bouton accent" type="button">Créer</button>
-      <button id="importer" class="bouton" type="button">Importer un .json</button>
-      <input id="fichier" type="file" accept="application/json,.json" class="cache">
-    </div>
-
-    <div id="message" class="message"></div>
-    <ul id="liste" class="liste"></ul>
-
-    <p class="mention">
-      L’affichage de l’arbre arrive au <strong>lot 4</strong>. D’ici là, vous pouvez déjà
-      créer vos mondes, importer un fichier venu de la version locale, et tout réexporter
-      quand vous voulez : rien n’est enfermé ici. Les portraits collés dans les fiches ne
-      sont pas conservés en ligne — le reste l’est intégralement.
-    </p>
-  </div>
-</main>
-
-<script type="module">
-  import { appeler, compteConnecte } from '/js/identite.js';
-
-  const compte = await compteConnecte();
-  if (!compte) {
-    window.location.replace('/connexion');
-  } else {
-    document.getElementById('salutation').textContent =
-      `Connecté en tant que ${compte.nom_affiche || compte.email}` +
-      (compte.role === 'admin' ? ' (administrateur)' : '');
-
-    document.getElementById('deconnexion').addEventListener('click', async () => {
-      await appeler('/api/auth/deconnexion', { method: 'POST' });
-      window.location.replace('/connexion');
-    });
-
-    // Chargé seulement une fois la session confirmée : le panneau n'a aucun
-    // sens hors connexion, et toutes ses requêtes répondraient 401.
-    document.getElementById('panneau').hidden = false;
-    await import('/js/sauvegardes.js');
-  }
-</script>
+  <script src="/vendor/d3.v7.min.js"></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>

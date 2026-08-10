@@ -4,9 +4,20 @@ const $ = (id) => document.getElementById(id);
 
 let mode = 'connexion';
 
+/**
+ * Où repartir après la connexion. L'application renvoie ici avec `?retour=…`
+ * quand la session a expiré ; on n'accepte qu'un chemin de ce site, sinon un
+ * lien fabriqué pourrait faire rebondir un compte fraîchement connecté vers
+ * l'extérieur.
+ */
+function destination() {
+  const demande = new URLSearchParams(location.search).get('retour');
+  return demande && demande.startsWith('/') && !demande.startsWith('//') ? demande : '/';
+}
+
 /* Déjà connecté ? Inutile de redemander. */
 compteConnecte().then((compte) => {
-  if (compte) window.location.replace('/');
+  if (compte) window.location.replace(destination());
 });
 
 /* -------------------------------------------------------------------------- */
@@ -101,7 +112,7 @@ $('formulaire').addEventListener('submit', async (evenement) => {
       return;
     }
 
-    window.location.replace('/');
+    window.location.replace(destination());
   });
 });
 
@@ -109,7 +120,7 @@ $('formulaire').addEventListener('submit', async (evenement) => {
 // `addEventListener` sur le même bouton finiraient par se déclencher tous les
 // deux.
 $('continuer').addEventListener('click', () => {
-  window.location.replace($('continuer').dataset.vers ?? '/');
+  window.location.replace($('continuer').dataset.vers ?? destination());
 });
 
 /* -------------------------------------------------------------------------- */

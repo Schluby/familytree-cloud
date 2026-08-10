@@ -249,6 +249,28 @@ verifier "  la supprimer deux fois ne casse rien" 404 "$(code "$BOCAL_A" DELETE 
 verifier "  une place s'est liberee" 201 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"Apres le menage"}')"
 
 # ---------------------------------------------------------------------------
+# Lot 4 : l'interface est servie, et c'est bien celle du nuage
+#
+# Rien ici ne demande de session : ces fichiers doivent arriver a un visiteur
+# deconnecte, sinon personne ne peut atteindre la page de connexion. Ce que ces
+# verifications attrapent, c'est un deploiement ampute — un dossier public/
+# incomplet passe autrement inapercu jusqu'a ce qu'on ouvre le site.
+# ---------------------------------------------------------------------------
+
+echo "-- l'interface"
+verifier "la racine sert l'application" 200 "$(code - GET /)"
+verifier "  et non le panneau provisoire" oui "$(contient 'id="liste-sauvegardes"')"
+verifier "  elle charge le module principal" oui "$(contient '/js/main.js')"
+verifier "la page de connexion est servie" 200 "$(code - GET /connexion)"
+verifier "le client d'API est servi" 200 "$(code - GET /js/api.js)"
+verifier "  il renvoie les 401 vers la connexion" oui "$(contient '/connexion.html?retour=')"
+verifier "  et ne sonde plus l'ecriture differee" non "$(contient 'etatSauvegarde')"
+verifier "le moteur de rendu est servi" 200 "$(code - GET /js/views/cartes.js)"
+verifier "d3 est servi" 200 "$(code - GET /vendor/d3.v7.min.js)"
+verifier "la feuille de style est servie" 200 "$(code - GET /css/app.css)"
+verifier "  avec la passe telephone" oui "$(contient 'max-width: 760px')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

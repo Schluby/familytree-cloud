@@ -47,7 +47,11 @@ désormais `outils/essai.sh` — il couvre les deux lots, et couvrira les suivan
 La page d'accueil montre un panneau provisoire (créer, importer, copier,
 renommer, exporter, supprimer) en attendant l'interface du lot 4.
 
-Le lot 4 n'a pas commencé.
+**Lot 4 livré le 10/08/2026** : l'interface de l'application locale tourne en
+ligne, sur les comptes et les sauvegardes du nuage. Le panneau provisoire du
+lot 2 a disparu — la racine sert l'application.
+
+Le lot 5 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -177,27 +181,51 @@ qui plante :
 
 *Fini.* 100/100 au harnais et 28/28 à la comparaison, en local **et** en ligne.
 
-## Lot 4 — L'interface  ☐
+## Lot 4 — L'interface  ☑
 
-- ☐ Copier `web/` depuis l'application locale dans `public/`. **Aucune
+- ☑ Copier `web/` depuis l'application locale dans `public/`. **Aucune
   réécriture** : c'est tout l'intérêt d'avoir gardé le contrat d'API. La copie
   est assumée comme une **fourche** : les deux interfaces vont diverger, et
   l'invariant partagé est le contrat d'API, pas les fichiers.
-- ☐ Barre du haut : le compte connecté, un bouton de déconnexion.
-- ☐ Le bloc « Sauvegardes » du rail parle aux nouvelles routes (les siennes,
-  pas un dossier).
-- ☐ Retirer ce qui n'a plus de sens : compteur de modifications en attente **et
+  → 12 fichiers repris (≈ 8 900 lignes), d3 compris.
+- ☑ Barre du haut : le compte connecté, un bouton de déconnexion.
+- ☑ Le bloc « Sauvegardes » du rail parle aux nouvelles routes (les siennes,
+  pas un dossier), et affiche les plafonds du compte.
+- ☑ Retirer ce qui n'a plus de sens : compteur de modifications en attente **et
   son sondage toutes les 15 s** (240 requêtes/heure et par onglet, pour rien),
   la zone photo de la fiche ; `📸` reste ; `Enregistrer sous…` devient « Tout
   télécharger ».
-- ☐ Redirection vers la page de connexion sur 401.
-- ☐ **Passe téléphone minimale**, pas une refonte : `<meta viewport>`, les deux
+- ☑ Redirection vers la page de connexion sur 401.
+- ☑ **Passe téléphone minimale**, pas une refonte : `<meta viewport>`, les deux
   volets deviennent des tiroirs plein écran, la barre du haut se replie. But
   affiché : **consulter** un arbre depuis un téléphone. Éditer reste une
   activité d'écran large, et c'est dit à l'utilisateur plutôt que subi.
 
-*Fini quand :* on joue une séance complète dans le navigateur, sans jamais
-ouvrir un terminal, et qu'un arbre se lit sur un téléphone.
+*Fini.* Séance jouée dans le navigateur sans ouvrir un terminal ; un champ tapé
+dans la fiche est en base 1,8 s plus tard, sans bouton ; les deux volets
+s'ouvrent et se ferment sur 375 px de large, sans débordement horizontal.
+`outils/essai.sh` est passé à **111 vérifications**.
+
+**Trois décisions prises en chemin, à ne pas rejouer :**
+
+- **`public/js/api.js` est la couture de la fourche.** Tout ce que la version
+  en ligne fait autrement y est absorbé — la session, la forme de la liste des
+  sauvegardes, l'absence d'écriture différée — pour que `main.js`, `panel.js`
+  et les éditeurs restent la copie de la version locale. Une divergence qui
+  peut tenir dans `api.js` doit y tenir.
+- **Les instantanés n'ont pas de table.** En ligne, une copie datée *est* une
+  sauvegarde de plus : `📸` appelle la route de copie existante, et
+  « restaurer » se fait en ouvrant la copie, ce qui se voit dans le rail au
+  lieu de se deviner. La table `instantanes` du lot 0 reste vide, et aucun lot
+  ne la programme.
+- **Les portraits sont des adresses, pas des fichiers.** La pastille de la
+  fiche demande une adresse `https://…` ; le collage, le dépôt et le choix de
+  fichier sont retirés, `photos.js` avec. Le serveur refusait déjà les `data:`
+  (décision du 06/08) — l'interface le dit maintenant au lieu de le subir.
+
+**Ce qui n'a pas suivi, et pourquoi :** l'export en classeur Excel a disparu du
+menu des sauvegardes, faute d'existence côté serveur. Il revient au lot 5 avec
+`exports.py` et la vue « Tableaux & exports ».
 
 ## Lot 5 — Sortir ses données  ☐
 
