@@ -1212,6 +1212,23 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .tb-table td:first-child { color: var(--texte-faible); font-size: 11px; }
 .tb-plus { display: block; margin: 14px auto; }
 
+/* ------------------------------------------------- édition par procuration
+ *
+ * Un administrateur écrit dans l'arbre de quelqu'un d'autre. Le bandeau ne se
+ * referme pas : on ne doit jamais oublier chez qui l'on est. Ce qui porterait
+ * sur *son* compte à lui (tout télécharger, instantané) sort de la barre —
+ * ces gestes n'auraient pas le sens qu'on leur prêterait.
+ */
+.bandeau-procuration {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  background: #fdf3d8; color: #7a5c12; border-bottom: 1px solid #e0c169;
+}
+.bandeau-procuration .bouton { margin-left: auto; }
+body.sombre .bandeau-procuration { background: #352c12; color: #e8c96a; border-bottom-color: #6b5620; }
+body.en-procuration #btn-telecharger,
+body.en-procuration #btn-instantane { display: none; }
+
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 1180px) {

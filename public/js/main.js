@@ -86,7 +86,18 @@ const elements = {
   btnFermerPanneau: document.getElementById('btn-fermer-panneau'),
   panneauVolet: document.getElementById('panneau'),
   aidePlafonds: document.getElementById('aide-plafonds'),
+  bandeauProcuration: document.getElementById('bandeau-procuration'),
 };
+
+/**
+ * On édite l'arbre de quelqu'un d'autre (lot 8.F) : `?arbre=<sauvegarde>`.
+ *
+ * L'application ne change pas de comportement — c'est tout l'intérêt du
+ * montage côté serveur — mais elle doit le **dire**, et retirer ce qui n'a
+ * plus de sens : la liste des sauvegardes est celle de l'administrateur, pas
+ * celle du propriétaire, et un instantané irait dans le mauvais compte.
+ */
+const PROCURATION = Api.procuration;
 
 // Le document de campagne : celui de Maxime par défaut, mais chaque sauvegarde
 // peut pointer ailleurs via `meta.document` — un autre univers, un autre doc.
@@ -265,6 +276,23 @@ async function demarrer() {
   // Le compte d'abord : c'est lui qui dit si la session tient encore, et un
   // 401 renvoie à la connexion avant qu'on ait affiché un arbre vide.
   await dessinerCompte();
+  if (PROCURATION) {
+    try {
+      await preparerProcuration();
+    } catch (erreur) {
+      message(`Arbre inaccessible : ${erreur.message}`);
+      return;
+    }
+    try {
+      etat.vues = (await Api.vues()).vues;
+      dessinerListeVues();
+      await chargerUnivers();
+      await choisirVue(etat.vues[0]?.id);
+    } catch (erreur) {
+      message(`Impossible de contacter l'API : ${erreur.message}`);
+    }
+    return;
+  }
   try {
     etat.vues = (await Api.vues()).vues;
     dessinerListeVues();
@@ -286,6 +314,51 @@ async function demarrer() {
   } catch (erreur) {
     message(`Impossible de contacter l'API : ${erreur.message}`);
   }
+}
+
+/**
+ * Le décor de la procuration : dire chez qui l'on écrit, et retirer ce qui
+ * porterait à confusion.
+ *
+ * On demande à la surface d'administration le nom du propriétaire — c'est la
+ * seule information qui manque, l'arbre lui-même arrivant par les routes
+ * ordinaires. Si elle refuse (compte redevenu simple membre entre-temps), on
+ * ne montre rien : mieux vaut un message qu'un arbre sans étiquette.
+ */
+async function preparerProcuration() {
+  const reponse = await fetch(`/api/admin/sauvegardes/${PROCURATION}`);
+  if (!reponse.ok) {
+    const corps = await reponse.json().catch(() => null);
+    throw new Error(corps?.erreur || `HTTP ${reponse.status}`);
+  }
+  // Cet appel-ci est aussi ce qui inscrit l'ouverture au journal, du côté
+  // « consultation » : ouvrir l'arbre de quelqu'un reste un acte, même quand
+  // on l'ouvre pour l'éditer.
+  const { sauvegarde = {} } = await reponse.json();
+  const proprietaire = sauvegarde.proprietaire_email || 'un autre compte';
+
+  document.body.classList.add('en-procuration');
+  elements.bandeauProcuration.hidden = false;
+  elements.bandeauProcuration.replaceChildren(
+    ...[
+      ['b', '✎ Édition par procuration'],
+      ['span', ` — vous écrivez dans « ${sauvegarde.nom || 'l’arbre'} », qui appartient à ${proprietaire}. Chaque modification est inscrite au journal.`],
+    ].map(([balise, texte]) => {
+      const element = document.createElement(balise);
+      element.textContent = texte;
+      return element;
+    })
+  );
+  const retour = document.createElement('a');
+  retour.className = 'bouton bouton-icone';
+  retour.href = '/admin.html';
+  retour.textContent = '↩ Administration';
+  elements.bandeauProcuration.append(retour);
+
+  // Ce bloc liste les sauvegardes de l'administrateur, pas celles du
+  // propriétaire : l'afficher inviterait à changer d'arbre sans le savoir.
+  elements.listeSauvegardes.closest('.rail-bloc').hidden = true;
+  elements.univers.textContent = sauvegarde.nom || '';
 }
 
 /** Tout ce qui dépend de la sauvegarde active : maisons, types, joueurs… */
@@ -351,6 +424,9 @@ function dessinerPlafonds() {
 }
 
 async function dessinerSauvegardes() {
+  // Sous procuration, cette liste est celle de l'administrateur : la dessiner
+  // inviterait à changer d'arbre sans s'en apercevoir. Le bloc est masqué.
+  if (PROCURATION) return;
   let reponse;
   try {
     reponse = await Api.sauvegardes();

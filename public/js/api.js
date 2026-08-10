@@ -14,6 +14,20 @@
  *     d'`/api/etat-sauvegarde`, pas d'`/api/enregistrer`, pas d'instantanés.
  */
 
+/* ------------------------------------------------------- la procuration
+ *
+ * `?arbre=<sauvegarde>` : l'application entière travaille sur l'arbre de
+ * quelqu'un d'autre, par la surface d'administration. Rien d'autre ne change —
+ * mêmes écrans, mêmes gestes — parce que le serveur monte **le domaine
+ * entier** derrière `/api/admin/arbres/<id>` (voir `src/admin/procuration.ts`).
+ *
+ * Le préfixe ne vaut que pour le domaine. Le compte, la session et les
+ * sauvegardes restent ceux de la personne connectée : un administrateur qui
+ * édite l'arbre d'un autre reste lui-même.
+ */
+const ARBRE_VISE = new URLSearchParams(location.search).get('arbre') || '';
+const DOMAINE = ARBRE_VISE ? `/api/admin/arbres/${encodeURIComponent(ARBRE_VISE)}` : '/api';
+
 /** Redirige vers la connexion en gardant l'adresse demandée. */
 function versConnexion() {
   if (location.pathname.startsWith('/connexion')) return;
@@ -81,15 +95,17 @@ async function listerSauvegardes() {
 }
 
 export const Api = {
+  /** L'arbre d'un autre qu'on édite, ou `''` : c'est le sien. */
+  procuration: ARBRE_VISE,
   sante: () => requete('/api/sante'),
-  referentiels: () => requete('/api/referentiels'),
+  referentiels: () => requete(`${DOMAINE}/referentiels`),
 
-  vues: () => requete('/api/vues'),
-  vue: (id, parametres) => requete(`/api/vue/${id}${versQuery(parametres)}`),
+  vues: () => requete(`${DOMAINE}/vues`),
+  vue: (id, parametres) => requete(`${DOMAINE}/vue/${id}${versQuery(parametres)}`),
 
   /** L'année courante de la campagne : la seule clé de `meta` qui s'écrit. */
   majAnnee: (annee) =>
-    requete('/api/meta', {
+    requete(`${DOMAINE}/meta`, {
       method: 'PATCH',
       body: JSON.stringify({ annee_courante: annee }),
     }),
@@ -148,78 +164,78 @@ export const Api = {
    * compte d'un coup, ce qui n'a de sens que là où les sauvegardes ne sont
    * pas déjà des fichiers sur un disque.
    */
-  urlExport: (format, parametres) => `/api/export/${format}${versQuery(parametres)}`,
+  urlExport: (format, parametres) => `${DOMAINE}/export/${format}${versQuery(parametres)}`,
 
-  maisons: () => requete('/api/maisons'),
+  maisons: () => requete(`${DOMAINE}/maisons`),
   creerMaison: (donnees) =>
-    requete('/api/maisons', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/maisons`, { method: 'POST', body: JSON.stringify(donnees) }),
   majMaison: (id, patch) =>
-    requete(`/api/maisons/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/maisons/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   /** Sans remplacement, le serveur choisit une maison de repli. */
   supprimerMaison: (id, remplacement) =>
-    requete(`/api/maisons/${id}${versQuery({ remplacement })}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/maisons/${id}${versQuery({ remplacement })}`, { method: 'DELETE' }),
 
-  categories: () => requete('/api/categories'),
+  categories: () => requete(`${DOMAINE}/categories`),
   creerCategorie: (donnees) =>
-    requete('/api/categories', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/categories`, { method: 'POST', body: JSON.stringify(donnees) }),
   majCategorie: (id, patch) =>
-    requete(`/api/categories/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/categories/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   /** Les maisons rangées là restent, simplement sans catégorie. */
-  supprimerCategorie: (id) => requete(`/api/categories/${id}`, { method: 'DELETE' }),
+  supprimerCategorie: (id) => requete(`${DOMAINE}/categories/${id}`, { method: 'DELETE' }),
 
   /** Référence figée (régions et châteaux) : lecture seule. */
-  filtres: () => requete('/api/filtres'),
+  filtres: () => requete(`${DOMAINE}/filtres`),
   creerFiltre: (donnees) =>
-    requete('/api/filtres', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/filtres`, { method: 'POST', body: JSON.stringify(donnees) }),
   majFiltre: (id, patch) =>
-    requete(`/api/filtres/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-  supprimerFiltre: (id) => requete(`/api/filtres/${id}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/filtres/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  supprimerFiltre: (id) => requete(`${DOMAINE}/filtres/${id}`, { method: 'DELETE' }),
   apercuFiltre: (donnees) =>
-    requete('/api/filtres/apercu', { method: 'POST', body: JSON.stringify(donnees) }),
-  applicationFiltre: (id) => requete(`/api/filtres/${id}/application`),
+    requete(`${DOMAINE}/filtres/apercu`, { method: 'POST', body: JSON.stringify(donnees) }),
+  applicationFiltre: (id) => requete(`${DOMAINE}/filtres/${id}/application`),
   valeursVariable: (variable) =>
-    requete(`/api/filtres/valeurs${versQuery({ variable })}`),
+    requete(`${DOMAINE}/filtres/valeurs${versQuery({ variable })}`),
 
-  listes: () => requete('/api/listes'),
+  listes: () => requete(`${DOMAINE}/listes`),
   creerListe: (donnees) =>
-    requete('/api/listes', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/listes`, { method: 'POST', body: JSON.stringify(donnees) }),
   majListe: (id, patch) =>
-    requete(`/api/listes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-  supprimerListe: (id) => requete(`/api/listes/${id}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/listes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  supprimerListe: (id) => requete(`${DOMAINE}/listes/${id}`, { method: 'DELETE' }),
 
-  lieux: () => requete('/api/lieux'),
+  lieux: () => requete(`${DOMAINE}/lieux`),
 
-  joueurs: () => requete('/api/joueurs'),
+  joueurs: () => requete(`${DOMAINE}/joueurs`),
   creerJoueur: (donnees) =>
-    requete('/api/joueurs', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/joueurs`, { method: 'POST', body: JSON.stringify(donnees) }),
   majJoueur: (id, patch) =>
-    requete(`/api/joueurs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/joueurs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   /** Retirer un joueur efface aussi les humeurs qu'on lui portait. */
-  supprimerJoueur: (id) => requete(`/api/joueurs/${id}`, { method: 'DELETE' }),
+  supprimerJoueur: (id) => requete(`${DOMAINE}/joueurs/${id}`, { method: 'DELETE' }),
 
-  typesRelations: () => requete('/api/types-relations'),
+  typesRelations: () => requete(`${DOMAINE}/types-relations`),
   creerType: (donnees) =>
-    requete('/api/types-relations', { method: 'POST', body: JSON.stringify(donnees) }),
+    requete(`${DOMAINE}/types-relations`, { method: 'POST', body: JSON.stringify(donnees) }),
   majType: (id, patch) =>
-    requete(`/api/types-relations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/types-relations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   /** Sans remplacement, les liens de ce type sont supprimés avec lui. */
   supprimerType: (id, remplacement) =>
-    requete(`/api/types-relations/${id}${versQuery({ remplacement })}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/types-relations/${id}${versQuery({ remplacement })}`, { method: 'DELETE' }),
 
-  personnes: () => requete('/api/personnes'),
-  personne: (id, parametres) => requete(`/api/personnes/${id}${versQuery(parametres)}`),
+  personnes: () => requete(`${DOMAINE}/personnes`),
+  personne: (id, parametres) => requete(`${DOMAINE}/personnes/${id}${versQuery(parametres)}`),
   majPersonne: (id, patch) =>
-    requete(`/api/personnes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/personnes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   creerPersonne: (donnees) =>
-    requete('/api/personnes', { method: 'POST', body: JSON.stringify(donnees) }),
-  supprimerPersonne: (id) => requete(`/api/personnes/${id}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/personnes`, { method: 'POST', body: JSON.stringify(donnees) }),
+  supprimerPersonne: (id) => requete(`${DOMAINE}/personnes/${id}`, { method: 'DELETE' }),
 
-  relations: () => requete('/api/relations'),
+  relations: () => requete(`${DOMAINE}/relations`),
   majRelation: (id, patch) =>
-    requete(`/api/relations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    requete(`${DOMAINE}/relations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   creerRelation: (donnees) =>
-    requete('/api/relations', { method: 'POST', body: JSON.stringify(donnees) }),
-  supprimerRelation: (id) => requete(`/api/relations/${id}`, { method: 'DELETE' }),
+    requete(`${DOMAINE}/relations`, { method: 'POST', body: JSON.stringify(donnees) }),
+  supprimerRelation: (id) => requete(`${DOMAINE}/relations/${id}`, { method: 'DELETE' }),
 };
 
 export { versQuery };

@@ -16,7 +16,18 @@
  *   les journaux du Worker.
  */
 
-export type Action = 'consultation' | 'export' | 'plafond' | 'reinitialisation' | 'suppression';
+export type Action =
+  | 'consultation'
+  | 'export'
+  | 'plafond'
+  | 'reinitialisation'
+  | 'suppression'
+  /**
+   * Lot 8.F : l'administrateur écrit dans l'arbre d'un autre. C'est le geste
+   * qui compte le plus dans ce registre — le seul qui laisse une trace *dans*
+   * les données de quelqu'un d'autre.
+   */
+  | 'edition';
 
 export async function journaliser(
   base: D1Database,

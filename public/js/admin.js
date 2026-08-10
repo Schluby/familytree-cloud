@@ -195,8 +195,18 @@ async function chargerSauvegardes(compte) {
           lienJson.href = `/api/admin/sauvegardes/${fiche.id}/export`;
           const lienXlsx = el('a', '⤓ .xlsx');
           lienXlsx.href = `/api/admin/sauvegardes/${fiche.id}/export?format=xlsx`;
+          // « Éditer » ouvre l'application entière sur cet arbre, par
+          // procuration (lot 8.F). « Consulter » reste la lecture à plat, qui
+          // ne peut rien écrire — les deux gestes ne se valent pas, et on doit
+          // pouvoir choisir le moindre.
+          const lienEdition = el('a', '✎ Éditer');
+          lienEdition.href = `/?arbre=${encodeURIComponent(fiche.id)}`;
+          lienEdition.title =
+            `Ouvrir « ${fiche.nom} » dans l'application, avec droit d'écriture. ` +
+            'Chaque modification est inscrite au journal.';
           actions.append(
             bouton('Consulter', () => consulter(fiche, compte)),
+            lienEdition,
             lienJson,
             lienXlsx
           );

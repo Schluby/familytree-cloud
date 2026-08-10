@@ -12,9 +12,14 @@
  * - **Les comptes** — les lister, relever un plafond, réinitialiser un mot de
  *   passe, supprimer un compte. Ce sont des gestes d'administration, pas des
  *   modifications d'arbre.
- * - **Les arbres** — les lire et les exporter. `lectureSeule` interdit tout
- *   verbe autre que GET sur ce chemin : même une route d'écriture ajoutée par
- *   distraction serait refusée.
+ * - **Les arbres en lecture** (`/sauvegardes/*`) — les lire à plat et les
+ *   exporter. `lectureSeule` interdit tout verbe autre que GET sur ce chemin :
+ *   même une route d'écriture ajoutée par distraction y serait refusée.
+ * - **Les arbres en édition** (`/arbres/:id/*`, lot 8.F) — la porte ouverte au
+ *   revirement du 10/08/2026. Elle monte **le domaine entier** derrière une
+ *   procuration : voir `procuration.ts`, qui dit pourquoi et ce qui n'a pas
+ *   bougé. Deux chemins distincts pour deux pouvoirs distincts, plutôt qu'un
+ *   seul chemin dont le sens dépendrait d'un verbe.
  * - **Le journal** — consultable, jamais effaçable.
  */
 
@@ -24,16 +29,36 @@ import { empreinteMotDePasse } from '../auth/empreintes';
 import { fermerToutesLesSessions } from '../auth/sessions';
 import { tables as tablesDe, versXlsx, MIME_XLSX } from '../domaine/exports';
 import { Dataset, slugifier, type Objet } from '../domaine/models';
+import { routesDomaine } from '../domaine/routes';
 import type { Variables } from '../intergiciels';
 import { exigerAdmin, lectureSeule } from './intergiciel';
 import { dernieres, journaliser } from './journal';
+import { parProcuration } from './procuration';
 
 export const routesAdmin = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 routesAdmin.use('*', exigerAdmin);
 // La garde du verbe est posée sur le chemin, pas sur chaque route : c'est ce
-// qui la rend vraie pour les routes qui n'existent pas encore.
+// qui la rend vraie pour les routes qui n'existent pas encore. Elle ne couvre
+// que `/sauvegardes/*` — la lecture à plat. L'édition a son propre chemin.
 routesAdmin.use('/sauvegardes/*', lectureSeule);
+
+/* --------------------------------------------------------------------------
+ * Les arbres en édition — le domaine entier, par procuration
+ * -------------------------------------------------------------------------- */
+
+// Toute la surface du domaine, montée sous `/api/admin/arbres/:id`. Rien n'est
+// réécrit : ce sont les mêmes routes, les mêmes validations, les mêmes
+// plafonds — seulement exécutées au nom du propriétaire de l'arbre visé.
+// `parProcuration` fait la substitution et inscrit chaque écriture au journal.
+//
+// Le paramètre s'appelle `:arbre` et non `:id`, et ce n'est pas un détail de
+// style : le domaine a ses propres `/maisons/:id`, `/personnes/:id`… et deux
+// paramètres du même nom dans une adresse imbriquée se recouvrent. Avec `:id`
+// des deux côtés, `PATCH /arbres/<sauvegarde>/maisons/stark` cherchait une
+// maison nommée d'après l'identifiant de la sauvegarde.
+routesAdmin.use('/arbres/:arbre/*', parProcuration);
+routesAdmin.route('/arbres/:arbre', routesDomaine);
 
 function fichier(nom: string, mime: string, octets: Uint8Array | string): Response {
   const corps = typeof octets === 'string' ? new TextEncoder().encode(octets) : octets;
