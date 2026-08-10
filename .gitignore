@@ -7,3 +7,7 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# Arbres de mesure fabriques par outils/gros-arbre.mjs
+.gros.json
+gros*.json

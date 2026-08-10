@@ -1,0 +1,318 @@
+/**
+ * Référentiels éditables — port de `backend/referentiels.py`.
+ *
+ * Deux catalogues, mêmes règles. Une personne porte l'*id* de sa maison, une
+ * relation porte l'*id* de son type : cet id ne change donc jamais après la
+ * création. Renommer, c'est changer le libellé affiché, pas la clé — sinon
+ * toutes les fiches qui s'y réfèrent tomberaient dans le vide.
+ *
+ * Ce module ne fait que valider et normaliser ; les écritures sont dans les
+ * routes, qui seules touchent au document.
+ */
+
+import { arrondir, versEntier } from './python';
+import type { Objet } from './models';
+
+/** Styles de trait honorés par le moteur de rendu (`web/js/views/cartes.js`). */
+export const STYLES: Record<string, string> = {
+  solide: 'Trait plein',
+  tirets: 'Tirets',
+  pointille: 'Pointillé',
+};
+
+/** Les catégories servent au regroupement dans les menus et la fiche. */
+export const CATEGORIES: Record<string, string> = {
+  famille: 'Sang & alliances',
+  social: 'Liens sociaux',
+  politique: 'Liens politiques',
+  autre: 'Autres liens',
+};
+
+/**
+ * Types dont la sémantique est câblée dans la mise en page : la filiation
+ * construit les générations, l'union dessine la barre de couple, la fratrie est
+ * déduite des parents communs. On peut les renommer, les recolorer, les
+ * restyler — pas les supprimer.
+ */
+export const TYPES_STRUCTURANTS = ['parent', 'conjoint', 'amant', 'fratrie'] as const;
+
+export const COULEUR_MAISON_DEFAUT = '#7a7f87';
+export const COULEUR_TYPE_DEFAUT = '#8a8f98';
+export const COULEUR_JOUEUR_DEFAUT = '#7a7f87';
+
+const COULEUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/** Refus explicite, affichable tel quel dans l'interface. */
+export class ErreurReferentiel extends Error {}
+
+/* --------------------------------------------------------------------------
+ * Briques de validation
+ * -------------------------------------------------------------------------- */
+
+export function normaliserCouleur(brut: unknown, defaut: string): string {
+  let texte = String(brut || '').trim();
+  if (!texte) return defaut;
+  if (!COULEUR.test(texte)) {
+    throw new ErreurReferentiel(`couleur invalide : ${texte} (attendu #rrggbb)`);
+  }
+  if (texte.length === 4) {
+    // #abc -> #aabbcc, pour n'avoir qu'une seule forme en base.
+    texte = '#' + [...texte.slice(1)].map((c) => c + c).join('');
+  }
+  return texte.toLowerCase();
+}
+
+/** `str(brut if brut is not None else "").strip()[:maximum]`, à la lettre. */
+function texte(brut: unknown, maximum = 120): string {
+  return String(brut === null || brut === undefined ? '' : brut)
+    .trim()
+    .slice(0, maximum);
+}
+
+function ordre(brut: unknown, defaut = 0): number {
+  return versEntier(brut) ?? defaut;
+}
+
+/** `"cle" in patch` — propriété propre uniquement (le patch vient du réseau). */
+function fourni(patch: Objet, cle: string): boolean {
+  return Object.hasOwn(patch, cle);
+}
+
+/** `dict(base or {})` : une base vide compte comme absente, comme en Python. */
+function partirDe(base: Objet | null | undefined): { fiche: Objet; neuve: boolean } {
+  const neuve = !base || Object.keys(base).length === 0;
+  return { fiche: { ...(base ?? {}) }, neuve };
+}
+
+function choisir(patch: Objet, cle: string, courant: unknown): unknown {
+  return fourni(patch, cle) ? patch[cle] : courant;
+}
+
+/* --------------------------------------------------------------------------
+ * Maisons
+ * -------------------------------------------------------------------------- */
+
+export const CHAMPS_MAISON = ['label', 'couleur', 'devise', 'categorie', 'ordre'] as const;
+
+/**
+ * Fusionne un patch dans une maison existante (ou en crée une).
+ *
+ * Les champs absents du patch sont conservés, les champs inconnus du référentiel
+ * aussi : on ne perd jamais ce qu'on ne comprend pas.
+ */
+export function appliquerMaison(base: Objet | null, patch: Objet): Objet {
+  const { fiche, neuve } = partirDe(base);
+
+  if (fourni(patch, 'label') || neuve) {
+    fiche.label = texte(choisir(patch, 'label', fiche.label));
+  }
+  if (fourni(patch, 'couleur') || neuve) {
+    fiche.couleur = normaliserCouleur(
+      choisir(patch, 'couleur', fiche.couleur),
+      COULEUR_MAISON_DEFAUT
+    );
+  }
+  if (fourni(patch, 'devise') || neuve) {
+    fiche.devise = texte(choisir(patch, 'devise', fiche.devise), 200);
+  }
+  if (fourni(patch, 'categorie') || neuve) {
+    // Vide = « sans catégorie », qui est un cas légitime, pas une erreur.
+    fiche.categorie = texte(choisir(patch, 'categorie', fiche.categorie), 60);
+  }
+  if (fourni(patch, 'ordre')) {
+    fiche.ordre = ordre(patch.ordre);
+  }
+
+  if (!fiche.label) throw new ErreurReferentiel("une maison a besoin d'un nom");
+  return fiche;
+}
+
+/* --------------------------------------------------------------------------
+ * Types de liens
+ * -------------------------------------------------------------------------- */
+
+export const CHAMPS_TYPE = [
+  'label',
+  'label_sortant',
+  'label_entrant',
+  'couleur',
+  'dirige',
+  'style',
+  'categorie',
+  'ordre',
+] as const;
+
+export function appliquerType(base: Objet | null, patch: Objet): Objet {
+  const { fiche, neuve } = partirDe(base);
+
+  if (fourni(patch, 'label') || neuve) {
+    fiche.label = texte(choisir(patch, 'label', fiche.label));
+  }
+  if (fourni(patch, 'couleur') || neuve) {
+    fiche.couleur = normaliserCouleur(
+      choisir(patch, 'couleur', fiche.couleur),
+      COULEUR_TYPE_DEFAUT
+    );
+  }
+  if (fourni(patch, 'dirige') || neuve) {
+    fiche.dirige = Boolean(choisir(patch, 'dirige', fiche.dirige ?? false));
+  }
+  if (fourni(patch, 'style') || neuve) {
+    const style = String(choisir(patch, 'style', fiche.style ?? 'solide') || 'solide').toLowerCase();
+    if (!Object.hasOwn(STYLES, style)) {
+      throw new ErreurReferentiel(`style inconnu : ${style} (${Object.keys(STYLES).join(', ')})`);
+    }
+    fiche.style = style;
+  }
+  if (fourni(patch, 'categorie') || neuve) {
+    const categorie = String(
+      choisir(patch, 'categorie', fiche.categorie ?? 'autre') || 'autre'
+    ).toLowerCase();
+    if (!Object.hasOwn(CATEGORIES, categorie)) {
+      throw new ErreurReferentiel(
+        `catégorie inconnue : ${categorie} (${Object.keys(CATEGORIES).join(', ')})`
+      );
+    }
+    fiche.categorie = categorie;
+  }
+  if (fourni(patch, 'ordre')) {
+    fiche.ordre = ordre(patch.ordre);
+  }
+
+  // Les libellés de sens n'ont de sens que sur un lien orienté : on les range
+  // quand le lien l'est, on les efface quand il ne l'est plus.
+  for (const champ of ['label_sortant', 'label_entrant'] as const) {
+    if (fourni(patch, champ)) fiche[champ] = texte(patch[champ]);
+  }
+  if (!fiche.dirige) {
+    delete fiche.label_sortant;
+    delete fiche.label_entrant;
+  }
+  for (const champ of ['label_sortant', 'label_entrant'] as const) {
+    if (Object.hasOwn(fiche, champ) && !fiche[champ]) delete fiche[champ];
+  }
+
+  if (!fiche.label) throw new ErreurReferentiel("un type de lien a besoin d'un nom");
+  return fiche;
+}
+
+/* --------------------------------------------------------------------------
+ * Catégories de maisons
+ *
+ * Une catégorie regroupe des maisons — « Grandes maisons », « Ordres »,
+ * « Sauvageons »… C'est un axe de couleur et de filtre de plus, défini par
+ * l'utilisateur. Sa couleur est proposée automatiquement (teintes réparties),
+ * mais reste modifiable : l'automatique ne doit jamais empêcher de choisir.
+ * -------------------------------------------------------------------------- */
+
+export const CHAMPS_CATEGORIE = ['label', 'couleur', 'ordre'] as const;
+
+/**
+ * Teintes réparties sur la roue, saturation et clarté fixes : deux catégories
+ * voisines se distinguent, et l'ensemble reste dans la même famille de tons.
+ */
+const TEINTES = [205, 25, 145, 275, 45, 175, 320, 95, 250, 15, 190, 300];
+
+/** Couleur de catégorie n° `index`, en parcourant la roue des teintes. */
+export function couleurAuto(index: number): string {
+  const teinte = TEINTES[((index % TEINTES.length) + TEINTES.length) % TEINTES.length] as number;
+  // Chaque tour de roue assombrit légèrement : douze catégories restent
+  // distinctes, la treizième ne recommence pas exactement à la première.
+  const tour = Math.floor(index / TEINTES.length);
+  return hslVersHex(teinte, 0.42 - 0.05 * tour, 0.52 - 0.06 * tour);
+}
+
+function hslVersHex(teinte: number, saturationBrute: number, clarteBrute: number): string {
+  const saturation = Math.max(0, Math.min(1, saturationBrute));
+  const clarte = Math.max(0, Math.min(1, clarteBrute));
+  const chroma = (1 - Math.abs(2 * clarte - 1)) * saturation;
+  const secteur = (((teinte % 360) + 360) % 360) / 60;
+  const seconde = chroma * (1 - Math.abs((secteur % 2) - 1));
+  const quartier = Math.trunc(secteur);
+
+  const roue: [number, number, number][] = [
+    [chroma, seconde, 0],
+    [seconde, chroma, 0],
+    [0, chroma, seconde],
+    [0, seconde, chroma],
+    [seconde, 0, chroma],
+    [chroma, 0, seconde],
+  ];
+  const rvb = roue[((quartier % 6) + 6) % 6] as [number, number, number];
+  const decalage = clarte - chroma / 2;
+
+  return (
+    '#' +
+    rvb
+      .map((c) =>
+        arrondir((c + decalage) * 255)
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')
+  );
+}
+
+export function appliquerCategorie(base: Objet | null, patch: Objet, rang = 0): Objet {
+  const { fiche, neuve } = partirDe(base);
+
+  if (fourni(patch, 'label') || neuve) {
+    fiche.label = texte(choisir(patch, 'label', fiche.label));
+  }
+  if (fourni(patch, 'couleur') || neuve) {
+    fiche.couleur = normaliserCouleur(choisir(patch, 'couleur', fiche.couleur), couleurAuto(rang));
+  }
+  if (fourni(patch, 'ordre')) {
+    fiche.ordre = ordre(patch.ordre);
+  }
+
+  if (!fiche.label) throw new ErreurReferentiel("une catégorie a besoin d'un nom");
+  return fiche;
+}
+
+/* --------------------------------------------------------------------------
+ * Joueurs
+ *
+ * Un joueur n'est pas un personnage : c'est quelqu'un autour de la table. Son id
+ * est la clé sous laquelle chaque fiche range l'humeur qu'on lui porte
+ * (`personne.relations_joueurs`), et il ne bouge donc jamais non plus.
+ * -------------------------------------------------------------------------- */
+
+export const CHAMPS_JOUEUR = ['nom', 'personnage', 'couleur', 'personne_id', 'ordre'] as const;
+
+export function appliquerJoueur(base: Objet | null, patch: Objet): Objet {
+  const { fiche, neuve } = partirDe(base);
+
+  if (fourni(patch, 'nom') || neuve) {
+    fiche.nom = texte(choisir(patch, 'nom', fiche.nom));
+  }
+  if (fourni(patch, 'personnage') || neuve) {
+    fiche.personnage = texte(choisir(patch, 'personnage', fiche.personnage));
+  }
+  if (fourni(patch, 'couleur') || neuve) {
+    fiche.couleur = normaliserCouleur(
+      choisir(patch, 'couleur', fiche.couleur),
+      COULEUR_JOUEUR_DEFAUT
+    );
+  }
+  if (fourni(patch, 'personne_id') || neuve) {
+    // Le personnage joué, s'il a sa fiche dans l'arbre : sa carte porte alors
+    // un cadre à part. Vide = le joueur n'a pas de fiche.
+    fiche.personne_id = texte(choisir(patch, 'personne_id', fiche.personne_id));
+  }
+  if (fourni(patch, 'ordre')) {
+    fiche.ordre = ordre(patch.ordre);
+  }
+
+  if (!fiche.nom) throw new ErreurReferentiel("un joueur a besoin d'un nom");
+  return fiche;
+}
+
+/** Ce que le front a besoin de savoir pour construire ses formulaires. */
+export function decrireCatalogues(): Objet {
+  return {
+    styles: Object.entries(STYLES).map(([id, label]) => ({ id, label })),
+    categories: Object.entries(CATEGORIES).map(([id, label]) => ({ id, label })),
+    types_structurants: [...TYPES_STRUCTURANTS],
+  };
+}

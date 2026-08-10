@@ -30,6 +30,15 @@ import {
   type DocumentPrepare,
 } from './document';
 import { squelette } from './squelette';
+import {
+  activer,
+  CHAMPS_FICHE,
+  ecrireDocument,
+  ErreurPlafond,
+  ficheDe,
+  maintenant,
+  type Fiche,
+} from './depot';
 
 type Contexte = Context<{ Bindings: Env; Variables: Variables }>;
 
@@ -42,21 +51,6 @@ routesSauvegardes.use('*', exigerSession);
  * Formes et garde-fous
  * -------------------------------------------------------------------------- */
 
-interface Fiche {
-  id: string;
-  nom: string;
-  schema_version: number;
-  personnes: number;
-  relations: number;
-  taille: number;
-  revision: number;
-  cree_le: number;
-  modifie_le: number;
-}
-
-const CHAMPS_FICHE =
-  'id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le';
-
 const LONGUEUR_NOM = 120;
 
 /**
@@ -65,10 +59,6 @@ const LONGUEUR_NOM = 120;
  * le temps de CPU de la requête rien qu'à être parcouru.
  */
 const OCTETS_MAXIMUM_CORPS = 8 * 1024 * 1024;
-
-function maintenant(): number {
-  return Math.floor(Date.now() / 1000);
-}
 
 function nettoyerNom(brut: unknown, secours = ''): string {
   const propose = typeof brut === 'string' ? brut.trim() : '';
@@ -115,17 +105,6 @@ function extraireDocument(
     return { document: enveloppe, nom: undefined, revision: undefined };
   }
   return null;
-}
-
-/**
- * L'invariant du projet, en une fonction. Tout ce qui touche à une sauvegarde
- * commence ici — et si elle n'appartient pas au demandeur, elle n'existe pas.
- */
-async function ficheDe(base: D1Database, utilisateurId: string, id: string): Promise<Fiche | null> {
-  return base
-    .prepare(`SELECT ${CHAMPS_FICHE} FROM sauvegardes WHERE id = ? AND utilisateur_id = ?`)
-    .bind(id, utilisateurId)
-    .first<Fiche>();
 }
 
 function introuvable(c: Contexte): Response {
@@ -201,6 +180,10 @@ async function creerSauvegarde(
     ),
   ]);
 
+  // Première sauvegarde du compte : elle devient l'active, sinon les routes du
+  // domaine répondraient « aucune sauvegarde active » juste après une création.
+  if (!compte.sauvegarde_active) await activer(c.env.DB, compte.id, id);
+
   return {
     id,
     nom,
@@ -226,13 +209,30 @@ routesSauvegardes.get('/', async (c) => {
     .bind(compte.id)
     .all<Fiche>();
 
+  // `actif` fait partie du contrat de la version locale : le sélecteur de
+  // sauvegarde s'en sert pour cocher celle qui est ouverte.
+  const actif = results.some((f) => f.id === compte.sauvegarde_active)
+    ? compte.sauvegarde_active
+    : (results[0]?.id ?? null);
+
   return c.json({
+    actif,
     sauvegardes: results,
     plafonds: {
       sauvegardes: compte.plafond_sauvegardes,
       octets: compte.plafond_octets,
     },
   });
+});
+
+/** Ouvrir un autre monde : tout `/api/…` du domaine bascule dessus. */
+routesSauvegardes.post('/:id/activer', async (c) => {
+  const compte = c.get('compte');
+  const fiche = await ficheDe(c.env.DB, compte.id, c.req.param('id'));
+  if (!fiche) return introuvable(c);
+
+  await activer(c.env.DB, compte.id, fiche.id);
+  return c.json({ sauvegarde: fiche });
 });
 
 /* --------------------------------------------------------------------------
@@ -391,14 +391,23 @@ routesSauvegardes.patch('/:id', async (c) => {
 });
 
 routesSauvegardes.delete('/:id', async (c) => {
+  const compte = c.get('compte');
+  const id = c.req.param('id');
+
   // `ON DELETE CASCADE` emporte le contenu et les instantanés.
   const resultat = await c.env.DB.prepare(
     'DELETE FROM sauvegardes WHERE id = ? AND utilisateur_id = ?'
   )
-    .bind(c.req.param('id'), c.get('compte').id)
+    .bind(id, compte.id)
     .run();
 
-  return resultat.meta.changes ? c.body(null, 204) : introuvable(c);
+  if (!resultat.meta.changes) return introuvable(c);
+
+  // Si c'était l'active, on l'efface : la prochaine lecture repointera d'elle-
+  // même sur la plus récente (voir `sauvegardeActive`).
+  if (compte.sauvegarde_active === id) await activer(c.env.DB, compte.id, null);
+
+  return c.body(null, 204);
 });
 
 /* --------------------------------------------------------------------------
@@ -456,46 +465,33 @@ routesSauvegardes.put('/:id/contenu', async (c) => {
     );
   }
 
-  const prepare = preparerDocument(extrait.document);
-  const debordement = verifierTaille(c, prepare);
-  if (debordement) return debordement;
-
-  const le = maintenant();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE sauvegardes
-          SET schema_version = ?, personnes = ?, relations = ?, taille = ?,
-              revision = revision + 1, modifie_le = ?
-        WHERE id = ? AND utilisateur_id = ?`
-    ).bind(
-      prepare.schemaVersion,
-      prepare.personnes,
-      prepare.relations,
-      prepare.octets,
-      le,
-      id,
-      c.get('compte').id
-    ),
-    // Upsert : la ligne existe par construction, mais si elle manquait, une
-    // mise à jour muette perdrait le document sans rien dire.
-    c.env.DB.prepare(
-      `INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)
-         ON CONFLICT(sauvegarde_id) DO UPDATE SET donnees = excluded.donnees`
-    ).bind(id, prepare.texte),
-  ]);
-
-  return c.json({
-    sauvegarde: {
-      ...fiche,
-      schema_version: prepare.schemaVersion,
-      personnes: prepare.personnes,
-      relations: prepare.relations,
-      taille: prepare.octets,
-      revision: fiche.revision + 1,
-      modifie_le: le,
-    },
-    portraits_retires: prepare.portraitsRetires,
-  });
+  try {
+    const ecriture = await ecrireDocument(
+      c.env.DB,
+      c.get('compte').id,
+      fiche,
+      extrait.document,
+      c.get('compte').plafond_octets
+    );
+    return c.json({
+      sauvegarde: ecriture.fiche,
+      portraits_retires: ecriture.portraitsRetires,
+    });
+  } catch (erreur) {
+    if (erreur instanceof ErreurPlafond) {
+      return c.json(
+        {
+          erreur: erreur.message,
+          indice:
+            'les portraits collés sont la cause la plus fréquente ; la version hébergée ne les stocke pas',
+          octets: erreur.octets,
+          plafond_octets: erreur.plafond,
+        },
+        413
+      );
+    }
+    throw erreur;
+  }
 });
 
 /* --------------------------------------------------------------------------

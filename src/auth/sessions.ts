@@ -29,6 +29,12 @@ export interface Compte {
    */
   plafond_octets: number;
   plafond_sauvegardes: number;
+  /**
+   * La sauvegarde que les routes du domaine éditent quand l'adresse n'en nomme
+   * aucune. Elle voyage aussi avec la session : sinon chaque `/api/personnes/…`
+   * paierait une requête juste pour savoir de quel monde on parle.
+   */
+  sauvegarde_active: string | null;
 }
 
 /** Ce qu'on montre au navigateur : ni les plafonds internes, ni rien d'autre. */
@@ -66,7 +72,8 @@ export async function resoudreSession(base: D1Database, jeton: string): Promise<
   const maintenant = Math.floor(Date.now() / 1000);
   const ligne = await base
     .prepare(
-      `SELECT u.id, u.email, u.nom_affiche, u.role, u.plafond_octets, u.plafond_sauvegardes
+      `SELECT u.id, u.email, u.nom_affiche, u.role,
+              u.plafond_octets, u.plafond_sauvegardes, u.sauvegarde_active
          FROM sessions s
          JOIN utilisateurs u ON u.id = s.utilisateur_id
         WHERE s.jeton_hache = ? AND s.expire_le > ?`

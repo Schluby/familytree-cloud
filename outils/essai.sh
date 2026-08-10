@@ -200,6 +200,26 @@ verifier "sans cookie, pas de liste" 401 "$(code - GET /api/sauvegardes)"
 code "$BOCAL_A" GET /api/sauvegardes/$ID_IMPORT > /dev/null
 verifier "et A n'a rien perdu au passage" 2 "$(lire sauvegarde.revision)"
 
+echo "-- le domaine porte sur la sauvegarde active, et sur elle seule"
+verifier "A active sa sauvegarde importee" 200 "$(code "$BOCAL_A" POST /api/sauvegardes/$ID_IMPORT/activer)"
+verifier "A voit ses fiches" 200 "$(code "$BOCAL_A" GET /api/personnes)"
+verifier "  et elles sont bien les siennes" 1 "$(lire personnes.length)"
+verifier "la vue sociogramme se construit" 200 "$(code "$BOCAL_A" GET /api/vue/sociogramme)"
+verifier "  et c'est bien elle" oui "$(contient '"vue":"sociogramme"')"
+verifier "  avec ses aretes et sa legende" oui "$(contient '"legende"')"
+verifier "les referentiels repondent" 200 "$(code "$BOCAL_A" GET /api/referentiels)"
+verifier "une vue inconnue" 404 "$(code "$BOCAL_A" GET /api/vue/inexistante)"
+verifier "une personne inconnue" 404 "$(code "$BOCAL_A" GET /api/personnes/fantome)"
+verifier "sans cookie, pas de domaine" 401 "$(code - GET /api/personnes)"
+verifier "B n'active pas la sauvegarde de A" 404 "$(code "$BOCAL_B" POST /api/sauvegardes/$ID_IMPORT/activer)"
+verifier "B sans sauvegarde n'a pas de monde" 409 "$(code "$BOCAL_B" GET /api/personnes)"
+verifier "B se cree un monde a lui" 201 "$(code "$BOCAL_B" POST /api/sauvegardes '{"nom":"Le monde de B"}')"
+verifier "  qui est vide, pas celui de A" 200 "$(code "$BOCAL_B" GET /api/personnes)"
+verifier "  aucune fiche heritee" 0 "$(lire personnes.length)"
+verifier "B cree une fiche chez lui" 201 "$(code "$BOCAL_B" POST /api/personnes '{"prenom":"Test","nom":"Chez B"}')"
+code "$BOCAL_A" GET /api/personnes > /dev/null
+verifier "et A n'en voit rien" 1 "$(lire personnes.length)"
+
 echo "-- plafonds"
 code "$BOCAL_A" GET /api/sauvegardes > /dev/null
 PLAFOND="$(lire plafonds.sauvegardes)"

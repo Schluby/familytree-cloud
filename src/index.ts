@@ -14,6 +14,8 @@
 import { Hono } from 'hono';
 import { routesAuth } from './auth/routes';
 import { routesSauvegardes } from './sauvegardes/routes';
+import { routesDomaine, santeDuMonde } from './domaine/routes';
+import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import type { Variables } from './intergiciels';
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -47,11 +49,22 @@ app.get('/api/sante', async (c) => {
     ).all<{ utilisateurs: number; sauvegardes: number }>();
 
     const ligne = results[0] ?? { utilisateurs: 0, sauvegardes: 0 };
+
+    // Connecté, on ajoute ce que la version locale met dans sa propre santé :
+    // l'univers ouvert, ses effectifs et ses incohérences. Les deux contrats
+    // tiennent dans une seule réponse, sans qu'aucun des deux ne bouge.
+    const jeton = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
+    const compte = jeton ? await resoudreSession(c.env.DB, jeton) : null;
+    const monde = compte
+      ? await santeDuMonde(c.env.DB, compte.id, compte.sauvegarde_active)
+      : null;
+
     return c.json({
       ok: true,
       base: 'joignable',
       utilisateurs: ligne.utilisateurs,
       sauvegardes: ligne.sauvegardes,
+      ...(monde ?? {}),
       ms: Date.now() - debut,
     });
   } catch (erreur) {
@@ -80,6 +93,15 @@ app.route('/api/auth', routesAuth);
  * -------------------------------------------------------------------------- */
 
 app.route('/api/sauvegardes', routesSauvegardes);
+
+/* --------------------------------------------------------------------------
+ * Le domaine : l'arbre lui-même, sur le contrat d'adresses de la version
+ * locale (`/api/vue/…`, `/api/personnes/…`). Ces routes portent sur la
+ * **sauvegarde active du compte** — c'est ce qui permettra de reprendre `web/`
+ * sans le réécrire, au lot 4.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api', routesDomaine);
 
 /* --------------------------------------------------------------------------
  * Tout /api/ inconnu répond en JSON, jamais en HTML : le front sait alors
