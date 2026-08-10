@@ -568,3 +568,54 @@ Tranché le **10/08/2026**, au lot 2 :
   quadratique sur une vue), et l'intergiciel de session est posé **route par
   route** au lieu d'un `use('*')` — monté sur `/api`, un `*` aurait exigé une
   session pour s'inscrire.
+
+---
+
+# Lot 8 — ce que la table a demandé après coup (10/08/2026)
+
+Le plan d'origine s'arrêtait au lot 7. Ce qui suit vient de l'usage : la
+campagne tourne, et il manquait des choses qu'on ne voit qu'en jouant.
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 8.A | L'appui long remplace le clic droit, partout. « ＋ Profil » en bas, « Thème » en haut. | `js/dom.js`, `js/views/cartes.js` |
+| 8.B | Âges déduits d'une année de campagne, éditable. | `js/calendrier.js`, `PATCH /api/meta` |
+| 8.C | Tags « chef de maison » / « héritier », cadre appuyé. | `js/rangs.js` |
+| 8.D | Liens révolus, catégorie « Événements passés », détails facultatifs. | `models.ts`, `js/editeurs.js` |
+| 8.E | Vue « Maisons » en écran partagé. | `vues/maisons.ts`, `js/views/maisons.js` |
+| 8.F | Écriture par procuration pour l'administrateur. | `src/admin/procuration.ts` |
+| 8.G | Mot de passe oublié par courriel. | `src/auth/courriel.ts`, migration `0004` |
+
+## Les trois décisions qui méritent d'être relues
+
+**8.F renverse le lot 7.** « Comptes administrateurs voyant tous les arbres, en
+lecture seule » était tranché depuis le 06/08. La demande du 10/08 le défait :
+un outil de campagne où le MJ ne peut pas corriger une fiche n'est pas un outil
+de campagne. Ce qui n'a pas bougé : les routes de membres ignorent toujours les
+rôles, le pouvoir n'existe que sur `/api/admin/*`, et il est journalisé. Le
+mécanisme — substituer le compte sur le contexte plutôt que réécrire trente
+routes — garantit qu'un administrateur ne peut rien faire de plus que ce que le
+propriétaire pourrait faire lui-même.
+
+**Les caractéristiques de maison sont celles du manuel, pas du document de la
+table.** Le document de règles indiqué est un Google Docs qui demande une
+autorisation : il n'a pas pu être lu. Ce sont donc les sept ressources standard
+du JDR *Le Trône de Fer* (Défense, Influence, Terres, Loi, Population, Pouvoir,
+Richesse). Elles sont déclarées **en un seul endroit**
+(`CARACTERISTIQUES_MAISON`, dans `referentiels.ts`) et descendues au front :
+en changer la liste est une ligne, si la table joue autrement.
+
+**8.G est complet sauf l'envoi.** Le jeton, l'expiration, l'usage unique, la
+page, la conservation des sauvegardes : tout est là et vérifié. Envoyer un
+courriel depuis un Worker demande un service tiers, donc un compte et une clé —
+ce qui revient au propriétaire de l'instance. Sans clé, l'option n'apparaît pas
+et le code de secours reste la voie de récupération.
+
+## Vérification
+
+**225/225** au harnais (`outils/essai.sh`), contre 174 à la fin du lot 7. Les
+51 vérifications neuves couvrent notamment : un membre refusé sur toute la
+porte d'édition avant même de savoir si l'arbre existe, une caractéristique
+inventée ignorée, une année sans chiffre refusée, et — pour le mot de passe
+oublié — la preuve que la réponse est **exactement la même** pour une adresse
+connue et pour une inconnue.

@@ -15,10 +15,17 @@ function destination() {
   return demande && demande.startsWith('/') && !demande.startsWith('//') ? demande : '/';
 }
 
-/* Déjà connecté ? Inutile de redemander. */
-compteConnecte().then((compte) => {
-  if (compte) window.location.replace(destination());
-});
+/** Le jeton du courriel, s'il y en a un : il change tout ce qui suit. */
+const jetonRecu = new URLSearchParams(location.search).get('jeton');
+
+/* Déjà connecté ? Inutile de redemander — sauf si l'on vient d'un lien de
+   réinitialisation : quelqu'un qui change son mot de passe depuis un appareil
+   où il est resté connecté ne doit pas être renvoyé sur son arbre. */
+if (!jetonRecu) {
+  compteConnecte().then((compte) => {
+    if (compte) window.location.replace(destination());
+  });
+}
 
 /* -------------------------------------------------------------------------- */
 
@@ -125,11 +132,100 @@ $('continuer').addEventListener('click', () => {
 
 /* -------------------------------------------------------------------------- */
 
-$('lienOubli').addEventListener('click', () => {
+$('lienOubli').addEventListener('click', async () => {
   document.querySelectorAll('.carte').forEach((c) => c.classList.add('cache'));
   $('carteRecuperation').classList.remove('cache');
   $('emailRecuperation').value = $('email').value;
+  $('emailOubli').value = $('email').value;
+
+  // Le bloc « lien par courriel » n'apparaît que si le serveur sait envoyer :
+  // promettre un message qui n'arrivera jamais est pire que ne rien proposer.
+  const { donnees } = await appeler('/api/auth/moyens');
+  if (donnees?.courriel) {
+    $('blocCourriel').classList.remove('cache');
+    $('aideSecours').insertAdjacentText(
+      'afterbegin',
+      'Sans accès à votre boîte ? '
+    );
+  }
 });
+
+/* ----------------------------------------------- mot de passe oublié (8.G) */
+
+$('formulaireOubli').addEventListener('submit', async (evenement) => {
+  evenement.preventDefault();
+  const zone = $('messageOubli');
+  zone.textContent = '';
+
+  await pendant($('validerOubli'), 'Envoi…', async () => {
+    const { ok, donnees } = await appeler('/api/auth/mot-de-passe-oublie', {
+      method: 'POST',
+      body: JSON.stringify({ email: $('emailOubli').value }),
+    });
+    zone.className = `message ${ok ? 'reussite' : 'erreur'}`;
+    // Le même message que l'adresse existe ou non : cette page ne doit pas
+    // servir à savoir qui a un compte ici.
+    zone.textContent = ok
+      ? 'Si un compte existe pour cette adresse, un lien vient de partir. Il dure une heure. Pensez aux indésirables.'
+      : donnees?.erreur ?? 'Envoi impossible.';
+  });
+});
+
+/**
+ * Arrivée par le lien du courriel. On demande d'abord à qui il appartient :
+ * l'adresse sert de sel à la dérivation, la retaper de travers fabriquerait un
+ * mot de passe inutilisable.
+ */
+async function ouvrirNouveauMotDePasse(jeton) {
+  document.querySelectorAll('.carte').forEach((c) => c.classList.add('cache'));
+  $('carteNouveau').classList.remove('cache');
+  const zone = $('messageNouveau');
+
+  const { ok, donnees } = await appeler(
+    `/api/auth/reinitialisation?jeton=${encodeURIComponent(jeton)}`
+  );
+  if (!ok) {
+    $('formulaireNouveau').classList.add('cache');
+    zone.className = 'message erreur';
+    zone.textContent = `${donnees?.erreur ?? 'Lien invalide'} — redemandez-en un depuis « Mot de passe oublié ? ».`;
+    return;
+  }
+  $('emailNouveau').value = donnees.email;
+  $('emailNouveau').readOnly = true;
+  $('nouveauMdp').focus();
+
+  $('formulaireNouveau').addEventListener('submit', async (evenement) => {
+    evenement.preventDefault();
+    zone.textContent = '';
+    if ($('nouveauMdp').value !== $('confirmationNouveau').value) {
+      zone.className = 'message erreur';
+      zone.textContent = 'Les deux mots de passe ne sont pas identiques.';
+      return;
+    }
+
+    await pendant($('validerNouveau'), 'Chiffrement en cours…', async () => {
+      const nouvelleCle = await deriverCle(donnees.email, $('nouveauMdp').value);
+      const reponse = await appeler('/api/auth/nouveau-mot-de-passe', {
+        method: 'POST',
+        body: JSON.stringify({ jeton, nouvelle_cle: nouvelleCle }),
+      });
+      if (!reponse.ok) {
+        zone.className = 'message erreur';
+        zone.textContent = reponse.donnees?.erreur ?? 'Échec du changement.';
+        return;
+      }
+      // Le code de secours change aussi : celui d'avant a pu être vu par qui
+      // a demandé la réinitialisation.
+      document.querySelectorAll('.carte').forEach((c) => c.classList.add('cache'));
+      $('codeAffiche').textContent = reponse.donnees.code_secours;
+      $('carteCode').classList.remove('cache');
+      $('continuer').textContent = "C'est noté, se connecter";
+      $('continuer').dataset.vers = '/connexion';
+    });
+  });
+}
+
+if (jetonRecu) ouvrirNouveauMotDePasse(jetonRecu);
 
 $('lienRetour').addEventListener('click', () => window.location.reload());
 

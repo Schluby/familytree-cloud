@@ -11,13 +11,16 @@
  */
 
 import { Hono } from 'hono';
+import { envoiConfigure, envoyerLienReinitialisation, racinePublique } from './courriel';
 import {
   depuisBase64,
   empreinteCodeSecours,
   empreinteMotDePasse,
+  sha256,
   tirerCodeSecours,
   verifierCodeSecours,
   verifierMotDePasse,
+  versBase64,
 } from './empreintes';
 import {
   attenteAvantConnexion,
@@ -338,6 +341,172 @@ routesAuth.post('/recuperation', async (c) => {
     .run();
   await fermerToutesLesSessions(c.env.DB, ligne.id);
   await oublierEchecsConnexion(c.env.DB, email);
+
+  return c.json({ code_secours: nouveauCode });
+});
+
+/* --------------------------------------------------------------------------
+ * Mot de passe oublié — le lien par courriel (lot 8.G)
+ * -------------------------------------------------------------------------- */
+
+/** Une heure : assez pour aller relever ses courriels, trop peu pour traîner. */
+const DUREE_JETON = 3600;
+
+/** Le jeton part dans un lien : base64url, sans caractère à échapper. */
+function tirerJeton(): string {
+  return versBase64(crypto.getRandomValues(new Uint8Array(32)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+const empreinteJeton = async (jeton: string) =>
+  versBase64(await sha256(new TextEncoder().encode(jeton)));
+
+/**
+ * De quoi dispose cette instance pour récupérer un compte.
+ *
+ * Une seule information, qui ne dépend que de la configuration du serveur :
+ * y a-t-il un service d'envoi branché ? La page de connexion s'en sert pour
+ * proposer le lien par courriel — ou, à défaut, pour ne rien promettre.
+ */
+routesAuth.get('/moyens', (c) => c.json({ courriel: envoiConfigure(c.env) }));
+
+/**
+ * « J'ai oublié mon mot de passe. »
+ *
+ * **La réponse est la même que l'adresse existe ou non.** Sans cela, cette
+ * route deviendrait un moyen de savoir qui a un compte ici — et la seule chose
+ * qu'on sache de nos utilisateurs, c'est justement leur adresse.
+ *
+ * `envoi_configure` dit si un service d'envoi est branché. Ce n'est pas une
+ * fuite : la réponse ne dépend que de la configuration du serveur, jamais de
+ * l'adresse saisie. C'est ce qui permet à la page de proposer le code de
+ * secours quand il n'y a pas de courriel possible, plutôt que de laisser
+ * quelqu'un attendre un message qui ne viendra jamais.
+ */
+routesAuth.post('/mot-de-passe-oublie', async (c) => {
+  const corps = await c.req.json<CorpsIdentifiants>().catch(() => null);
+  const email = typeof corps?.email === 'string' ? normaliserEmail(corps.email) : '';
+  const configure = envoiConfigure(c.env);
+  if (!emailValide(email)) return c.json({ erreur: 'adresse de courriel invalide' }, 400);
+
+  // Le même compteur que les échecs de connexion : sans lui, cette route
+  // servirait à faire envoyer des courriels en rafale à quelqu'un d'autre.
+  const attente = await attenteAvantConnexion(c.env.DB, email);
+  if (attente > 0) return c.json({ erreur: `trop d'essais, réessayez dans ${attente} s` }, 429);
+
+  const reponse = { envoi_configure: configure };
+  if (!configure) return c.json(reponse);
+
+  const ligne = await c.env.DB.prepare('SELECT id, email FROM utilisateurs WHERE email_norm = ?')
+    .bind(email)
+    .first<{ id: string; email: string }>();
+
+  if (ligne) {
+    const jeton = tirerJeton();
+    const maintenant = Math.floor(Date.now() / 1000);
+    // Les demandes précédentes tombent : un seul lien vivant à la fois, sinon
+    // un ancien courriel oublié dans une boîte reste une porte ouverte.
+    await c.env.DB.prepare(
+      'UPDATE reinitialisations SET utilise_le = ? WHERE utilisateur_id = ? AND utilise_le IS NULL'
+    )
+      .bind(maintenant, ligne.id)
+      .run();
+    await c.env.DB.prepare(
+      `INSERT INTO reinitialisations (jeton_empreinte, utilisateur_id, cree_le, expire_le)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(await empreinteJeton(jeton), ligne.id, maintenant, maintenant + DUREE_JETON)
+      .run();
+
+    const lien = `${racinePublique(c.env, c.req.raw)}/mot-de-passe-oublie.html?jeton=${jeton}`;
+    const resultat = await envoyerLienReinitialisation(c.env, ligne.email, lien);
+    // L'échec est journalisé côté serveur, jamais renvoyé : le dire
+    // trahirait l'existence du compte.
+    if (!resultat.envoye) console.error('courriel non envoyé :', resultat.raison);
+  }
+
+  await noterEchecConnexion(c.env.DB, email);
+  return c.json(reponse);
+});
+
+/**
+ * Le lien vient d'être ouvert : à qui appartient-il ?
+ *
+ * Ce n'est pas une fuite d'adresse : pour poser la question il faut déjà tenir
+ * le jeton, et le jeton n'a été envoyé qu'à cette adresse-là. C'est en
+ * revanche une nécessité — le navigateur dérive la clé **à partir de
+ * l'adresse** (voir `empreintes.ts`), donc quelqu'un qui la retaperait de
+ * travers se fabriquerait un mot de passe avec lequel il ne pourrait plus
+ * entrer. Autant la lui donner.
+ */
+routesAuth.get('/reinitialisation', async (c) => {
+  const jeton = c.req.query('jeton') ?? '';
+  if (!jeton) return c.json({ erreur: 'jeton absent' }, 400);
+
+  const ligne = await c.env.DB.prepare(
+    `SELECT u.email, r.expire_le, r.utilise_le
+       FROM reinitialisations r
+       JOIN utilisateurs u ON u.id = r.utilisateur_id
+      WHERE r.jeton_empreinte = ?`
+  )
+    .bind(await empreinteJeton(jeton))
+    .first<{ email: string; expire_le: number; utilise_le: number | null }>();
+
+  if (!ligne || ligne.utilise_le !== null || ligne.expire_le < Math.floor(Date.now() / 1000)) {
+    return c.json({ erreur: 'ce lien n’est plus valable' }, 410);
+  }
+  return c.json({ email: ligne.email, expire_le: ligne.expire_le });
+});
+
+/**
+ * Le lien a été suivi : on pose le nouveau mot de passe.
+ *
+ * **Les sauvegardes ne bougent pas** — elles pendent à `utilisateurs.id`, qui
+ * ne change pas. Ce qui change : l'empreinte du mot de passe, le code de
+ * secours (l'ancien a pu être vu par qui a demandé la réinitialisation), et
+ * toutes les sessions ouvertes, qui se ferment.
+ */
+routesAuth.post('/nouveau-mot-de-passe', async (c) => {
+  const corps = await c.req.json<CorpsIdentifiants & { jeton?: unknown }>().catch(() => null);
+  const jeton = typeof corps?.jeton === 'string' ? corps.jeton : '';
+  const nouvelle = cleValide(corps?.nouvelle_cle);
+  if (!jeton || !nouvelle) return c.json({ erreur: 'requête incomplète' }, 400);
+
+  const maintenant = Math.floor(Date.now() / 1000);
+  const ligne = await c.env.DB.prepare(
+    `SELECT utilisateur_id, expire_le, utilise_le
+       FROM reinitialisations WHERE jeton_empreinte = ?`
+  )
+    .bind(await empreinteJeton(jeton))
+    .first<{ utilisateur_id: string; expire_le: number; utilise_le: number | null }>();
+
+  if (!ligne || ligne.utilise_le !== null || ligne.expire_le < maintenant) {
+    return c.json(
+      {
+        erreur: 'ce lien n’est plus valable',
+        indice: 'les liens durent une heure et ne servent qu’une fois — redemandez-en un',
+      },
+      410
+    );
+  }
+
+  // Consommé d'abord : si l'écriture suivante échoue, le lien est quand même
+  // brûlé. Mieux vaut redemander un courriel que laisser un jeton rejouable.
+  await c.env.DB.prepare('UPDATE reinitialisations SET utilise_le = ? WHERE jeton_empreinte = ?')
+    .bind(maintenant, await empreinteJeton(jeton))
+    .run();
+
+  const nouveauCode = tirerCodeSecours();
+  await c.env.DB.prepare('UPDATE utilisateurs SET mot_de_passe = ?, code_secours = ? WHERE id = ?')
+    .bind(
+      await empreinteMotDePasse(nouvelle),
+      await empreinteCodeSecours(nouveauCode),
+      ligne.utilisateur_id
+    )
+    .run();
+  await fermerToutesLesSessions(c.env.DB, ligne.utilisateur_id);
 
   return c.json({ code_secours: nouveauCode });
 });

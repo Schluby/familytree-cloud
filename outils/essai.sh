@@ -430,8 +430,121 @@ verifier "l'export aussi" oui "$(contient '"action":"export"')"
 verifier "et le changement de plafond" oui "$(contient '"action":"plafond"')"
 verifier "avec l'adresse de l'administrateur" oui "$(contient "$EMAIL_A")"
 
+# ---------------------------------------------------------------------------
+# Lot 8.F : l'ecriture par procuration
+#
+# Le revirement du 10/08/2026. A est encore administrateur ici : on verifie
+# qu'il peut ecrire chez B **par cette porte-la et par aucune autre**, et que
+# chaque ecriture reussie laisse une ligne au journal.
+# ---------------------------------------------------------------------------
+
+ARBRE_B="/api/admin/arbres/$ID_SAUVEGARDE_B"
+
+echo "-- la porte d'edition est fermee aux membres"
+verifier "sans session" 401 "$(code - GET $ARBRE_B/referentiels)"
+verifier "un membre, meme pour lire" 403 "$(code "$BOCAL_B" GET $ARBRE_B/referentiels)"
+verifier "  et meme sur un arbre qui n'existe pas" 403 "$(code "$BOCAL_B" GET /api/admin/arbres/inexistant/referentiels)"
+
+echo "-- A ecrit chez B, par procuration"
+verifier "il lit les referentiels de B" 200 "$(code "$BOCAL_A" GET $ARBRE_B/referentiels)"
+verifier "un arbre inconnu reste introuvable" 404 "$(code "$BOCAL_A" GET /api/admin/arbres/inexistant/referentiels)"
+verifier "il cree une maison chez B" 201 "$(code "$BOCAL_A" POST $ARBRE_B/maisons '{"label":"Maison posee par l administrateur"}')"
+MAISON_ADMIN="$(lire maison.id)"
+verifier "il regle ses caracteristiques" 200 "$(code "$BOCAL_A" PATCH $ARBRE_B/maisons/$MAISON_ADMIN '{"caracteristiques":{"defense":12,"richesse":400},"notes":"vue depuis l administration"}')"
+verifier "  les bornes tiennent (400 -> 100)" oui "$(contient '"richesse":100')"
+verifier "  et une caracteristique inventee est ignoree" 200 "$(code "$BOCAL_A" PATCH $ARBRE_B/maisons/$MAISON_ADMIN '{"caracteristiques":{"charisme":9}}')"
+verifier "  elle n'est pas entree" non "$(contient '"charisme"')"
+verifier "il pose l'annee de campagne de B" 200 "$(code "$BOCAL_A" PATCH $ARBRE_B/meta '{"annee_courante":"300 AC"}')"
+
+code "$BOCAL_A" GET $ARBRE_B/personnes > /dev/null
+ID_FICHE_B="$(lire personnes.0.id)"
+verifier "il corrige une fiche de B" 200 "$(code "$BOCAL_A" PATCH $ARBRE_B/personnes/$ID_FICHE_B '{"notes":"corrige par le MJ","tags":["chef de maison"]}')"
+verifier "  et la relit corrigee" oui "$(contient 'corrige par le MJ')"
+
+echo "-- et B retrouve tout ca chez lui, sans rien avoir fait"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "la maison est bien dans SON arbre" oui "$(contient 'Maison posee par l administrateur')"
+verifier "  avec l'annee de campagne" oui "$(contient '"annee_courante":"300 AC"')"
+
+echo "-- le journal porte les ecritures, et rien d'autre"
+code "$BOCAL_A" GET /api/admin/journal > /dev/null
+verifier "l'edition y figure" oui "$(contient '"action":"edition"')"
+# Une tentative refusee n'a rien change : elle n'a pas a encombrer le registre.
+code "$BOCAL_A" PATCH $ARBRE_B/maisons/maison-fantome '{"label":"x"}' > /dev/null
+code "$BOCAL_A" GET /api/admin/journal > /dev/null
+verifier "  et la lecture seule tient toujours a cote" 403 "$(code "$BOCAL_A" PATCH /api/admin/sauvegardes/$ID_SAUVEGARDE_B '{"nom":"volee"}')"
+
 sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
 verifier "A redevient membre, et la porte se referme" 403 "$(code "$BOCAL_A" GET /api/admin/utilisateurs)"
+verifier "  la porte d'edition aussi" 403 "$(code "$BOCAL_A" GET $ARBRE_B/referentiels)"
+
+# ---------------------------------------------------------------------------
+# Lot 8.B, 8.D, 8.E : ce que le domaine sait de plus depuis le lot 8
+#
+# B est redevenu seul maitre chez lui : ces verifications passent par l'API des
+# membres, comme n'importe quel utilisateur.
+# ---------------------------------------------------------------------------
+
+echo "-- l'annee de campagne (8.B)"
+verifier "un patch vide est refuse" 400 "$(code "$BOCAL_B" PATCH /api/meta '{}')"
+verifier "une annee sans chiffre est refusee" 400 "$(code "$BOCAL_B" PATCH /api/meta '{"annee_courante":"bientot"}')"
+verifier "une annee lisible passe" 200 "$(code "$BOCAL_B" PATCH /api/meta '{"annee_courante":"305 AC"}')"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  et se relit" oui "$(contient '"annee_courante":"305 AC"')"
+verifier "on peut l'effacer" 200 "$(code "$BOCAL_B" PATCH /api/meta '{"annee_courante":null}')"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  elle a bien disparu" non "$(contient '"annee_courante"')"
+
+echo "-- liens revolus et evenements (8.D)"
+verifier "la categorie « historique » existe" oui "$(contient '"id":"historique"')"
+verifier "B cree une deuxieme fiche" 201 "$(code "$BOCAL_B" POST /api/personnes '{"prenom":"Autre","nom":"Chez B"}')"
+code "$BOCAL_B" GET /api/personnes > /dev/null
+ID_P1="$(lire personnes.0.id)"
+ID_P2="$(lire personnes.1.id)"
+verifier "un lien se cree" 201 "$(code "$BOCAL_B" POST /api/relations "{\"source\":\"$ID_P1\",\"cible\":\"$ID_P2\",\"type\":\"parent\"}")"
+ID_LIEN="$(lire relation.id)"
+verifier "il devient revolu, date et situe" 200 "$(code "$BOCAL_B" PATCH /api/relations/$ID_LIEN '{"revolu":true,"depuis":"298 AC","jusqu_a":"301 AC","lieu":"les Jumeaux"}')"
+verifier "  et le relit" oui "$(contient '"revolu":true')"
+verifier "  avec son lieu" oui "$(contient '"lieu":"les Jumeaux"')"
+code "$BOCAL_B" GET /api/export/csv?table=relations > /dev/null
+verifier "l'export des liens porte la colonne Revolu" oui "$(contient 'Révolu')"
+
+echo "-- la fiche des maisons (8.E)"
+code "$BOCAL_B" GET /api/vues > /dev/null
+verifier "la vue « Maisons » est au catalogue" oui "$(contient '"id":"maisons"')"
+verifier "elle se construit" 200 "$(code "$BOCAL_B" GET /api/vue/maisons)"
+verifier "  avec les sept caracteristiques" oui "$(contient '"id":"richesse"')"
+verifier "  et la maison posee par l'administrateur" oui "$(contient 'Maison posee par l administrateur')"
+verifier "une maison prend un evenement" 200 "$(code "$BOCAL_B" PATCH /api/maisons/$MAISON_ADMIN "{\"evenements\":[{\"annee\":\"299 AC\",\"titre\":\"Un siege\",\"personnes\":[\"$ID_P1\"]}]}")"
+verifier "  un evenement sans titre ni texte est ecarte" 200 "$(code "$BOCAL_B" PATCH /api/maisons/$MAISON_ADMIN '{"evenements":[{"annee":"300 AC"}]}')"
+verifier "  il n'en reste rien" non "$(contient '"annee":"300 AC"')"
+verifier "un lien de maison a maison se pose" 200 "$(code "$BOCAL_B" PATCH /api/maisons/$MAISON_ADMIN '{"liens":[{"maison":"autre","type":"vassal","revolu":true}]}')"
+verifier "  et il est revolu" oui "$(contient '"revolu":true')"
+code "$BOCAL_B" GET /api/vue/maisons > /dev/null
+verifier "la vue nomme la maison visee" oui "$(contient '"maison_label"')"
+
+# ---------------------------------------------------------------------------
+# Lot 8.G : mot de passe oublie
+#
+# L'envoi lui-meme demande un service exterieur, donc une cle : ce qui se
+# verifie ici, c'est le reste — et surtout que la reponse ne trahit jamais
+# l'existence d'une adresse.
+# ---------------------------------------------------------------------------
+
+echo "-- mot de passe oublie (8.G)"
+verifier "l'instance dit ce qu'elle sait faire" 200 "$(code - GET /api/auth/moyens)"
+verifier "  sans exiger de session" oui "$(contient '"courriel"')"
+verifier "une adresse invalide est refusee" 400 "$(code - POST /api/auth/mot-de-passe-oublie '{"email":"pas-une-adresse"}')"
+# La meme reponse pour une adresse connue et pour une inconnue : c'est tout
+# l'interet de la route.
+verifier "une adresse inconnue repond 200" 200 "$(code - POST /api/auth/mot-de-passe-oublie '{"email":"personne-ici@exemple.test"}')"
+REPONSE_INCONNUE="$(cat "$DOSSIER/corps.json")"
+verifier "une adresse connue repond 200" 200 "$(code - POST /api/auth/mot-de-passe-oublie "{\"email\":\"$EMAIL_B\"}")"
+verifier "  et exactement la meme chose" "$REPONSE_INCONNUE" "$(cat "$DOSSIER/corps.json")"
+verifier "un lien sans jeton" 400 "$(code - GET /api/auth/reinitialisation)"
+verifier "un jeton invente" 410 "$(code - GET /api/auth/reinitialisation?jeton=jamais-emis)"
+verifier "  et il ne change aucun mot de passe" 410 "$(code - POST /api/auth/nouveau-mot-de-passe "{\"jeton\":\"jamais-emis\",\"nouvelle_cle\":\"$CLE_B\"}")"
+verifier "une demande incomplete" 400 "$(code - POST /api/auth/nouveau-mot-de-passe '{"jeton":"x"}')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

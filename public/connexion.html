@@ -58,10 +58,30 @@
   <!-- ------------------------------------------------------------------ -->
   <div id="carteRecuperation" class="carte cache">
     <h2 style="font-size:1.1rem;margin:0">Récupérer son compte</h2>
-    <p style="font-size:.88rem">
-      Il n'y a pas d'envoi de courriel ici : le <strong>code de secours</strong>
-      donné à l'inscription est la seule façon de reprendre la main tout seul.
-      Sans lui, il faut passer par un administrateur.
+
+    <!-- Le lien par courriel. Il n'apparaît que si le serveur a de quoi
+         envoyer : promettre un message qui n'arrivera jamais est pire que de
+         ne rien proposer. Voir src/auth/courriel.ts. -->
+    <div id="blocCourriel" class="cache">
+      <p style="font-size:.88rem">
+        On vous envoie un lien pour choisir un nouveau mot de passe. Il dure une
+        heure et ne sert qu'une fois. <strong>Vos sauvegardes ne sont pas
+        touchées</strong> : seul le mot de passe change.
+      </p>
+      <form id="formulaireOubli">
+        <label>Adresse de courriel
+          <input id="emailOubli" type="email" required autocomplete="username">
+        </label>
+        <button id="validerOubli" class="principal" type="submit">Envoyer le lien</button>
+      </form>
+      <div id="messageOubli" class="message"></div>
+      <hr style="border:0;border-top:1px solid var(--bord);margin:18px 0">
+    </div>
+
+    <p id="aideSecours" style="font-size:.88rem">
+      Le <strong>code de secours</strong> donné à l'inscription permet de
+      reprendre la main tout seul. Sans lui, il faut passer par un
+      administrateur.
     </p>
     <form id="formulaireRecuperation">
       <label>Adresse de courriel
@@ -77,6 +97,29 @@
     </form>
     <button id="lienRetour" class="lien" type="button">Revenir à la connexion</button>
     <div id="messageRecuperation" class="message"></div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Arrivée depuis le lien du courriel : ?jeton=… -->
+  <div id="carteNouveau" class="carte cache">
+    <h2 style="font-size:1.1rem;margin:0">Choisir un nouveau mot de passe</h2>
+    <p style="font-size:.88rem">
+      Vos arbres et vos sauvegardes sont intacts. Les appareils encore connectés
+      à ce compte seront déconnectés.
+    </p>
+    <form id="formulaireNouveau">
+      <label>Adresse de courriel
+        <input id="emailNouveau" type="email" required autocomplete="username">
+      </label>
+      <label>Nouveau mot de passe
+        <input id="nouveauMdp" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <label>Confirmer
+        <input id="confirmationNouveau" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <button id="validerNouveau" class="principal" type="submit">Changer le mot de passe</button>
+    </form>
+    <div id="messageNouveau" class="message"></div>
   </div>
 
   <!-- ------------------------------------------------------------------ -->

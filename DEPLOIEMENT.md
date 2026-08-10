@@ -221,6 +221,54 @@ Pour retirer le rôle, la même commande avec `role='membre'`.
 Vérification : reconnectez-vous, et l'icône ⚙ apparaît dans la barre du haut.
 `GET /api/admin/utilisateurs` répond 200 au lieu de 403.
 
+Depuis le lot 8, un administrateur ne fait plus que regarder : la page
+d'administration porte un bouton **« ✎ Éditer »** à côté de « Consulter », qui
+ouvre l'application entière sur l'arbre visé. Chaque écriture est inscrite au
+journal, et un bandeau rappelle en permanence chez qui l'on écrit.
+
+## Brancher l'envoi de courriel (« mot de passe oublié »)
+
+**Facultatif, et l'application marche sans.** Sans clé, le lien par courriel
+n'est pas proposé du tout, et la récupération se fait par le **code de secours**
+donné à l'inscription — c'est l'état actuel.
+
+Pourquoi un service extérieur : un Worker ne sait pas parler SMTP, il n'a pas
+de sockets sortantes arbitraires. Le seul moyen d'envoyer un courriel est
+d'appeler l'API HTTP de quelqu'un qui, lui, sait le faire. (MailChannels, qui
+rendait ce service gratuitement aux Workers, l'a fermé en 2024.)
+
+Ce qu'il faut faire — **vous, pas l'assistant** : ces étapes ouvrent un compte
+et manipulent une clé.
+
+1. Ouvrir un compte chez [Resend](https://resend.com). L'offre gratuite (3 000
+   courriels par mois, 100 par jour) est très au-dessus des besoins d'une table
+   de JDR.
+2. Y **vérifier un domaine** d'expédition. Sans domaine à vous, Resend
+   n'autorise l'envoi que vers votre propre adresse : de quoi essayer, pas de
+   quoi dépanner vos joueurs.
+3. Créer une clé d'API, puis, depuis la machine qui a le jeton Cloudflare :
+
+```bash
+npx wrangler secret put RESEND_API_KEY
+```
+
+```bash
+npx wrangler secret put COURRIEL_EXPEDITEUR
+```
+
+`COURRIEL_EXPEDITEUR` s'écrit `FamilyTree <no-reply@votre-domaine.fr>`, sur le
+domaine vérifié à l'étape 2. Une troisième variable facultative,
+`ADRESSE_PUBLIQUE`, force la racine des liens du courriel ; sans elle, elle est
+déduite de la requête, ce qui suffit tant que le site répond sur une seule
+adresse.
+
+Vérification : `GET /api/auth/moyens` répond `{"courriel":true}`, et le bloc
+« Recevoir un lien par courriel » apparaît sous « Mot de passe oublié ? ».
+
+Changer de service (Brevo, Mailgun, Postmark…) tient dans une fonction :
+`envoyerLienReinitialisation`, dans `src/auth/courriel.ts`. Rien d'autre dans
+le projet ne sait qu'un courriel existe.
+
 ## Développer en local
 
 ```bash

@@ -173,8 +173,9 @@ app.all('*', async (c) => {
 });
 
 /* --------------------------------------------------------------------------
- * Ménage nocturne (cron). Deux suppressions, pas plus : une session périmée
- * ne sert à rien, un compteur de tentatives non plus.
+ * Ménage nocturne (cron). Que des suppressions de choses périmées : une
+ * session expirée ne sert à rien, un compteur de tentatives non plus, et un
+ * lien de réinitialisation qui n'est plus valable encore moins.
  * -------------------------------------------------------------------------- */
 
 async function menage(env: Env): Promise<void> {
@@ -182,6 +183,9 @@ async function menage(env: Env): Promise<void> {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM sessions WHERE expire_le < ?').bind(maintenant),
     env.DB.prepare('DELETE FROM tentatives WHERE dernier_le < ?').bind(maintenant - 86400),
+    // Un jour de marge : de quoi expliquer un « ce lien n'est plus valable »
+    // à quelqu'un qui écrit le lendemain.
+    env.DB.prepare('DELETE FROM reinitialisations WHERE expire_le < ?').bind(maintenant - 86400),
   ]);
 }
 
