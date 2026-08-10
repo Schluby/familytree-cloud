@@ -271,21 +271,51 @@ forcément identiques. Score : **36/36, zéro tolérance**.
 > hébergée ne prend pas les portraits (décision du 06/08/2026). Un service de
 > moins, une clé de moins, et le stockage devient un non-sujet.
 
-## Lot 6 — Mise en ligne  ☐
+## Lot 6 — Mise en ligne  ☑
 
-- ☐ Suivre [`DEPLOIEMENT.md`](DEPLOIEMENT.md) : base D1 en `weur`, migrations
+- ☑ Suivre [`DEPLOIEMENT.md`](DEPLOIEMENT.md) : base D1 en `weur`, migrations
   en ligne, premier `wrangler deploy`, puis le dépôt branché sur Cloudflare.
-  **Aucun secret à poser** — voir « Tranché ».
-- ☐ Vérifier les en-têtes : `Secure` sur le cookie, HSTS, pas de `Server`.
-- ☐ Verrou optimiste (`modifie_le`) : deux onglets ne s'écrasent plus en
-  silence.
-- ☐ Purge des sessions expirées (tâche `cron` du Worker, gratuite).
-- ☐ Une page « Vos données » : ce qui est stocké, **que les administrateurs
+  **Aucun secret à poser** — voir « Tranché ». *(fait au lot 1)*
+- ☑ Vérifier les en-têtes : `Secure` sur le cookie, HSTS, pas de `Server`.
+- ☑ Verrou optimiste : `revision` plutôt que `modifie_le`, dont la seconde a un
+  angle mort. *(fait au lot 2)*
+- ☑ Purge des sessions expirées (tâche `cron` du Worker, gratuite). *(lot 0)*
+- ☑ Une page « Vos données » : ce qui est stocké, **que les administrateurs
   peuvent consulter les arbres**, tout télécharger, tout supprimer.
 - ☐ Mesurer la consommation sur une semaine, la noter ici.
+  → **Relevé de départ posé le 10/08/2026** : 2 comptes, 1 sauvegarde. À
+  relire dans le tableau de bord Cloudflare **le 17/08/2026**.
 
 *Fini quand :* l'adresse est partageable et qu'un joueur crée son compte tout
-seul.
+seul. **C'est le cas** — il ne reste que le relevé de consommation, qui demande
+une semaine de calendrier, pas une heure de travail.
+
+**Ce que la vérification des en-têtes a révélé.** Ils étaient posés par un
+intergiciel du Worker… qui ne voyait **aucune page HTML**. Deux causes qui se
+cumulaient :
+
+1. `wrangler.jsonc` déclare `run_worker_first: ["/api/*"]` : tout le reste est
+   servi directement par le serveur de fichiers de Cloudflare, sans que le
+   Worker soit appelé.
+2. Même quand il l'était, `c.header()` ne pouvait rien : une réponse issue d'un
+   `fetch` a des en-têtes **immuables**, et les protections ne s'appliquaient
+   donc qu'aux réponses JSON fabriquées à la main.
+
+Les deux sont corrigés — [`public/_headers`](public/_headers) pour les fichiers
+statiques, une recopie de la réponse dans `src/index.ts` pour l'API — et
+**vérifiés séparément** par le harnais, parce que ce sont deux surfaces
+distinctes. Faire passer tous les fichiers par le Worker aurait tout unifié,
+au prix d'une invocation par fichier servi : une quinzaine par chargement de
+page, sur un quota de 100 000 par jour. Le prix de l'élégance était trop élevé.
+
+**Ajouté au passage :** une politique de contenu (`Content-Security-Policy`)
+stricte sur les scripts. L'application ne charge rien d'ailleurs — d3 est servi
+localement, il n'y a aucun script en ligne — donc `script-src 'self'` ne coûte
+rien et ferme la porte à l'injection.
+
+**Non faisable, et il faut le dire :** `Server: cloudflare` **ne peut pas être
+retiré**. C'est le bord du réseau qui l'ajoute, après le Worker. Aucun code ne
+peut l'enlever ; il faudrait ne pas être chez Cloudflare.
 
 ## Lot 7 — Administration  ☐
 

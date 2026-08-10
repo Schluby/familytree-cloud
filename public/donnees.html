@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FamilyTree — vos données</title>
+  <link rel="stylesheet" href="/css/base.css">
+</head>
+<body class="large">
+<main>
+  <h1>Vos données</h1>
+  <p>Ce que ce service garde de vous, et comment le reprendre ou l’effacer.</p>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte">
+    <h2>Ce qui est stocké</h2>
+    <table class="donnees">
+      <tbody>
+        <tr><th>Adresse de courriel</th><td id="email">…</td></tr>
+        <tr><th>Nom affiché</th><td id="nom">…</td></tr>
+        <tr><th>Compte créé le</th><td id="creeLe">…</td></tr>
+        <tr><th>Dernier accès</th><td id="dernierAcces">…</td></tr>
+        <tr><th>Sauvegardes</th><td id="sauvegardes">…</td></tr>
+        <tr><th>Contenu</th><td id="contenu">…</td></tr>
+        <tr><th>Place occupée</th><td id="octets">…</td></tr>
+        <tr><th>Sessions ouvertes</th><td id="sessions">…</td></tr>
+      </tbody>
+    </table>
+
+    <div class="mention">
+      <strong>Votre mot de passe n’est pas stocké</strong>, ni même transmis :
+      votre navigateur en calcule une empreinte irréversible, le serveur en
+      recalcule une par-dessus, et c’est celle-là qui est gardée. Personne — pas
+      même un administrateur — ne peut le relire.
+      <br><br>
+      <strong>Il n’y a pas de photos ici.</strong> Un portrait n’est qu’une
+      adresse d’image hébergée ailleurs ; aucun fichier image n’est déposé sur
+      ce service.
+      <br><br>
+      <strong>Aucun traceur, aucune mesure d’audience, aucun tiers.</strong> Le
+      seul témoin (« cookie ») déposé est celui de votre session : il ne sert
+      qu’à vous reconnaître d’une page à l’autre, et disparaît à la déconnexion.
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte">
+    <h2>Qui peut voir vos arbres</h2>
+    <p>
+      <strong>Vous</strong>, et <strong>les administrateurs de cette
+      instance</strong>. C’est dit à l’inscription, et redit ici : les
+      administrateurs peuvent consulter les arbres créés sur ce service. Ils ne
+      peuvent pas les modifier, et ne peuvent pas lire votre mot de passe.
+    </p>
+    <p>
+      Les autres membres, eux, ne voient <strong>rien</strong> de vos
+      sauvegardes : chaque lecture et chaque écriture est filtrée par votre
+      identifiant de compte, sans exception.
+    </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte">
+    <h2>Tout reprendre</h2>
+    <p>
+      Une archive <code>.zip</code> contenant <strong>toutes</strong> vos
+      sauvegardes en JSON, plus un <code>LISEZMOI.txt</code>. Chaque fichier est
+      autonome et se relit ici — par « ⤒ Importer » — comme dans l’application
+      locale. Rien n’y dépend de ce service.
+    </p>
+    <a class="principal" id="telecharger" href="/api/export/zip" download>⤓ Télécharger toutes mes données</a>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <div class="carte danger">
+    <h2>Tout effacer</h2>
+    <p>
+      Efface votre compte, vos sauvegardes et vos sessions.
+      <strong>C’est définitif</strong> : il n’y a pas de corbeille, et aucune
+      copie n’est gardée de notre côté. Téléchargez d’abord.
+    </p>
+    <form id="formulaireSuppression">
+      <label>Votre mot de passe, pour confirmer
+        <input id="motDePasse" type="password" required minlength="8" autocomplete="current-password">
+      </label>
+      <label>Tapez <code>SUPPRIMER</code> pour confirmer
+        <input id="confirmation" type="text" required autocomplete="off" placeholder="SUPPRIMER">
+      </label>
+      <button id="supprimer" class="principal danger" type="submit">Supprimer définitivement mon compte</button>
+    </form>
+    <div id="message" class="message"></div>
+  </div>
+
+  <button id="retour" class="lien" type="button">← Revenir à mes arbres</button>
+</main>
+
+<script type="module" src="/js/donnees.js"></script>
+</body>
+</html>

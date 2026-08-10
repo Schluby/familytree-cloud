@@ -24,14 +24,54 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
  * En-têtes de sécurité, posés une fois pour toutes.
  * -------------------------------------------------------------------------- */
 
+/**
+ * L'application ne charge rien d'ailleurs : d3 est servi depuis `public/`, il
+ * n'y a aucun script en ligne, et le seul appel réseau va à sa propre origine.
+ * La politique peut donc être stricte sans rien casser.
+ *
+ * Deux ouvertures, chacune pour une raison précise :
+ * - `img-src … https:` — les portraits sont des **adresses** d'images hébergées
+ *   ailleurs (décision du 06/08 : rien n'est stocké ici) ; `data:` couvre la
+ *   favicon, un SVG en ligne.
+ * - `style-src 'unsafe-inline'` — d3 pose des styles par `setAttribute`, ce que
+ *   la politique bloquerait. `script-src` reste strict, et c'est lui qui compte
+ *   contre l'injection.
+ */
+const POLITIQUE = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+  "font-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 app.use('*', async (c, next) => {
   await next();
-  c.header('X-Content-Type-Options', 'nosniff');
-  c.header('Referrer-Policy', 'same-origin');
-  c.header('X-Frame-Options', 'DENY');
+
+  // Une réponse issue d'un `fetch` — c'est le cas de tous les fichiers de
+  // `public/` — a des en-têtes **immuables** : `c.header()` n'y peut rien, et
+  // les protections ne s'appliquaient qu'aux réponses JSON. Autrement dit :
+  // pas à la page HTML, celle qui en a le plus besoin. On recopie donc la
+  // réponse pour pouvoir l'habiller.
+  const entetes = new Headers(c.res.headers);
+  entetes.set('X-Content-Type-Options', 'nosniff');
+  entetes.set('Referrer-Policy', 'same-origin');
+  entetes.set('X-Frame-Options', 'DENY');
+  entetes.set('Content-Security-Policy', POLITIQUE);
   // 180 jours. Cloudflare sert déjà tout en HTTPS ; ceci empêche le tout
   // premier aller-retour en clair.
-  c.header('Strict-Transport-Security', 'max-age=15552000');
+  entetes.set('Strict-Transport-Security', 'max-age=15552000');
+
+  c.res = new Response(c.res.body, {
+    status: c.res.status,
+    statusText: c.res.statusText,
+    headers: entetes,
+  });
 });
 
 /* --------------------------------------------------------------------------

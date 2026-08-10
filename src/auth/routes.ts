@@ -215,6 +215,91 @@ routesAuth.get('/moi', async (c) => {
   return c.json({ compte: enPublic(compte) });
 });
 
+/* --------------------------------------------------------------------------
+ * « Vos données » : ce qui est gardé, et comment tout reprendre ou tout
+ * effacer.
+ *
+ * Rien ici n'est un privilège : c'est le pendant honnête d'un service qui
+ * héberge le travail de quelqu'un d'autre. La page qui s'en sert est
+ * `public/donnees.html`.
+ * -------------------------------------------------------------------------- */
+
+routesAuth.get('/donnees', async (c) => {
+  const jeton = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
+  const compte = jeton ? await resoudreSession(c.env.DB, jeton) : null;
+  if (!compte) return c.json({ erreur: 'non connecté' }, 401);
+
+  const maintenant = Math.floor(Date.now() / 1000);
+  const ligne = await c.env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM sauvegardes WHERE utilisateur_id = ?1)        AS sauvegardes,
+       (SELECT COALESCE(SUM(taille), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS octets,
+       (SELECT COALESCE(SUM(personnes), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS personnes,
+       (SELECT COALESCE(SUM(relations), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS relations,
+       (SELECT COUNT(*) FROM sessions WHERE utilisateur_id = ?1 AND expire_le > ?2) AS sessions,
+       (SELECT cree_le FROM utilisateurs WHERE id = ?1)                    AS cree_le,
+       (SELECT dernier_acces FROM utilisateurs WHERE id = ?1)              AS dernier_acces`
+  )
+    .bind(compte.id, maintenant)
+    .first<{
+      sauvegardes: number;
+      octets: number;
+      personnes: number;
+      relations: number;
+      sessions: number;
+      cree_le: number;
+      dernier_acces: number;
+    }>();
+
+  return c.json({
+    compte: enPublic(compte),
+    cree_le: ligne?.cree_le ?? null,
+    dernier_acces: ligne?.dernier_acces ?? null,
+    contenu: {
+      sauvegardes: ligne?.sauvegardes ?? 0,
+      personnes: ligne?.personnes ?? 0,
+      relations: ligne?.relations ?? 0,
+      octets: ligne?.octets ?? 0,
+    },
+    sessions_ouvertes: ligne?.sessions ?? 0,
+    plafonds: {
+      sauvegardes: compte.plafond_sauvegardes,
+      octets: compte.plafond_octets,
+    },
+  });
+});
+
+/**
+ * Effacement du compte, et de tout ce qui pend après lui.
+ *
+ * Gardé par le **mot de passe**, pas par la seule session : un onglet resté
+ * ouvert sur un poste partagé ne doit pas suffire à effacer une campagne. La
+ * clé arrive dérivée par le navigateur, comme à la connexion — le mot de passe
+ * lui-même ne quitte jamais la page.
+ *
+ * Les suppressions en cascade du schéma emportent sauvegardes, contenus,
+ * instantanés et sessions : une seule ligne à effacer, et il ne reste rien.
+ */
+routesAuth.delete('/compte', async (c) => {
+  const jeton = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
+  const compte = jeton ? await resoudreSession(c.env.DB, jeton) : null;
+  if (!compte) return c.json({ erreur: 'non connecté' }, 401);
+
+  const corps = await c.req.json<CorpsIdentifiants>().catch(() => null);
+  const cle = cleValide(corps?.cle);
+  if (!cle) return c.json({ erreur: 'mot de passe requis' }, 400);
+
+  const ligne = await c.env.DB.prepare('SELECT mot_de_passe FROM utilisateurs WHERE id = ?')
+    .bind(compte.id)
+    .first<{ mot_de_passe: string }>();
+  const bon = await verifierMotDePasse(cle, ligne?.mot_de_passe ?? EMPREINTE_LEURRE);
+  if (!bon) return c.json({ erreur: 'mot de passe incorrect' }, 401);
+
+  await c.env.DB.prepare('DELETE FROM utilisateurs WHERE id = ?').bind(compte.id).run();
+  c.header('Set-Cookie', enteteCookie(c.req.url, '', 0));
+  return c.body(null, 204);
+});
+
 /* -------------------------------------------------------------------------- */
 
 /**

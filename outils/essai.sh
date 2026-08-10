@@ -77,6 +77,18 @@ lire() { # lire <chemin.pointe> : lit un champ de la derniere reponse
   " 2>/dev/null
 }
 
+entete() { # entete <bocal|-> <chemin> <nom> [methode] : un en-tete de reponse
+  local bocal="$1" chemin="$2" nom="$3" methode="${4:-GET}"
+  local args=(-s -o /dev/null -D "$DOSSIER/entetes.txt" -X "$methode")
+  [ "$bocal" != "-" ] && args+=(-b "$bocal")
+  curl "${args[@]}" "$BASE$chemin"
+  grep -i "^$nom:" "$DOSSIER/entetes.txt" | head -1 | sed 's/^[^:]*: *//' | tr -d '\r'
+}
+
+porte() { # porte <valeur> <fragment> : le fragment est-il dans la valeur ?
+  case "$1" in *"$2"*) echo oui ;; *) echo non ;; esac
+}
+
 contient() { # contient <texte> : le texte apparait-il dans la derniere reponse ?
   if grep -qF -- "$1" "$DOSSIER/corps.json" 2>/dev/null; then echo oui; else echo non; fi
 }
@@ -247,6 +259,55 @@ verifier "A supprime" 204 "$(code "$BOCAL_A" DELETE /api/sauvegardes/$ID_IMPORT)
 verifier "  elle n'existe plus" 404 "$(code "$BOCAL_A" GET /api/sauvegardes/$ID_IMPORT)"
 verifier "  la supprimer deux fois ne casse rien" 404 "$(code "$BOCAL_A" DELETE /api/sauvegardes/$ID_IMPORT)"
 verifier "  une place s'est liberee" 201 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"Apres le menage"}')"
+
+# ---------------------------------------------------------------------------
+# Lot 6 : ce que le navigateur recoit avant meme de lire une ligne
+#
+# Les fichiers statiques ne passent PAS par le Worker (`run_worker_first` ne
+# couvre que /api/*) : leurs en-tetes viennent de public/_headers, ceux des
+# routes d'API de src/index.ts. Deux surfaces, donc deux verifications — c'est
+# le prix de ne pas payer une invocation de Worker par fichier servi.
+# ---------------------------------------------------------------------------
+
+echo "-- en-tetes de securite (page HTML)"
+verifier "politique de contenu" oui "$(porte "$(entete - / Content-Security-Policy)" "default-src 'self'")"
+verifier "  scripts de la seule origine" oui "$(porte "$(entete - / Content-Security-Policy)" "script-src 'self'")"
+verifier "  pas d'encadrement" DENY "$(entete - / X-Frame-Options)"
+verifier "  pas de reniflage de type" nosniff "$(entete - / X-Content-Type-Options)"
+verifier "  HTTPS impose" oui "$(porte "$(entete - / Strict-Transport-Security)" "max-age=")"
+
+echo "-- en-tetes de securite (routes d'API)"
+verifier "politique de contenu" oui "$(porte "$(entete - /api/sante Content-Security-Policy)" "default-src 'self'")"
+verifier "  pas d'encadrement" DENY "$(entete - /api/sante X-Frame-Options)"
+verifier "  HTTPS impose" oui "$(porte "$(entete - /api/sante Strict-Transport-Security)" "max-age=")"
+
+echo "-- le temoin de session"
+# `Secure` empecherait le temoin d'etre pose sur http:// : en local il doit
+# donc etre absent, en ligne present. Les deux sont verifies, pas seulement
+# celui qui arrange.
+# La deconnexion pose un temoin vide, avec exactement les memes attributs que
+# celui de la connexion : de quoi les verifier sans avoir a se reconnecter.
+TEMOIN="$(entete - /api/auth/deconnexion Set-Cookie POST)"
+case "$BASE" in
+  https://*) verifier "Secure, puisqu'on est en HTTPS" oui "$(porte "$TEMOIN" Secure)" ;;
+  *)         verifier "pas de Secure sur http local" non "$(porte "$TEMOIN" Secure)" ;;
+esac
+verifier "  inaccessible au JavaScript" oui "$(porte "$TEMOIN" HttpOnly)"
+verifier "  non envoye depuis un autre site" oui "$(porte "$TEMOIN" SameSite)"
+
+echo "-- la page « Vos donnees »"
+verifier "la page est servie" 200 "$(code - GET /donnees)"
+verifier "  elle annonce ce qui est stocke" oui "$(contient 'Ce qui est stocké')"
+verifier "  et que les administrateurs peuvent consulter" oui "$(contient 'administrateurs de cette')"
+verifier "le releve demande une session" 401 "$(code - GET /api/auth/donnees)"
+verifier "le releve repond a A" 200 "$(code "$BOCAL_A" GET /api/auth/donnees)"
+verifier "  il compte ses sauvegardes" "$PLAFOND" "$(lire contenu.sauvegardes)"
+verifier "  et ses sessions ouvertes" oui "$([ "$(lire sessions_ouvertes)" -ge 1 ] && echo oui || echo non)"
+
+echo "-- effacement du compte : les deux verrous"
+verifier "sans mot de passe, refuse" 400 "$(code "$BOCAL_A" DELETE /api/auth/compte '{}')"
+verifier "avec le mauvais, refuse" 401 "$(code "$BOCAL_A" DELETE /api/auth/compte "{\"cle\":\"$CLE_FAUSSE\"}")"
+verifier "  et le compte est toujours la" 200 "$(code "$BOCAL_A" GET /api/auth/moi)"
 
 # ---------------------------------------------------------------------------
 # Lot 5 : sortir ses donnees

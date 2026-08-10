@@ -1,0 +1,22 @@
+# En-têtes des fichiers statiques.
+#
+# **Pourquoi ce fichier existe alors que `src/index.ts` pose déjà ces
+# en-têtes :** `wrangler.jsonc` déclare `run_worker_first: ["/api/*"]`. Tout ce
+# qui n'est pas une route d'API est donc servi directement par le serveur de
+# fichiers de Cloudflare, **sans que le Worker soit appelé** — et l'intergiciel
+# du Worker ne voit jamais passer la page HTML. C'est un choix voulu : faire
+# passer chaque image et chaque script par le Worker coûterait une invocation
+# par fichier, soit une quinzaine par chargement de page, à prendre sur les
+# 100 000 requêtes quotidiennes du palier gratuit.
+#
+# La contrepartie est cette duplication. Elle est assumée, mais elle se vérifie :
+# `outils/essai.sh` contrôle les deux surfaces, HTML **et** JSON.
+#
+# Cloudflare ne sert pas ce fichier : il est lu à la construction.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  X-Frame-Options: DENY
+  Strict-Transport-Security: max-age=15552000
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'

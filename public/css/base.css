@@ -201,3 +201,32 @@ main.large { max-width: 46rem; }
   border-radius: .5rem;
   text-align: center;
 }
+
+/* ------------------------------------------------- page « Vos données » */
+
+/* Cette page est plus large que la connexion : c'est un tableau, pas un
+   formulaire de trois champs. */
+body.large main { max-width: 44rem; }
+
+h2 { font-size: 1.05rem; margin: 0 0 .6rem; color: var(--encre); }
+
+.donnees { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.donnees th,
+.donnees td { padding: .45rem .2rem; border-bottom: 1px solid var(--bord); text-align: left; }
+.donnees th { color: var(--encre-douce); font-weight: 500; width: 42%; }
+.donnees tr:last-child th,
+.donnees tr:last-child td { border-bottom: 0; }
+
+.carte.danger { border-color: #6d3a33; }
+.carte.danger h2 { color: var(--erreur); }
+
+/* Un bouton qui efface ne doit pas ressembler à un bouton qui enregistre. */
+.principal.danger { background: var(--erreur); color: #1b1714; }
+
+a.principal { display: block; text-align: center; text-decoration: none; }
+
+code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: .88em;
+  color: var(--accent);
+}
