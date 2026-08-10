@@ -5,15 +5,15 @@
  * la liste est explicite : un Worker n'a pas d'effet de bord d'import à
  * exploiter, et une liste qu'on lit vaut mieux qu'une magie qu'on suppose.
  *
- * La vue « tableaux & exports » n'y est pas encore : elle dépend de
- * `exports.py` (CSV et classeur Excel), qui est le lot 5. Elle arrivera avec
- * lui, pas avant — la déclarer sans son moteur donnerait un onglet qui plante.
+ * L'ordre compte : c'est celui du rail, et la première vue est celle qui
+ * s'ouvre au chargement.
  */
 
 import type { Vue } from './vues/base';
 import { VueSociogramme } from './vues/sociogramme';
+import { VueTableau } from './vues/tableau';
 
-const VUES: Vue[] = [new VueSociogramme()];
+const VUES: Vue[] = [new VueSociogramme(), new VueTableau()];
 
 export function toutes(): Vue[] {
   return VUES;

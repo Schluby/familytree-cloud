@@ -403,12 +403,18 @@ function menuSauvegarde(fiche, evenement) {
     },
     { separateur: true },
     {
-      label: 'Télécharger la sauvegarde',
+      label: 'Exporter en classeur Excel',
+      icone: '⤓',
+      detail: '.xlsx',
+      onclick: () => exporter('xlsx'),
+    },
+    {
+      label: 'Exporter le fichier de sauvegarde',
       icone: '⤓',
       detail: '.json',
       onclick: () => exporter('json'),
     },
-    { texte: 'Le classeur Excel et les CSV arrivent avec la vue « Tableaux & exports ».' },
+    { texte: 'Les exports CSV sont dans la vue « Tableaux & exports ».' },
     { separateur: true },
     {
       label: 'Supprimer la sauvegarde',
@@ -1996,15 +2002,19 @@ async function seDeconnecter() {
 
 const sauvegardeActive = () => etat.sauvegardes.find((fiche) => fiche.actif) || null;
 
-/** « Tout télécharger » : le fichier de la sauvegarde ouverte, réimportable. */
+/**
+ * « Tout télécharger » : **toutes** les sauvegardes du compte, dans un `.zip`,
+ * avec un LISEZMOI qui dit quoi en faire. C'est le remplaçant en ligne du
+ * dossier `data/sauvegardes/` de la version locale — de quoi partir d'ici sans
+ * rien laisser derrière.
+ */
 function toutTelecharger() {
-  const fiche = sauvegardeActive();
-  if (!fiche) {
-    message('Aucune sauvegarde ouverte à télécharger.');
+  if (!etat.sauvegardes.length) {
+    message('Aucune sauvegarde à télécharger.');
     return;
   }
-  telecharger(Api.urlExport('json', { sauvegarde: fiche.id }));
-  astuce(`Téléchargement de « ${fiche.nom} »…`);
+  telecharger(Api.urlExport('zip'));
+  astuce(`Téléchargement de ${pluriel(etat.sauvegardes.length, 'sauvegarde')}…`);
 }
 
 /**

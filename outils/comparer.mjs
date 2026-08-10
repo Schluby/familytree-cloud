@@ -22,6 +22,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import zlib from 'node:zlib';
 
 const PYTHON = process.argv[2] || 'http://127.0.0.1:8000';
 const CLOUD = process.argv[3] || 'http://127.0.0.1:8787';
@@ -131,28 +132,110 @@ function communes(a, b) {
   return [gauche, droite];
 }
 
+/* --------------------------------------------------------------------------
+ * Les fichiers (CSV, classeur Excel)
+ *
+ * Les routes JSON ne disent rien de ce qui sort en piece jointe. Ces deux
+ * fonctions comparent les octets eux-memes ; pour le .xlsx, elles ouvrent
+ * l'archive et comparent les parties XML, parce que deux zips du meme contenu
+ * ne sont pas forcement identiques (dates, niveau de compression, ordre).
+ * -------------------------------------------------------------------------- */
+
+async function octetsCloud(chemin) {
+  const reponse = await fetch(CLOUD + chemin, { headers: cookie ? { Cookie: cookie } : {} });
+  return { code: reponse.status, octets: Buffer.from(await reponse.arrayBuffer()) };
+}
+
+async function octetsPython(chemin) {
+  const reponse = await fetch(PYTHON + chemin);
+  return { code: reponse.status, octets: Buffer.from(await reponse.arrayBuffer()) };
+}
+
+async function comparerOctets(chemin) {
+  comparees += 1;
+  const [python, nuage] = await Promise.all([octetsPython(chemin), octetsCloud(chemin)]);
+  if (python.code !== nuage.code) {
+    echecs += 1;
+    console.log(`  ECHEC ${chemin}  codes ${python.code} vs ${nuage.code}`);
+    return;
+  }
+  if (python.octets.equals(nuage.octets)) {
+    console.log(`  ok    ${chemin}  (${python.octets.length} octets identiques)`);
+    return;
+  }
+  echecs += 1;
+  // Premiere ligne qui differe : c'est ce qu'on veut voir, pas un dump.
+  const gauche = python.octets.toString('utf8').split('\r\n');
+  const droite = nuage.octets.toString('utf8').split('\r\n');
+  const i = gauche.findIndex((ligne, index) => ligne !== droite[index]);
+  console.log(`  ECHEC ${chemin}  ${python.octets.length} vs ${nuage.octets.length} octets`);
+  console.log(`        ligne ${i + 1} python : ${apercu(gauche[i])}`);
+  console.log(`        ligne ${i + 1} nuage  : ${apercu(droite[i])}`);
+}
+
+/** Ouvre un .xlsx et rend {chemin: contenu} pour chaque partie. */
+function ouvrirClasseur(octets) {
+  const parties = {};
+  // On lit les en-tetes locaux dans l'ordre : suffisant pour une archive
+  // qu'on a soi-meme ecrite, et ca evite de parcourir le repertoire central.
+  let position = 0;
+  while (position + 4 <= octets.length && octets.readUInt32LE(position) === 0x04034b50) {
+    const methode = octets.readUInt16LE(position + 8);
+    const compressee = octets.readUInt32LE(position + 18);
+    const tailleNom = octets.readUInt16LE(position + 26);
+    const tailleExtra = octets.readUInt16LE(position + 28);
+    const nom = octets.toString('utf8', position + 30, position + 30 + tailleNom);
+    const debut = position + 30 + tailleNom + tailleExtra;
+    const brutes = octets.subarray(debut, debut + compressee);
+    parties[nom] = methode === 8 ? zlib.inflateRawSync(brutes).toString('utf8') : brutes.toString('utf8');
+    position = debut + compressee;
+  }
+  return parties;
+}
+
+async function comparerClasseur(chemin) {
+  comparees += 1;
+  const [python, nuage] = await Promise.all([octetsPython(chemin), octetsCloud(chemin)]);
+  if (python.code !== nuage.code) {
+    echecs += 1;
+    console.log(`  ECHEC ${chemin}  codes ${python.code} vs ${nuage.code}`);
+    return;
+  }
+  const gauche = ouvrirClasseur(python.octets);
+  const droite = ouvrirClasseur(nuage.octets);
+  const noms = [...new Set([...Object.keys(gauche), ...Object.keys(droite)])].sort();
+  const differentes = noms.filter((nom) => gauche[nom] !== droite[nom]);
+  if (!differentes.length) {
+    console.log(`  ok    ${chemin}  (${noms.length} parties XML identiques)`);
+    return;
+  }
+  echecs += 1;
+  console.log(`  ECHEC ${chemin}  parties differentes : ${differentes.join(', ')}`);
+  for (const nom of differentes.slice(0, 2)) {
+    const a = gauche[nom] ?? '';
+    const b = droite[nom] ?? '';
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+    console.log(`        ${nom} diverge au caractere ${i}`);
+    console.log(`        python : ${apercu(a.slice(Math.max(0, i - 40), i + 60))}`);
+    console.log(`        nuage  : ${apercu(b.slice(Math.max(0, i - 40), i + 60))}`);
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 
 /**
  * Les divergences qu'on assume, nommées une par une.
  *
  * Une liste, pas un filtre silencieux : ce qui est ici est connu et justifié,
- * et **tout le reste échoue**. Le jour où la vue « tableaux » est portée
- * (lot 5), ces deux lignes disparaissent et le score repasse à 28/28 sans
- * qu'on ait à toucher au reste.
+ * et **tout le reste échoue**. Elle est vide depuis le lot 5, qui a porté
+ * `exports.py` et la vue « tableaux » — les deux entrées qui y figuraient
+ * n'avaient plus de raison d'être.
+ *
+ * Y ajouter une ligne doit rester un acte réfléchi, jamais une façon de faire
+ * taire un écart qu'on ne comprend pas.
  */
-const ATTENDUES = [
-  {
-    chemin: '/api/vues',
-    prefixes: ['.vues'],
-    raison: "la vue « tableaux & exports » depend de exports.py — c'est le lot 5",
-  },
-  {
-    chemin: '/api/sante',
-    prefixes: ['.vues'],
-    raison: 'meme raison : elle apparait dans la liste des vues',
-  },
-];
+const ATTENDUES = [];
 
 function attendue(chemin, ecarts) {
   const regle = ATTENDUES.find((r) => r.chemin === chemin);
@@ -293,6 +376,26 @@ async function principal() {
     await comparer(`/api/vue/sociogramme?focus=${unePersonne}&profondeur=2`);
     await comparer(`/api/vue/sociogramme?focus=${unePersonne}&profondeur=3&secrets=1`);
   }
+
+  console.log();
+  console.log('-- la vue tableaux, et les colonnes qu’elle partage avec les exports');
+  // Le payload contient les cinq tableaux, colonnes et lignes comprises : si
+  // une seule cellule differe entre les deux portages, ca se voit ici.
+  await comparer('/api/vue/tableau');
+  await comparer('/api/vue/tableau?secrets=1');
+
+
+  console.log();
+  console.log('-- les fichiers exportes, octet par octet');
+  // Les routes JSON ne disent rien du CSV ni du classeur Excel : ce sont des
+  // octets, pas des objets. On les compare donc directement — et pour le
+  // .xlsx, on compare les parties XML **a l'interieur** de l'archive, parce
+  // que deux zips du meme contenu ne sont pas forcement identiques (dates,
+  // niveau de compression, ordre).
+  for (const table of ['personnes', 'relations', 'maisons', 'types', 'joueurs']) {
+    await comparerOctets(`/api/export/csv?table=${table}&secrets=1`);
+  }
+  await comparerClasseur('/api/export/xlsx?secrets=1');
 
   console.log();
   if (echecs === 0) {

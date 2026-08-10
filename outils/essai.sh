@@ -249,6 +249,33 @@ verifier "  la supprimer deux fois ne casse rien" 404 "$(code "$BOCAL_A" DELETE 
 verifier "  une place s'est liberee" 201 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"Apres le menage"}')"
 
 # ---------------------------------------------------------------------------
+# Lot 5 : sortir ses donnees
+#
+# Les exports ne rendent pas du JSON mais des fichiers, donc on verifie le code
+# et l'en-tete, pas le corps. Le point qui compte vraiment est le dernier :
+# **un compte ne peut pas exporter la sauvegarde d'un autre**, sinon le
+# cloisonnement se contournerait par la porte de derriere.
+# ---------------------------------------------------------------------------
+
+echo "-- exports"
+verifier "la vue tableaux est declaree" 200 "$(code "$BOCAL_A" GET /api/vues)"
+verifier "  et elle est dans la liste" oui "$(contient '"id":"tableau"')"
+verifier "la vue tableaux se construit" 200 "$(code "$BOCAL_A" GET /api/vue/tableau)"
+verifier "  avec ses cinq tableaux" oui "$(contient '"titre":"Regard des joueurs"')"
+verifier "export JSON de l'active" 200 "$(code "$BOCAL_A" GET /api/export/json)"
+verifier "export CSV" 200 "$(code "$BOCAL_A" GET /api/export/csv?table=personnes)"
+verifier "export classeur Excel" 200 "$(code "$BOCAL_A" GET /api/export/xlsx)"
+verifier "archive complete du compte" 200 "$(code "$BOCAL_A" GET /api/export/zip)"
+verifier "tableau inconnu refuse" 400 "$(code "$BOCAL_A" GET /api/export/csv?table=nawak)"
+verifier "format inconnu refuse" 400 "$(code "$BOCAL_A" GET /api/export/nawak)"
+verifier "export sans session refuse" 401 "$(code - GET /api/export/json)"
+
+echo "-- exports : le cloisonnement tient aussi ici"
+verifier "B n'exporte pas la sauvegarde de A" 404 "$(code "$BOCAL_B" GET /api/export/json?sauvegarde=$ID_REF)"
+verifier "  ni son classeur" 404 "$(code "$BOCAL_B" GET /api/export/xlsx?sauvegarde=$ID_REF)"
+verifier "  et son archive ne contient que les siennes" 200 "$(code "$BOCAL_B" GET /api/export/zip)"
+
+# ---------------------------------------------------------------------------
 # Lot 4 : l'interface est servie, et c'est bien celle du nuage
 #
 # Rien ici ne demande de session : ces fichiers doivent arriver a un visiteur

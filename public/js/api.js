@@ -136,12 +136,12 @@ export const Api = {
   activerSauvegarde: (id) => requete(`/api/sauvegardes/${id}/activer`, { method: 'POST' }),
 
   /**
-   * Téléchargement d'une sauvegarde entière. **L'identifiant est obligatoire
-   * en ligne** : il n'y a pas de « dossier courant », seulement des lignes.
-   * Seul le JSON existe pour l'instant — le classeur Excel et les CSV
-   * arrivent au lot 5, avec le portage d'`exports.py`.
+   * Lien de téléchargement — le serveur renvoie le fichier en pièce jointe.
+   * Mêmes formats qu'en local (`json`, `xlsx`, `csv`), plus `zip` : tout le
+   * compte d'un coup, ce qui n'a de sens que là où les sauvegardes ne sont
+   * pas déjà des fichiers sur un disque.
    */
-  urlExport: (format, parametres = {}) => `/api/sauvegardes/${parametres.sauvegarde}/export`,
+  urlExport: (format, parametres) => `/api/export/${format}${versQuery(parametres)}`,
 
   maisons: () => requete('/api/maisons'),
   creerMaison: (donnees) =>

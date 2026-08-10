@@ -51,7 +51,12 @@ renommer, exporter, supprimer) en attendant l'interface du lot 4.
 ligne, sur les comptes et les sauvegardes du nuage. Le panneau provisoire du
 lot 2 a disparu — la racine sert l'application.
 
-Le lot 5 n'a pas commencé.
+**Lot 5 livré le 10/08/2026** : tout se récupère. Les cinq tableaux, le CSV, le
+classeur Excel et un `.zip` de tout le compte. Le portage de `backend/` est
+**complet** : plus une seule vue ni un seul module qui manque, et le
+comparateur ne tolère plus aucune divergence (36/36).
+
+Le lot 6 n'a pas commencé.
 
 L'application locale (`../FamilyTree_GOT`) reste la référence : c'est elle qui
 définit le contrat d'API et le format des sauvegardes.
@@ -227,15 +232,40 @@ s'ouvrent et se ferment sur 375 px de large, sans débordement horizontal.
 menu des sauvegardes, faute d'existence côté serveur. Il revient au lot 5 avec
 `exports.py` et la vue « Tableaux & exports ».
 
-## Lot 5 — Sortir ses données  ☐
+## Lot 5 — Sortir ses données  ☑
 
-- ☐ `GET /api/export/zip` : un `.zip` de toutes ses sauvegardes + un
-  `LISEZMOI.txt`. Écrit à la main, en mode « stocké », sans dépendance.
-- ☐ Bouton « Tout télécharger » dans la barre du haut.
-- ☐ `POST /api/sauvegardes/import` accepte aussi un `.zip`.
+- ☑ `GET /api/export/zip` : un `.zip` de toutes ses sauvegardes + un
+  `LISEZMOI.txt`. Écrit à la main, sans dépendance — `src/domaine/zip.ts`.
+  Dégonflé plutôt que stocké : `CompressionStream` est fourni par la
+  plateforme, et une campagne de 200 fiches tombe de 168 à 10 Ko.
+- ☑ Bouton « Tout télécharger » dans la barre du haut.
+- ☑ L'import accepte aussi un `.zip`.
+- ☑ **Portage d'`exports.py`** (`src/domaine/exports.ts`) : les cinq tableaux,
+  le CSV point-virgule à BOM, et le classeur Excel écrit à la main.
+- ☑ **La vue « Tableaux & exports » est déclarée** dans le registre : c'était
+  la seule vue non portée au lot 3, et la seule divergence tolérée du
+  comparateur. `ATTENDUES` est désormais **vide**.
 
-*Fini quand :* on télécharge le `.zip`, on l'ouvre dans l'application locale,
-et on retrouve tout.
+*Fini.* On télécharge le `.zip`, on le rouvre, on retrouve tout — 200 fiches et
+428 liens intacts, dans 10 Ko.
+
+**Deux décisions, à ne pas rejouer :**
+
+- **Le dézippage se fait dans le navigateur, pas sur le serveur.** Le plan
+  disait « `POST /api/sauvegardes/import` accepte aussi un `.zip` » ; une
+  archive peut contenir dix sauvegardes de deux mégaoctets, et un Worker
+  dispose d'une poignée de millisecondes de calcul par requête. `public/js/zip.js`
+  ouvre l'archive et renvoie chaque sauvegarde par la route d'import normale,
+  une à la fois : les plafonds sont vérifiés comme d'habitude, et une entrée
+  fautive échoue toute seule au lieu de faire tomber une requête géante.
+- **`src/domaine/zip.ts` est partagé** par le classeur Excel et l'archive du
+  compte : un `.xlsx` *est* un ZIP d'XML. Un seul écrivain, testé deux fois.
+
+**Ce que la vérification a gagné :** `outils/comparer.mjs` ne compare plus
+seulement du JSON. Il télécharge les cinq CSV et le classeur Excel des deux
+versions et compare **les octets** — et, pour le `.xlsx`, les parties XML à
+l'intérieur de l'archive, parce que deux ZIP du même contenu ne sont pas
+forcément identiques. Score : **36/36, zéro tolérance**.
 
 > Le chantier « photos vers R2 » qui figurait ici est **annulé** : la version
 > hébergée ne prend pas les portraits (décision du 06/08/2026). Un service de

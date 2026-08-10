@@ -21,7 +21,23 @@
 
 import { Hono, type Context } from 'hono';
 import { exigerSession, type Variables } from '../intergiciels';
-import { ecrireDocument, ErreurPlafond, sauvegardeActive, type Fiche } from '../sauvegardes/depot';
+import {
+  ecrireDocument,
+  ErreurPlafond,
+  ficheDe,
+  lireTexte as lireDocument,
+  sauvegardeActive,
+  type Fiche,
+} from '../sauvegardes/depot';
+import {
+  MIME_CSV,
+  MIME_XLSX,
+  table as tableDe,
+  tables as tablesDe,
+  versCsv,
+  versXlsx,
+} from './exports';
+import { archiver, type Entree } from './zip';
 import * as filtres from './filtres';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
@@ -69,6 +85,7 @@ const SURFACE = [
   '/filtres',
   '/filtres/*',
   '/lieux',
+  '/export/*',
 ];
 
 for (const chemin of SURFACE) routesDomaine.use(chemin, exigerSession);
@@ -1091,6 +1108,138 @@ routesDomaine.delete('/filtres/:id', async (c) => {
 /* --------------------------------------------------------------------------
  * Lieux
  * -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+ * Sortir ses données
+ *
+ * Même adresse qu'en local : `/api/export/<format>`, avec `?sauvegarde=`
+ * (défaut : l'active), `?table=` pour le CSV et `?secrets=` (défaut : oui).
+ * La vue « tableaux » fabrique ces adresses elle-même — le front pose un lien
+ * de téléchargement sans rien savoir du format des routes.
+ *
+ * `zip` s'ajoute à la liste locale : en ligne, on veut pouvoir tout reprendre
+ * d'un coup, sans cliquer sauvegarde par sauvegarde.
+ * -------------------------------------------------------------------------- */
+
+function fichier(c: Contexte, nom: string, mime: string, octets: Uint8Array | string): Response {
+  const corps = typeof octets === 'string' ? new TextEncoder().encode(octets) : octets;
+  return new Response(corps as BodyInit, {
+    headers: {
+      'Content-Type': mime,
+      'Content-Disposition': `attachment; filename="${nom}"`,
+      'Content-Length': String(corps.length),
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
+/** Toutes les sauvegardes du compte, dans un ZIP, avec de quoi s'y retrouver. */
+async function toutTelecharger(c: Contexte): Promise<Response> {
+  const compte = c.get('compte');
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id, s.nom, s.personnes, s.relations, s.modifie_le, c.donnees
+       FROM sauvegardes s JOIN contenus c ON c.sauvegarde_id = s.id
+      WHERE s.utilisateur_id = ? ORDER BY s.modifie_le DESC`
+  )
+    .bind(compte.id)
+    .all<{
+      id: string;
+      nom: string;
+      personnes: number;
+      relations: number;
+      modifie_le: number;
+      donnees: string;
+    }>();
+
+  const pris = new Set<string>();
+  const entrees: Entree[] = [];
+  const inventaire: string[] = [];
+
+  for (const ligne of results) {
+    // Deux sauvegardes peuvent porter le même nom : dans une archive, deux
+    // fichiers de même chemin, c'est une qui écrase l'autre.
+    let base = slugifier(ligne.nom, 'sauvegarde');
+    if (pris.has(base)) base = `${base}-${ligne.id.slice(0, 8)}`;
+    pris.add(base);
+
+    entrees.push({ nom: `sauvegardes/${base}.json`, contenu: ligne.donnees });
+    inventaire.push(
+      `- sauvegardes/${base}.json — « ${ligne.nom} » : ` +
+        `${ligne.personnes} personnes, ${ligne.relations} liens, ` +
+        `modifiée le ${new Date(ligne.modifie_le * 1000).toISOString().slice(0, 19).replace('T', ' à ')}`
+    );
+  }
+
+  const lisezmoi = [
+    'FamilyTree — vos données',
+    '========================',
+    '',
+    `Compte : ${compte.email}`,
+    `Archive du ${new Date().toISOString().slice(0, 19).replace('T', ' à ')} (UTC).`,
+    '',
+    inventaire.length
+      ? `${inventaire.length} sauvegarde(s) :`
+      : "Ce compte n'a aucune sauvegarde.",
+    ...inventaire,
+    '',
+    'Chaque fichier .json est une sauvegarde complète et autonome.',
+    'Pour la relire :',
+    '  - ici, par « ⤒ Importer » dans le panneau de gauche ;',
+    "  - dans l'application locale, en le déposant dans data/sauvegardes/.",
+    '',
+    "Rien dans cette archive ne dépend du service : c'est du JSON, lisible",
+    "avec n'importe quel éditeur de texte.",
+    '',
+  ].join('\r\n');
+
+  entrees.push({ nom: 'LISEZMOI.txt', contenu: lisezmoi });
+
+  const archive = await archiver(entrees);
+  const jour = new Date().toISOString().slice(0, 10);
+  return fichier(c, `familytree-${jour}.zip`, 'application/zip', archive);
+}
+
+routesDomaine.get('/export/:format', async (c) => {
+  const format = c.req.param('format');
+  if (format === 'zip') return toutTelecharger(c);
+
+  const compte = c.get('compte');
+  const parametres = lireParametres(new URL(c.req.url));
+  const demandee = lireTexte(parametres, 'sauvegarde');
+  const secrets = lireBool(parametres, 'secrets', true);
+
+  const fiche = demandee
+    ? await ficheDe(c.env.DB, compte.id, demandee)
+    : await sauvegardeActive(c.env.DB, compte.id, compte.sauvegarde_active);
+  if (!fiche) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
+  const base = slugifier(fiche.nom, 'sauvegarde');
+
+  const contenu = await lireDocument(c.env.DB, compte.id, fiche.id);
+  if (!contenu) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
+
+  // Le JSON part tel quel : c'est le document qu'on a écrit, indenté, et non
+  // une resérialisation qui pourrait en changer un détail au passage.
+  if (format === 'json') {
+    return fichier(c, `${base}.json`, 'application/json; charset=utf-8', contenu.donnees);
+  }
+
+  const dataset = Dataset.depuisDict(JSON.parse(contenu.donnees) as Objet);
+
+  if (format === 'xlsx') {
+    const classeur = await versXlsx(tablesDe(dataset, secrets));
+    return fichier(c, `${base}.xlsx`, MIME_XLSX, classeur);
+  }
+
+  if (format === 'csv') {
+    const nomTable = lireTexte(parametres, 'table', 'personnes');
+    const table = tableDe(dataset, nomTable, secrets);
+    if (!table) return c.json({ erreur: `tableau inconnu : ${nomTable}` }, 400);
+    return fichier(c, `${base}-${table.id}.csv`, MIME_CSV, versCsv(table));
+  }
+
+  return c.json({ erreur: `format inconnu : ${format}` }, 400);
+});
+
 
 /**
  * Régions et châteaux de Westeros, pour l'autocomplétion du champ « Lieu ».

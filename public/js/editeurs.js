@@ -7,6 +7,7 @@
 import { Api } from './api.js';
 import { h, creerFlottant, choisirFichier } from './dom.js';
 import { DEFAUT as HUMEUR_DEFAUT, curseurHumeur } from './humeur.js';
+import { estArchive, lireArchive } from './zip.js';
 
 const LIBELLES_CATEGORIE = {
   famille: 'Sang & alliances',
@@ -2352,27 +2353,60 @@ export function creerEditeurSauvegarde(rappels = {}) {
     refs.nom.select();
   }
 
-  /** Import : le fichier est lu ici, l'API ne reçoit que du JSON validé. */
+  /**
+   * Import : le fichier est lu ici, l'API ne reçoit que du JSON validé.
+   *
+   * Un `.zip` — celui de « Tout télécharger » — est ouvert dans le navigateur,
+   * et chacune de ses sauvegardes repart par la route d'import normale. Le
+   * serveur n'a donc pas à dézipper : il n'en a ni le temps de calcul, ni le
+   * besoin, et chaque sauvegarde passe les contrôles de plafond une par une.
+   */
   async function importer() {
-    const fichier = await choisirFichier('.json,application/json');
+    const fichier = await choisirFichier('.json,.zip,application/json,application/zip');
     if (!fichier) return;
-    let donnees;
+
+    let documents;
     try {
-      donnees = JSON.parse(fichier.texte);
+      documents = estArchive(fichier.octets)
+        ? (await lireArchive(fichier.octets))
+            .filter((entree) => entree.nom.toLowerCase().endsWith('.json'))
+            .map((entree) => ({
+              nom: entree.nom.replace(/^.*\//, '').replace(/\.json$/i, ''),
+              donnees: JSON.parse(entree.texte),
+            }))
+        : [{ nom: fichier.nom.replace(/\.json$/i, ''), donnees: JSON.parse(fichier.texte) }];
     } catch (erreur) {
       rappels.surErreur?.(`Fichier illisible : ${erreur.message}`);
       return;
     }
-    try {
-      const reponse = await Api.creerSauvegarde({
-        nom: donnees?.meta?.sauvegarde || fichier.nom.replace(/\.json$/i, ''),
-        donnees,
-        activer: true,
-      });
-      rappels.surChangement?.(reponse.sauvegarde, 'import');
-    } catch (erreur) {
-      rappels.surErreur?.(`Import impossible : ${erreur.message}`);
+    if (!documents.length) {
+      rappels.surErreur?.('Cette archive ne contient aucune sauvegarde .json.');
+      return;
     }
+
+    // La dernière importée devient l'active : c'est celle qu'on veut voir.
+    let derniere = null;
+    const echecs = [];
+    for (const document of documents) {
+      try {
+        const reponse = await Api.creerSauvegarde({
+          nom: document.donnees?.meta?.sauvegarde || document.nom,
+          donnees: document.donnees,
+          activer: true,
+        });
+        derniere = reponse.sauvegarde;
+      } catch (erreur) {
+        echecs.push(`${document.nom} : ${erreur.message}`);
+      }
+    }
+
+    if (echecs.length) {
+      rappels.surErreur?.(
+        `${documents.length - echecs.length} sur ${documents.length} importée(s). ` +
+          `Échecs — ${echecs.join(' ; ')}`
+      );
+    }
+    if (derniere) rappels.surChangement?.(derniere, 'import');
   }
 
   function construire() {

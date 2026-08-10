@@ -84,6 +84,12 @@ const routes = [
   '/api/relations',
   '/api/filtres/valeurs?variable=maison',
   '/api/sauvegardes',
+  // Lot 5 : ce sont les routes qui fabriquent des fichiers, donc les plus
+  // gourmandes. Le classeur Excel serialise cinq feuilles puis les degonfle.
+  '/api/vue/tableau',
+  '/api/export/csv?table=relations',
+  '/api/export/xlsx',
+  '/api/export/zip',
 ];
 
 console.log('  ms     Ko    code   route   (ms = bout en bout, pas du CPU)');

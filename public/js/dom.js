@@ -31,7 +31,11 @@ export function telecharger(url) {
   lien.remove();
 }
 
-/** Ouvre le sélecteur de fichiers et rend le contenu texte du fichier choisi. */
+/**
+ * Ouvre le sélecteur de fichiers et rend `{nom, octets, texte}`. Les octets
+ * d'abord : un `.zip` ne se lit pas en texte, et le décodage n'a lieu que si
+ * quelqu'un demande `.texte`.
+ */
 export function choisirFichier(accept = '.json') {
   return new Promise((resoudre) => {
     const champ = h('input', {
@@ -41,7 +45,15 @@ export function choisirFichier(accept = '.json') {
       onchange: async () => {
         const fichier = champ.files?.[0];
         champ.remove();
-        resoudre(fichier ? { nom: fichier.name, texte: await fichier.text() } : null);
+        if (!fichier) return resoudre(null);
+        const octets = new Uint8Array(await fichier.arrayBuffer());
+        resoudre({
+          nom: fichier.name,
+          octets,
+          get texte() {
+            return new TextDecoder().decode(octets);
+          },
+        });
       },
     });
     document.body.append(champ);
