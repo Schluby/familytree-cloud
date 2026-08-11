@@ -619,3 +619,69 @@ porte d'édition avant même de savoir si l'arbre existe, une caractéristique
 inventée ignorée, une année sans chiffre refusée, et — pour le mot de passe
 oublié — la preuve que la réponse est **exactement la même** pour une adresse
 connue et pour une inconnue.
+
+---
+
+# Lot 9 — ouvrir la porte (11/08/2026)
+
+Le lot 8 avait amélioré l'outil pour ceux qui s'en servaient déjà. Celui-ci
+change **à qui il s'adresse** : on peut l'essayer sans compte, et l'inscription
+ne demande plus que ce dont elle a besoin.
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 9.A | Pastille (emoji) sur un lien, aux deux bouts et au milieu si le trait est long. | `models.ts`, `js/editeurs.js`, `js/views/cartes.js` |
+| 9.B | Sauvegarde de départ « Westeros », offerte à tout compte neuf. | `outils/construire-depart.mjs`, `src/depart/` |
+| 9.C | Essai sans compte, repris tel quel à l'inscription. | `POST /api/auth/invite`, `js/api.js` |
+| 9.D | Inscription réduite au courriel et au mot de passe. | `src/auth/routes.ts`, `connexion.html` |
+| 9.E | Connexion Google. **Évaluée, pas faite.** | — |
+
+## Les trois décisions qui méritent d'être relues
+
+**Un visiteur reçoit un vrai compte, pas un état de session.** L'autre voie
+était de garder son travail dans le navigateur sans rien créer côté serveur.
+Écartée : tout le domaine vit dans le Worker, et le porter en double dans le
+navigateur aurait doublé la surface à tenir juste. Le prix est assumé et
+borné — une ligne et ~90 Ko par visiteur, 8 essais par heure et par adresse IP,
+un ménage nocturne qui efface les invités inactifs depuis 14 jours. **C'est la
+ligne à regarder au relevé de consommation du 17/08.**
+
+**L'inscription reprend le compte d'essai au lieu d'en créer un neuf.** Même
+identifiant, mêmes sauvegardes. C'est ce qui rend la proposition honnête : sans
+cela, « créez un compte pour garder votre travail » serait un mensonge, puisqu'il
+faudrait tout refaire.
+
+**Le code de secours n'est plus imposé, et ce n'est pas gratuit.** Le montrer à
+quelqu'un qui vient de choisir un mot de passe ne servait personne — personne ne
+le notait. Il se demande maintenant depuis « Vos données ». Mais tant que l'envoi
+de courriel n'est pas branché, **un compte qui n'en a jamais demandé et qui perd
+son mot de passe n'a plus que l'administrateur pour le récupérer.** Une raison de
+plus de brancher la clé.
+
+## Deux corrections au passage
+
+`donnees.html` affirmait que les administrateurs « ne peuvent pas modifier » les
+arbres. Vrai au lot 7, faux depuis le 8.F — et c'est la page qui parle de vie
+privée, donc la seule où une phrase périmée n'est pas un détail. Corrigée, avec
+la mention de la trace horodatée.
+
+Le bouton « 📜 Document » pointait vers une adresse en dur : le document de
+campagne de Maxime. Tant que l'application n'avait qu'un lecteur, c'était un
+raccourci commode ; à partir du moment où des inconnus ouvrent un monde, c'en
+était un vers les notes de quelqu'un d'autre. Le document vit désormais dans
+`meta.document`, sauvegarde par sauvegarde, et le bouton disparaît quand il n'y
+en a pas.
+
+## Vérification
+
+**274/274** au harnais, contre 225 à la fin du lot 8. Les 49 vérifications
+neuves couvrent notamment : la pastille rognée à huit points de code, le
+va-et-vient qui ne laisse **aucun champ** derrière lui quand elle est vide, un
+invité refusé sur les deux portes d'administration, la reprise d'un essai qui
+garde l'identifiant **et** ce qui avait été modifié avant l'inscription, et un
+`javascript:` refusé comme document de campagne.
+
+**Quatre assertions ont été réécrites** — les premières depuis le début du
+projet. Elles disaient qu'un compte neuf n'a aucune sauvegarde ; c'est devenu
+faux exprès. Le cas « plus aucun monde » (409) reste vérifié, sur un essai
+jetable qui supprime la sienne.

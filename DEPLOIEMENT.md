@@ -226,6 +226,40 @@ d'administration porte un bouton **« ✎ Éditer »** à côté de « Consulter
 ouvre l'application entière sur l'arbre visé. Chaque écriture est inscrite au
 journal, et un bandeau rappelle en permanence chez qui l'on écrit.
 
+Fait le **11/08/2026** pour `maxschlub@gmail.com`.
+
+## Les visiteurs sans compte (lot 9)
+
+Depuis le lot 9, **ouvrir la page suffit** : sans session, le serveur crée un
+compte de rôle `invite`, sans adresse ni mot de passe, avec la sauvegarde de
+départ « Westeros ». S'inscrire ensuite reprend ce compte tel quel.
+
+Ce que ça coûte, et ce qui le borne :
+
+| | |
+| --- | --- |
+| Par visiteur | 1 ligne `utilisateurs` + 1 sauvegarde de ~90 Ko |
+| Frein | 8 essais par heure et par adresse IP (`invite:ip:…` dans `tentatives`) |
+| Ménage | les invités sans visite depuis **14 jours** sont effacés par le cron nocturne, sauvegardes comprises |
+
+Pour voir où on en est :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "SELECT role, COUNT(*) FROM utilisateurs GROUP BY role"
+```
+
+Pour déclencher le ménage à la main sans attendre la nuit (utile après une
+rafale d'essais) :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "DELETE FROM utilisateurs WHERE role='invite' AND dernier_acces < strftime('%s','now') - 14*86400"
+```
+
+**Si l'inscription ouverte devenait un problème**, c'est cette route qu'il
+faudrait fermer en premier — `POST /api/auth/invite` dans `src/auth/routes.ts` —
+et non l'inscription elle-même : un passant qui n'a rien tapé coûte autant qu'un
+compte, mais ne laisse aucune adresse pour vous écrire.
+
 ## Brancher l'envoi de courriel (« mot de passe oublié »)
 
 **Facultatif, et l'application marche sans.** Sans clé, le lien par courriel
