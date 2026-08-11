@@ -17,6 +17,23 @@ const LIBELLES_CATEGORIE = {
   autre: 'Autres liens',
 };
 
+/**
+ * Raccourcis de pastille : ce qui revient le plus souvent autour d'une table.
+ *
+ * Le champ reste libre — ceci n'est qu'une rangée de boutons pour éviter
+ * d'ouvrir le clavier emoji quand on veut juste dire « il lui doit de l'argent ».
+ */
+const SUGGESTIONS_EMOJI = [
+  { emoji: '💰', quoi: 'Dette, or, tribut' },
+  { emoji: '⚔️', quoi: 'Guerre, rancune, sang versé' },
+  { emoji: '🤝', quoi: 'Pacte, alliance, serment' },
+  { emoji: '💍', quoi: 'Fiançailles, mariage arrangé' },
+  { emoji: '🗝️', quoi: 'Secret partagé, chantage' },
+  { emoji: '👑', quoi: 'Allégeance, prétention au trône' },
+  { emoji: '🩸', quoi: 'Sang, vendetta, meurtre' },
+  { emoji: '🕊️', quoi: 'Paix, pardon, trêve' },
+];
+
 // ==========================================================================
 //  Éditeur de lien
 // ==========================================================================
@@ -55,6 +72,7 @@ export function creerEditeurLien(rappels = {}) {
       depuis: '',
       jusqu_a: '',
       lieu: '',
+      emoji: '',
     };
     socle.monter(construire(), x, y);
     refs.type?.focus();
@@ -77,6 +95,7 @@ export function creerEditeurLien(rappels = {}) {
       depuis: arete.depuis || '',
       jusqu_a: arete.jusqu_a || '',
       lieu: arete.lieu || '',
+      emoji: arete.emoji || '',
     };
     socle.monter(construire(), x, y);
   }
@@ -133,6 +152,7 @@ export function creerEditeurLien(rappels = {}) {
         h('label', { texte: 'Type de lien' }),
         h('div', { class: 'champ-avec-pastille' }, [refs.pastille, selecteur]),
       ]),
+      champPastille(),
       h('div', { class: 'champ-edit' }, [
         h('label', { texte: 'Humeur — ce que la source éprouve' }),
         refs.humeur,
@@ -222,6 +242,60 @@ export function creerEditeurLien(rappels = {}) {
     majEntete();
     if (!creation) definirEtat('Enregistré tout seul');
     return panneau;
+  }
+
+  /**
+   * Pastille : un emoji posé sur le trait qui dit d'un coup d'œil ce que le
+   * lien raconte — 💰 une dette, ⚔️ une rancune, 🤝 un pacte.
+   *
+   * Champ libre **et** raccourcis, parce que les deux claviers ne se valent
+   * pas : au téléphone l'emoji est à portée de pouce, au bureau il faut aller
+   * le chercher. Les suggestions couvrent ce qui revient dans une campagne
+   * sans enfermer personne — le champ accepte n'importe quoi.
+   */
+  function champPastille() {
+    refs.emoji = h('input', {
+      type: 'text',
+      class: 'champ-emoji',
+      maxlength: 8,
+      placeholder: '—',
+      title: 'Collez ou tapez un emoji',
+      value: brouillon.emoji,
+      oninput: (evenement) => {
+        brouillon.emoji = evenement.target.value;
+        majPastilles();
+        marquerModifie();
+      },
+    });
+
+    refs.pastilles = SUGGESTIONS_EMOJI.map(({ emoji, quoi }) =>
+      h('button', {
+        class: 'bouton bouton-emoji',
+        type: 'button',
+        texte: emoji,
+        title: quoi,
+        // Recliquer la pastille active l'enlève : sans ça, il n'y aurait aucun
+        // moyen de revenir en arrière sans vider le champ à la main.
+        onclick: () => {
+          brouillon.emoji = brouillon.emoji === emoji ? '' : emoji;
+          refs.emoji.value = brouillon.emoji;
+          majPastilles();
+          marquerModifie();
+        },
+      })
+    );
+
+    majPastilles();
+    return h('div', { class: 'champ-edit' }, [
+      h('label', { texte: 'Pastille (facultatif)' }),
+      h('div', { class: 'ligne-emoji' }, [refs.emoji, ...refs.pastilles]),
+    ]);
+  }
+
+  function majPastilles() {
+    refs.pastilles?.forEach((bouton, index) => {
+      bouton.classList.toggle('actif', SUGGESTIONS_EMOJI[index].emoji === brouillon.emoji);
+    });
   }
 
   /**
@@ -316,6 +390,7 @@ export function creerEditeurLien(rappels = {}) {
       depuis: brouillon.depuis,
       jusqu_a: brouillon.jusqu_a,
       lieu: brouillon.lieu,
+      emoji: brouillon.emoji,
     };
   }
 
@@ -1191,10 +1266,12 @@ function definirEtat(refs, texte, classe = '') {
 export function creerEditeurAnnee(rappels = {}) {
   const socle = creerFlottant();
   let brouillon = '';
+  let brouillonDocument = '';
   let refs = {};
 
   function ouvrir(x, y) {
     brouillon = rappels.annee?.() || '';
+    brouillonDocument = rappels.document?.() || '';
     socle.monter(construire(), x, y);
     refs.annee.select();
   }
@@ -1233,9 +1310,17 @@ export function creerEditeurAnnee(rappels = {}) {
       },
     });
     refs.apercu = h('span', {});
+    refs.document = h('input', {
+      type: 'url',
+      value: brouillonDocument,
+      placeholder: 'https://…',
+      oninput: (evenement) => {
+        brouillonDocument = evenement.target.value;
+      },
+    });
 
     const panneau = h('div', { class: 'flottant editeur-referentiel' }, [
-      entete('Année de la campagne', socle.fermer),
+      entete('Campagne', socle.fermer),
       h('div', { class: 'fl-corps' }, [
         h('div', { class: 'champ-edit' }, [
           h('label', { texte: 'Nous sommes en' }),
@@ -1263,6 +1348,18 @@ export function creerEditeurAnnee(rappels = {}) {
           texte:
             'Les âges ne sont enregistrés nulle part : ils se déduisent de cette date et de l’année de naissance de chacun. Avancer la date les avance tous.',
         }),
+        // Le document de campagne appartient à la sauvegarde, pas à
+        // l'application : chaque table a le sien, et une sauvegarde partagée
+        // ne doit pas renvoyer vers celui de quelqu'un d'autre.
+        h('div', { class: 'champ-edit' }, [
+          h('label', { texte: 'Document de campagne (facultatif)' }),
+          refs.document,
+        ]),
+        h('p', {
+          class: 'fl-aide',
+          texte:
+            'L’adresse ouverte par le bouton 📜. Vide, le bouton disparaît — personne ne tombe sur les notes d’une autre table.',
+        }),
       ]),
       pied(refs, { valider, libelle: 'Enregistrer' }),
     ]);
@@ -1273,7 +1370,10 @@ export function creerEditeurAnnee(rappels = {}) {
   async function valider() {
     definirEtat(refs, 'Enregistrement…');
     try {
-      const reponse = await Api.majAnnee(brouillon.trim());
+      const reponse = await Api.majMeta({
+        annee_courante: brouillon.trim(),
+        document: brouillonDocument.trim(),
+      });
       socle.fermer();
       rappels.surChangement?.(reponse.meta || {});
     } catch (erreur) {

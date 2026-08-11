@@ -178,6 +178,9 @@ app.all('*', async (c) => {
  * lien de réinitialisation qui n'est plus valable encore moins.
  * -------------------------------------------------------------------------- */
 
+/** Un essai sans compte abandonné depuis deux semaines n'intéresse plus personne. */
+const JOURS_INVITE = 14;
+
 async function menage(env: Env): Promise<void> {
   const maintenant = Math.floor(Date.now() / 1000);
   await env.DB.batch([
@@ -186,6 +189,14 @@ async function menage(env: Env): Promise<void> {
     // Un jour de marge : de quoi expliquer un « ce lien n'est plus valable »
     // à quelqu'un qui écrit le lendemain.
     env.DB.prepare('DELETE FROM reinitialisations WHERE expire_le < ?').bind(maintenant - 86400),
+    // Les visiteurs qui ne sont jamais revenus. C'est ce qui rend l'essai sans
+    // compte tenable : sans ce balayage, chaque passant laisserait ses 90 Ko
+    // pour toujours. Les sauvegardes et les sessions suivent par cascade.
+    // `role = 'invite'` : un compte qui s'est inscrit entre-temps n'est plus
+    // un invité, et ne sera donc jamais emporté par ce ménage.
+    env.DB.prepare("DELETE FROM utilisateurs WHERE role = 'invite' AND dernier_acces < ?").bind(
+      maintenant - JOURS_INVITE * 86400
+    ),
   ]);
 }
 

@@ -499,6 +499,33 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .lien-social.revolu.survol { opacity: .8; }
 .option-revolus { margin: 8px 0 2px; }
 
+/* Pastille d'un lien : l'emoji posé sur le trait, sur une rondelle de fond qui
+   coupe le trait pour rester lisible.
+   `pointer-events: none` n'est pas cosmétique — la pastille est dessinée
+   au-dessus du trait, et sans ça elle percerait un trou dans sa zone de survol. */
+.lien-pastille {
+  font-size: 12.5px;
+  pointer-events: none;
+  user-select: none;
+}
+.lien-pastille-fond {
+  fill: var(--fond);
+  pointer-events: none;
+}
+.lien-pastille.attenue, .lien-pastille-fond.attenue { opacity: .15; }
+.lien-pastille.revolu { opacity: .5; }
+
+/* Saisie de la pastille : un petit champ libre suivi des raccourcis. */
+.ligne-emoji { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.champ-emoji {
+  width: 44px; flex: 0 0 44px; text-align: center;
+  font-size: 15px; padding: 4px 2px;
+}
+.bouton-emoji {
+  font-size: 14px; line-height: 1; padding: 4px 5px; min-width: 0;
+}
+.bouton-emoji.actif { border-color: var(--accent); background: var(--accent-doux); }
+
 .plan.filtre-liens .lien-social { opacity: 1; stroke-width: 3.2px; }
 .plan.filtre-liens .lien-social.survol { stroke-width: 4.2px; }
 .plan.filtre-liens .lien-social.attenue { opacity: .35; }
@@ -1228,6 +1255,33 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 body.sombre .bandeau-procuration { background: #352c12; color: #e8c96a; border-bottom-color: #6b5620; }
 body.en-procuration #btn-telecharger,
 body.en-procuration #btn-instantane { display: none; }
+
+/* ------------------------------------------------------ essai sans compte
+ *
+ * Le contraire de la procuration : ici il ne s'agit pas d'avertir mais
+ * d'inviter. Le bandeau est neutre tant que le visiteur regarde, et prend de
+ * la voix — sans jamais bloquer — dès qu'il a modifié quelque chose.
+ */
+.bandeau-essai {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  background: var(--fond-3); color: var(--texte-faible);
+  border-bottom: 1px solid var(--bord);
+}
+.bandeau-essai-texte { flex: 1; min-width: 200px; }
+.bandeau-essai .bouton { flex: 0 0 auto; }
+.bandeau-essai-fermer { opacity: .6; }
+.bandeau-essai-fermer:hover { opacity: 1; }
+.bandeau-essai.presse {
+  background: var(--accent-doux); color: var(--accent-fonce);
+  border-bottom-color: var(--accent);
+}
+body.sombre .bandeau-essai.presse { color: #7fd8c6; }
+
+.groupe-essai { display: flex; align-items: center; gap: 6px; }
+/* Un essai n'a pas d'instantané à ranger : la copie datée n'a de sens que
+   pour quelqu'un qui reviendra la chercher. */
+body.en-essai #btn-instantane { display: none; }
 
 /* ------------------------------------------------------------ responsive */
 

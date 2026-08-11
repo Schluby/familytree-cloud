@@ -25,10 +25,13 @@ import {
 import {
   attenteAvantConnexion,
   inscriptionAutorisee,
+  inviteAutorise,
   noterEchecConnexion,
   noterInscription,
+  noterInvite,
   oublierEchecsConnexion,
 } from './limites';
+import { semerDepart } from '../depart';
 import {
   enteteCookie,
   fermerSession,
@@ -47,6 +50,14 @@ import {
  */
 const EMPREINTE_LEURRE =
   'v1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
+/**
+ * Ce qu'on écrit dans `mot_de_passe` pour un invité : une valeur qui n'a pas
+ * la forme attendue. `verifierMotDePasse` exige « v1$sel$empreinte » et rend
+ * faux avant de dériver — aucune clé, même bien choisie, ne peut ouvrir un
+ * compte d'essai.
+ */
+const SANS_MOT_DE_PASSE = 'invite';
 
 export const routesAuth = new Hono<{ Bindings: Env }>();
 
@@ -90,6 +101,73 @@ function enPublic(compte: ComptePublic): ComptePublic {
   };
 }
 
+/** Le compte porté par le cookie, ou `null`. N'exige rien : c'est au appelant. */
+async function compteDeLaSession(c: {
+  env: Env;
+  req: { header: (nom: string) => string | undefined };
+}): Promise<ComptePublic | null> {
+  const jeton = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
+  return jeton ? resoudreSession(c.env.DB, jeton) : null;
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Essayer sans compte (lot 9.C).
+ *
+ * Le visiteur reçoit un vrai compte, de rôle `invite` : même session, mêmes
+ * routes, même sauvegarde de départ. Rien en aval ne sait qu'il n'a pas
+ * d'adresse — c'est ce qui évite un second chemin de lecture et d'écriture,
+ * avec ses propres trous.
+ *
+ * Ce que ça coûte est assumé et borné : une ligne et 90 Ko par visiteur, un
+ * compteur horaire par adresse IP, et un ménage qui efface les invités
+ * abandonnés (voir `menage()` dans `src/index.ts`).
+ */
+routesAuth.post('/invite', async (c) => {
+  // Déjà une session valable ? On ne fabrique rien de plus. Sans cette garde,
+  // un rechargement de page créerait un compte à chaque fois.
+  const jetonCourant = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
+  const dejaLa = jetonCourant ? await resoudreSession(c.env.DB, jetonCourant) : null;
+  if (dejaLa) return c.json({ compte: enPublic(dejaLa) });
+
+  const ip = adresse(c.req.raw);
+  if (!(await inviteAutorise(c.env.DB, ip))) {
+    return c.json(
+      {
+        erreur: "trop d'essais ouverts depuis cette connexion, réessayez dans une heure",
+        indice: 'créez un compte pour continuer tout de suite',
+      },
+      429
+    );
+  }
+
+  const maintenant = Math.floor(Date.now() / 1000);
+  const id = crypto.randomUUID();
+
+  await c.env.DB.prepare(
+    `INSERT INTO utilisateurs
+       (id, email, email_norm, mot_de_passe, nom_affiche, role, plafond_sauvegardes, cree_le, dernier_acces)
+     VALUES (?, '', ?, ?, '', 'invite', 3, ?, ?)`
+  )
+    // `email_norm` est unique et non nul : il faut y mettre quelque chose, et
+    // ce quelque chose ne doit jamais pouvoir être tapé dans le formulaire.
+    // `invite:<uuid>` n'a ni arobase ni point — `emailValide` le rejette, donc
+    // personne ne peut s'inscrire ni demander un mot de passe sur cette
+    // adresse-là. Le mot de passe stocké n'a pas la forme « v1$sel$empreinte » :
+    // `verifierMotDePasse` renvoie faux avant même de dériver quoi que ce soit.
+    .bind(id, `invite:${id}`, SANS_MOT_DE_PASSE, maintenant, maintenant)
+    .run();
+
+  await noterInvite(c.env.DB, ip);
+  await semerDepart(c.env.DB, id);
+
+  const { jeton, expireLe } = await ouvrirSession(c.env.DB, id, c.req.header('User-Agent') ?? '');
+  c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant));
+
+  return c.json({ compte: { id, email: '', nom_affiche: '', role: 'invite' } }, 201);
+});
+
 /* -------------------------------------------------------------------------- */
 
 routesAuth.post('/inscription', async (c) => {
@@ -114,46 +192,70 @@ routesAuth.post('/inscription', async (c) => {
     .first<{ id: string }>();
   if (dejaPris) return c.json({ erreur: 'cette adresse a déjà un compte' }, 409);
 
+  // Le code de secours existe toujours, mais il n'est plus jeté au visage de
+  // quelqu'un qui vient de s'inscrire (lot 9.D). Il se demande depuis « Vos
+  // données », en connaissance de cause — voir POST /code-secours.
   const codeSecours = tirerCodeSecours();
   const maintenant = Math.floor(Date.now() / 1000);
-  const id = crypto.randomUUID();
-  const nomAffiche =
-    typeof corps.nom_affiche === 'string' ? corps.nom_affiche.trim().slice(0, 80) : '';
 
-  await c.env.DB.prepare(
-    `INSERT INTO utilisateurs (id, email, email_norm, mot_de_passe, nom_affiche, code_secours, cree_le, dernier_acces)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      id,
-      typeof corps.email === 'string' ? corps.email.trim() : email,
-      email,
-      await empreinteMotDePasse(cle),
-      nomAffiche,
-      await empreinteCodeSecours(codeSecours),
-      maintenant,
-      maintenant
+  // Un visiteur qui s'inscrit **reprend son propre compte** : même ligne, même
+  // identifiant, mêmes sauvegardes. C'est tout l'intérêt de l'essai sans
+  // compte — le travail commencé avant l'inscription ne doit pas s'évaporer au
+  // moment où on décide de le garder.
+  const invite = await compteDeLaSession(c);
+  const reprise = invite?.role === 'invite';
+  const id = reprise ? (invite as ComptePublic).id : crypto.randomUUID();
+
+  if (reprise) {
+    await c.env.DB.prepare(
+      `UPDATE utilisateurs
+          SET email = ?, email_norm = ?, mot_de_passe = ?, code_secours = ?,
+              role = 'membre', plafond_sauvegardes = 10, dernier_acces = ?
+        WHERE id = ? AND role = 'invite'`
     )
-    .run();
+      .bind(
+        typeof corps.email === 'string' ? corps.email.trim() : email,
+        email,
+        await empreinteMotDePasse(cle),
+        await empreinteCodeSecours(codeSecours),
+        maintenant,
+        id
+      )
+      .run();
+  } else {
+    await c.env.DB.prepare(
+      `INSERT INTO utilisateurs (id, email, email_norm, mot_de_passe, nom_affiche, code_secours, cree_le, dernier_acces)
+       VALUES (?, ?, ?, ?, '', ?, ?, ?)`
+    )
+      .bind(
+        id,
+        typeof corps.email === 'string' ? corps.email.trim() : email,
+        email,
+        await empreinteMotDePasse(cle),
+        await empreinteCodeSecours(codeSecours),
+        maintenant,
+        maintenant
+      )
+      .run();
+  }
 
   await noterInscription(c.env.DB, ip);
 
-  const { jeton, expireLe } = await ouvrirSession(
-    c.env.DB,
-    id,
-    c.req.header('User-Agent') ?? ''
-  );
+  // Un compte neuf n'ouvre pas sur une page blanche. Celui qui reprend un essai
+  // a déjà la sienne, éventuellement modifiée : on n'y touche pas.
+  const aDejaUnMonde = await c.env.DB.prepare(
+    'SELECT 1 AS oui FROM sauvegardes WHERE utilisateur_id = ? LIMIT 1'
+  )
+    .bind(id)
+    .first<{ oui: number }>();
+  if (!aDejaUnMonde) await semerDepart(c.env.DB, id);
+
+  // La session de l'invité reste valable — c'est le même compte — mais on en
+  // ouvre une neuve : le mot de passe vient de changer de main.
+  const { jeton, expireLe } = await ouvrirSession(c.env.DB, id, c.req.header('User-Agent') ?? '');
   c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant));
 
-  // Le code de secours n'est montré qu'ici, et ne sera jamais réaffiché : la
-  // base n'en garde que l'empreinte.
-  return c.json(
-    {
-      compte: { id, email, nom_affiche: nomAffiche, role: 'membre' },
-      code_secours: codeSecours,
-    },
-    201
-  );
+  return c.json({ compte: { id, email, nom_affiche: '', role: 'membre' }, reprise }, 201);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -212,10 +314,35 @@ routesAuth.post('/deconnexion', async (c) => {
 });
 
 routesAuth.get('/moi', async (c) => {
-  const jeton = lireCookie(c.req.header('Cookie'), NOM_COOKIE);
-  const compte = jeton ? await resoudreSession(c.env.DB, jeton) : null;
+  const compte = await compteDeLaSession(c);
   if (!compte) return c.json({ erreur: 'non connecté' }, 401);
   return c.json({ compte: enPublic(compte) });
+});
+
+/**
+ * Redonner un code de secours (lot 9.D).
+ *
+ * L'inscription ne le montre plus : c'était la première chose qu'on demandait
+ * à quelqu'un qui venait juste de choisir un mot de passe, et personne ne le
+ * notait. Il reste disponible, mais **quand on vient le chercher** — depuis
+ * « Vos données », en sachant à quoi il sert.
+ *
+ * Chaque appel en fabrique un neuf et **invalide le précédent** : la base n'en
+ * garde qu'une empreinte, donc le réafficher est impossible par construction.
+ */
+routesAuth.post('/code-secours', async (c) => {
+  const compte = await compteDeLaSession(c);
+  if (!compte) return c.json({ erreur: 'non connecté' }, 401);
+  if (compte.role === 'invite') {
+    return c.json({ erreur: "créez un compte d'abord : un essai n'a rien à récupérer" }, 409);
+  }
+
+  const code = tirerCodeSecours();
+  await c.env.DB.prepare('UPDATE utilisateurs SET code_secours = ? WHERE id = ?')
+    .bind(await empreinteCodeSecours(code), compte.id)
+    .run();
+
+  return c.json({ code_secours: code });
 });
 
 /* --------------------------------------------------------------------------

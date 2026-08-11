@@ -31,6 +31,20 @@ function texteOuVide(valeur: unknown, secours = ''): string {
 }
 
 /**
+ * Pastille d'un lien : on garde une poignée de caractères, pas une phrase.
+ *
+ * Le découpage se fait sur `[...texte]` et non sur `.slice()` : un emoji tient
+ * sur deux unités UTF-16, et couper au milieu produirait un demi-caractère
+ * illisible. Huit points de code laissent passer les emojis composés (drapeaux,
+ * familles avec liants ZWJ) sans ouvrir la porte à un champ de texte déguisé.
+ */
+function normaliserEmoji(valeur: unknown): string {
+  const texte = texteOuVide(valeur).trim();
+  if (!texte) return '';
+  return [...texte].slice(0, 8).join('');
+}
+
+/**
  * Lecture d'un catalogue **par propriété propre**.
  *
  * `catalogue[cle]` ne suffit pas : le document vient de l'utilisateur, et une
@@ -320,6 +334,11 @@ export const RELATION_CHAMPS = [
   // une bataille se rappelle par l'endroit où elle a eu lieu.
   'revolu',
   'lieu',
+  // Ajouté au lot 9 : une pastille libre posée sur le trait (« 💰 » pour une
+  // dette, « ⚔ » pour une rancune). Le type dit *ce qu'est* le lien, l'emoji
+  // dit ce qu'il **raconte** — deux choses différentes, d'où un champ à part
+  // plutôt qu'une propriété du catalogue.
+  'emoji',
 ] as const;
 
 export const RELATION_CHAMPS_EDITABLES = RELATION_CHAMPS.filter((champ) => champ !== 'id');
@@ -343,6 +362,8 @@ export class Relation {
   /** Le lien a existé, il n'existe plus. Voir `RELATION_CHAMPS`. */
   revolu = false;
   lieu = '';
+  /** Pastille libre affichée sur le trait. Voir `RELATION_CHAMPS`. */
+  emoji = '';
   extra: Objet = {};
 
   static depuisDict(donnees: Objet): Relation {
@@ -364,6 +385,7 @@ export class Relation {
     relation.secret = Boolean(relation.secret);
     relation.revolu = Boolean(relation.revolu);
     relation.lieu = texteOuVide(relation.lieu);
+    relation.emoji = normaliserEmoji(relation.emoji);
     relation.humeur = echelle.normaliser(relation.humeur) as number;
 
     return relation;
@@ -393,6 +415,7 @@ export class Relation {
       jusqu_a: this.jusqu_a,
       ...(this.revolu ? { revolu: true } : {}),
       ...(this.lieu ? { lieu: this.lieu } : {}),
+      ...(this.emoji ? { emoji: this.emoji } : {}),
       ...this.extra,
     };
   }
@@ -407,6 +430,7 @@ export class Relation {
       if (champ === 'humeur') valeur = echelle.normaliser(brut);
       else if (champ === 'secret' || champ === 'revolu') valeur = Boolean(brut);
       else if (champ === 'lieu') valeur = texteOuVide(brut);
+      else if (champ === 'emoji') valeur = normaliserEmoji(brut);
 
       const courant = (this as unknown as Objet)[champ];
       if (!memeValeur(courant, valeur)) {

@@ -280,6 +280,7 @@ export class VueSociogramme extends Vue {
         depuis: rel.depuis,
         jusqu_a: rel.jusqu_a,
         lieu: rel.lieu,
+        emoji: rel.emoji,
         deduit: Boolean(rel.extra.deduit),
         parallele_rang: rang,
         parallele_total: compteurPaires.get(paire) as number,

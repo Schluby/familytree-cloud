@@ -18,13 +18,24 @@ function destination() {
 /** Le jeton du courriel, s'il y en a un : il change tout ce qui suit. */
 const jetonRecu = new URLSearchParams(location.search).get('jeton');
 
-/* Déjà connecté ? Inutile de redemander — sauf si l'on vient d'un lien de
-   réinitialisation : quelqu'un qui change son mot de passe depuis un appareil
-   où il est resté connecté ne doit pas être renvoyé sur son arbre. */
+/* Déjà connecté ? Inutile de redemander — avec deux exceptions.
+
+   Un lien de réinitialisation : quelqu'un qui change son mot de passe depuis un
+   appareil où il est resté connecté ne doit pas être renvoyé sur son arbre.
+
+   Un essai sans compte : la session existe, mais c'est précisément pour en
+   sortir qu'on est venu ici. Le renvoyer sur son arbre le laisserait tourner
+   en rond entre « Créer un compte » et la page qu'il vient de quitter. */
 if (!jetonRecu) {
   compteConnecte().then((compte) => {
-    if (compte) window.location.replace(destination());
+    if (compte && compte.role !== 'invite') window.location.replace(destination());
   });
+}
+
+/* Arrivée depuis « Créer un compte » : on ouvre sur le bon onglet plutôt que
+   d'obliger à le chercher. */
+if (new URLSearchParams(location.search).get('creer')) {
+  addEventListener('DOMContentLoaded', () => basculer('inscription'));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -35,7 +46,6 @@ function basculer(nouveau) {
 
   $('ongletConnexion').setAttribute('aria-selected', String(!inscription));
   $('ongletInscription').setAttribute('aria-selected', String(inscription));
-  $('ligneNom').classList.toggle('cache', !inscription);
   $('ligneConfirmation').classList.toggle('cache', !inscription);
   $('mention').classList.toggle('cache', !inscription);
   $('lienOubli').classList.toggle('cache', inscription);
@@ -97,14 +107,10 @@ $('formulaire').addEventListener('submit', async (evenement) => {
     }
 
     const chemin = mode === 'inscription' ? '/api/auth/inscription' : '/api/auth/connexion';
-    const corps =
-      mode === 'inscription'
-        ? { email, cle, nom_affiche: $('nom').value }
-        : { email, cle };
 
     const { ok, donnees } = await appeler(chemin, {
       method: 'POST',
-      body: JSON.stringify(corps),
+      body: JSON.stringify({ email, cle }),
     });
 
     if (!ok) {
@@ -112,13 +118,9 @@ $('formulaire').addEventListener('submit', async (evenement) => {
       return;
     }
 
-    if (mode === 'inscription') {
-      $('codeAffiche').textContent = donnees.code_secours;
-      document.querySelectorAll('.carte').forEach((c) => c.classList.add('cache'));
-      $('carteCode').classList.remove('cache');
-      return;
-    }
-
+    // Plus de code de secours jeté au visage de quelqu'un qui vient de choisir
+    // un mot de passe (lot 9.D) : on entre dans l'application. Le code se
+    // demande depuis « Vos données », quand on sait à quoi il sert.
     window.location.replace(destination());
   });
 });

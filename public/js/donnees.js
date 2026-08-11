@@ -33,8 +33,12 @@ async function remplir() {
   }
 
   const { compte, contenu, plafonds } = donnees;
-  $('email').textContent = compte.email;
-  $('nom').textContent = compte.nom_affiche || '— (aucun)';
+  // Un essai sans compte n'a pas d'adresse : le dire plutôt que d'afficher un
+  // blanc qui ressemblerait à une donnée manquante.
+  const invite = compte.role === 'invite';
+  $('email').textContent = invite
+    ? '— essai sans compte, rien qui vous identifie'
+    : compte.email + (compte.role === 'admin' ? ' · compte administrateur' : '');
   $('creeLe').textContent = dateLisible(donnees.cree_le);
   $('dernierAcces').textContent = dateLisible(donnees.dernier_acces);
   $('sauvegardes').textContent =
@@ -45,10 +49,30 @@ async function remplir() {
     `${poids(contenu.octets)} — le plafond est de ${poids(plafonds.octets)} par sauvegarde`;
   $('sessions').textContent = plurielGroupe(donnees.sessions_ouvertes, ['appareil', 'connecté']);
 
-  if (compte.role === 'admin') {
-    $('nom').textContent += ' · compte administrateur';
-  }
+  // Rien à récupérer tant qu'il n'y a pas de compte à qui rendre la main.
+  $('carteSecours').hidden = invite;
 }
+
+/* -------------------------------------------------------------------------- */
+
+$('genererSecours').addEventListener('click', async () => {
+  const bouton = $('genererSecours');
+  bouton.disabled = true;
+  const { ok, donnees } = await appeler('/api/auth/code-secours', { method: 'POST' });
+  if (!ok) {
+    bouton.disabled = false;
+    $('messageSecours').textContent = donnees?.erreur ?? 'Échec. Réessayez.';
+    $('messageSecours').className = 'message erreur';
+    return;
+  }
+  $('codeSecoursAffiche').textContent = donnees.code_secours;
+  $('codeSecoursAffiche').hidden = false;
+  $('messageSecours').textContent =
+    'Notez-le maintenant : il ne sera plus réaffiché. Le code précédent, s’il y en avait un, ne fonctionne plus.';
+  $('messageSecours').className = 'message';
+  bouton.textContent = 'Obtenir un nouveau code';
+  bouton.disabled = false;
+});
 
 function message(texte, genre = '') {
   $('message').textContent = texte;

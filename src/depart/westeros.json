@@ -1,0 +1,5940 @@
+{
+ "meta": {
+  "titre": "Westeros — sociogramme de départ",
+  "description": "Le Trône de Fer en soixante-sept fiches : filiations, alliances, trahisons, et ce que chaque maison possède. Modifiez tout — c’est votre copie.",
+  "univers": "Le Trône de Fer",
+  "version": 1,
+  "sauvegarde": "Westeros",
+  "schema": 2,
+  "annee_courante": "300 AC",
+  "document": ""
+ },
+ "types_relations": {
+  "parent": {
+   "label": "Filiation",
+   "label_sortant": "Parent de",
+   "label_entrant": "Enfant de",
+   "couleur": "#8a94a0",
+   "dirige": true,
+   "categorie": "famille",
+   "style": "solide",
+   "ordre": 1
+  },
+  "conjoint": {
+   "label": "Union",
+   "couleur": "#b08968",
+   "dirige": false,
+   "categorie": "famille",
+   "style": "solide",
+   "ordre": 2
+  },
+  "fratrie": {
+   "label": "Fratrie",
+   "couleur": "#a3b18a",
+   "dirige": false,
+   "categorie": "famille",
+   "style": "tirets",
+   "ordre": 3
+  },
+  "amant": {
+   "label": "Liaison",
+   "couleur": "#cf7fa5",
+   "dirige": false,
+   "categorie": "famille",
+   "style": "pointille",
+   "ordre": 4
+  },
+  "ami": {
+   "label": "Amitié",
+   "couleur": "#5fa8d3",
+   "dirige": false,
+   "categorie": "social",
+   "style": "solide",
+   "ordre": 5
+  },
+  "nemesis": {
+   "label": "Némésis",
+   "couleur": "#d64545",
+   "dirige": false,
+   "categorie": "social",
+   "style": "solide",
+   "ordre": 6
+  },
+  "mentor": {
+   "label": "Mentorat",
+   "label_sortant": "Mentor de",
+   "label_entrant": "Élève de",
+   "couleur": "#b58df1",
+   "dirige": true,
+   "categorie": "social",
+   "style": "solide",
+   "ordre": 7
+  },
+  "trahison": {
+   "label": "Trahison",
+   "label_sortant": "A trahi",
+   "label_entrant": "Trahi par",
+   "couleur": "#ff8c42",
+   "dirige": true,
+   "categorie": "social",
+   "style": "tirets",
+   "ordre": 8
+  },
+  "allie": {
+   "label": "Alliance",
+   "couleur": "#52b788",
+   "dirige": false,
+   "categorie": "politique",
+   "style": "solide",
+   "ordre": 9
+  },
+  "vassal": {
+   "label": "Vassalité",
+   "label_sortant": "Prête serment à",
+   "label_entrant": "Reçoit le serment de",
+   "couleur": "#9aa5b1",
+   "dirige": true,
+   "categorie": "politique",
+   "style": "tirets",
+   "ordre": 10
+  },
+  "dette": {
+   "label": "Dette",
+   "label_sortant": "Redevable envers",
+   "label_entrant": "Créancier de",
+   "couleur": "#e6c229",
+   "dirige": true,
+   "categorie": "politique",
+   "style": "pointille",
+   "ordre": 11
+  },
+  "autre": {
+   "label": "Autre lien",
+   "couleur": "#8a8f98",
+   "dirige": false,
+   "categorie": "autre",
+   "style": "pointille",
+   "ordre": 12
+  },
+  "historique": {
+   "label": "Événement passé",
+   "couleur": "#9a8c78",
+   "dirige": false,
+   "categorie": "historique",
+   "style": "pointille",
+   "ordre": 13
+  }
+ },
+ "maisons": {
+  "stark": {
+   "label": "Stark",
+   "couleur": "#8fa1b3",
+   "devise": "L'hiver vient",
+   "caracteristiques": {
+    "defense": 58,
+    "influence": 42,
+    "terres": 87,
+    "loi": 34,
+    "population": 46,
+    "pouvoir": 62,
+    "richesse": 28
+   },
+   "notes": "Le Nord est immense, pauvre et fidèle. Winterfell tient sur des sources chaudes et sur la parole donnée — les deux ont été entamées.",
+   "evenements": [
+    {
+     "annee": "282 AC",
+     "titre": "Rickard et Brandon brûlés à Port-Réal",
+     "texte": "Convoqués par Aerys II pour répondre d’une accusation inventée, exécutés devant la cour. Le Nord entre en rébellion.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "rickard-stark",
+      "brandon-stark-aine",
+      "aerys-targaryen"
+     ]
+    },
+    {
+     "annee": "298 AC",
+     "titre": "Eddard nommé Main du Roi",
+     "texte": "Accepte par devoir ce que sa femme lui déconseille. Il ne reverra pas Winterfell.",
+     "lieu": "Winterfell",
+     "personnes": [
+      "eddard-stark",
+      "robert-baratheon",
+      "catelyn-stark"
+     ]
+    },
+    {
+     "annee": "299 AC",
+     "titre": "Noces Pourpres",
+     "texte": "Le Roi du Nord, sa mère et son ost meurent sous le toit d’un vassal. La maison cesse d’exister comme puissance militaire.",
+     "lieu": "Les Jumeaux",
+     "personnes": [
+      "robb-stark",
+      "catelyn-stark",
+      "walder-frey",
+      "roose-bolton"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Winterfell reprise",
+     "texte": "Les Bolton chassés. Sansa tient la place, Bran est ailleurs, Arya n’est pas rentrée.",
+     "lieu": "Winterfell",
+     "personnes": [
+      "sansa-stark",
+      "jon-snow",
+      "ramsay-bolton"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "tully",
+     "type": "allie",
+     "label": "Mariage d’Eddard et Catelyn"
+    },
+    {
+     "maison": "bolton",
+     "type": "vassal",
+     "label": "Vassal du Nord",
+     "revolu": true
+    },
+    {
+     "maison": "greyjoy",
+     "type": "nemesis",
+     "label": "Rébellion et prise de Winterfell"
+    },
+    {
+     "maison": "baratheon",
+     "type": "allie",
+     "label": "Frères d’armes de la rébellion",
+     "revolu": true
+    },
+    {
+     "maison": "frey",
+     "type": "nemesis",
+     "label": "Le droit d’hôte violé"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "tully": {
+   "label": "Tully",
+   "couleur": "#3f6f9c",
+   "devise": "Famille, Devoir, Honneur",
+   "caracteristiques": {
+    "defense": 63,
+    "influence": 51,
+    "terres": 66,
+    "loi": 47,
+    "population": 55,
+    "pouvoir": 49,
+    "richesse": 44
+   },
+   "notes": "Vivesaigues tient un gué, donc une guerre sur deux. « Famille, devoir, honneur » — dans cet ordre, et c’est ce qui lui coûte.",
+   "evenements": [
+    {
+     "annee": "282 AC",
+     "titre": "Les deux mariages de la rébellion",
+     "texte": "Hoster achète l’alliance du Nord et du Val en mariant ses filles. Lysa n’a jamais accepté la sienne.",
+     "lieu": "Vivesaigues",
+     "personnes": [
+      "hoster-tully",
+      "catelyn-stark",
+      "lysa-arryn",
+      "jon-arryn"
+     ]
+    },
+    {
+     "annee": "299 AC",
+     "titre": "Le mariage d’Edmure aux Jumeaux",
+     "texte": "Le prix à payer pour un serment rompu par son neveu. Le piège se referme pendant la noce.",
+     "lieu": "Les Jumeaux",
+     "personnes": [
+      "edmure-tully",
+      "walder-frey",
+      "robb-stark"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "allie",
+     "label": "Catelyn à Winterfell"
+    },
+    {
+     "maison": "arryn",
+     "type": "allie",
+     "label": "Lysa aux Eyrié"
+    },
+    {
+     "maison": "frey",
+     "type": "vassal",
+     "label": "Vassal réticent depuis toujours"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "arryn": {
+   "label": "Arryn",
+   "couleur": "#9ec9e2",
+   "devise": "Aussi haut que l'honneur",
+   "caracteristiques": {
+    "defense": 94,
+    "influence": 58,
+    "terres": 59,
+    "loi": 44,
+    "population": 42,
+    "pouvoir": 46,
+    "richesse": 57
+   },
+   "notes": "Les Eyrié ne se prennent pas : la seule route passe sous trois châteaux. Le Val est resté neutre pendant toute la guerre, et intact.",
+   "evenements": [
+    {
+     "annee": "298 AC",
+     "titre": "Mort de Jon Arryn",
+     "texte": "Empoisonné par sa propre femme, qui accuse ensuite les Lannister par lettre.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "jon-arryn",
+      "lysa-arryn",
+      "petyr-baelish"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "La Porte de la Lune",
+     "texte": "Lysa tombe. Littlefinger devient protecteur du Val et tuteur de l’héritier.",
+     "lieu": "Les Eyrié",
+     "personnes": [
+      "lysa-arryn",
+      "petyr-baelish",
+      "robin-arryn",
+      "sansa-stark"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "tully",
+     "type": "allie",
+     "label": "Le mariage de Lysa"
+    },
+    {
+     "maison": "stark",
+     "type": "allie",
+     "label": "Jon Arryn a élevé Eddard et Robert"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "lannister": {
+   "label": "Lannister",
+   "couleur": "#c8102e",
+   "devise": "Un Lannister paie toujours ses dettes",
+   "caracteristiques": {
+    "defense": 64,
+    "influence": 88,
+    "terres": 61,
+    "loi": 52,
+    "population": 58,
+    "pouvoir": 71,
+    "richesse": 97
+   },
+   "notes": "Casterly Rock a payé la couronne, l’armée et la dette. Le crédit est immense et la mine est vide — personne à la cour ne le sait encore.",
+   "evenements": [
+    {
+     "annee": "283 AC",
+     "titre": "Sac de Port-Réal",
+     "texte": "Tywin arrive en allié et entre en pillard. Jaime tue le roi qu’il a juré de garder.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "tywin-lannister",
+      "jaime-lannister",
+      "gregor-clegane",
+      "elia-martell"
+     ]
+    },
+    {
+     "annee": "298 AC",
+     "titre": "La vérité de Jon Arryn",
+     "texte": "La Main découvre que les enfants du roi ne sont pas de lui. Il meurt d’un mal soudain.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "jon-arryn",
+      "cersei-lannister",
+      "jaime-lannister"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Tywin tué par son fils",
+     "texte": "Une arbalète, des latrines, et la fin de l’autorité qui tenait la maison debout.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "tyrion-lannister",
+      "tywin-lannister"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "baratheon",
+     "type": "allie",
+     "label": "Le mariage de Cersei et Robert"
+    },
+    {
+     "maison": "tyrell",
+     "type": "allie",
+     "label": "Alliance de guerre, fragile des deux côtés"
+    },
+    {
+     "maison": "stark",
+     "type": "nemesis",
+     "label": "De la Main emprisonnée aux Noces Pourpres"
+    },
+    {
+     "maison": "martell",
+     "type": "nemesis",
+     "label": "Elia et ses enfants, jamais soldés"
+    },
+    {
+     "maison": "frey",
+     "type": "allie",
+     "label": "L’accord préalable aux Noces"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "baratheon": {
+   "label": "Baratheon",
+   "couleur": "#f2b134",
+   "devise": "Nôtre est la fureur",
+   "caracteristiques": {
+    "defense": 71,
+    "influence": 76,
+    "terres": 68,
+    "loi": 41,
+    "population": 62,
+    "pouvoir": 74,
+    "richesse": 31
+   },
+   "notes": "La couronne est portée par un enfant, contestée par un frère et payée par une autre maison. Accalmie tient toujours ; le reste est en jeu.",
+   "evenements": [
+    {
+     "annee": "283 AC",
+     "titre": "Robert prend le trône",
+     "texte": "Une rébellion partie d’un enlèvement, gagnée au marteau, conclue par un mariage.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "robert-baratheon",
+      "eddard-stark",
+      "cersei-lannister"
+     ]
+    },
+    {
+     "annee": "298 AC",
+     "titre": "La chasse au sanglier",
+     "texte": "Trop de vin, une bête trop grosse, et une reine qui savait ce qu’elle versait.",
+     "lieu": "Bois-du-Roi",
+     "personnes": [
+      "robert-baratheon",
+      "cersei-lannister"
+     ]
+    },
+    {
+     "annee": "299 AC",
+     "titre": "Guerre des deux frères",
+     "texte": "Stannis revendique par le droit, Renly par le nombre. Une ombre tranche le débat.",
+     "lieu": "Accalmie",
+     "personnes": [
+      "stannis-baratheon",
+      "renly-baratheon",
+      "melisandre",
+      "brienne-tarth"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "lannister",
+     "type": "allie",
+     "label": "Le mariage qui a payé la couronne"
+    },
+    {
+     "maison": "stark",
+     "type": "allie",
+     "label": "L’amitié de Robert et Eddard",
+     "revolu": true
+    },
+    {
+     "maison": "targaryen",
+     "type": "nemesis",
+     "label": "La dynastie renversée"
+    },
+    {
+     "maison": "tyrell",
+     "type": "allie",
+     "label": "Renly, puis Margaery"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "targaryen": {
+   "label": "Targaryen",
+   "couleur": "#7d1128",
+   "devise": "Feu et Sang",
+   "caracteristiques": {
+    "defense": 22,
+    "influence": 46,
+    "terres": 8,
+    "loi": 12,
+    "population": 15,
+    "pouvoir": 55,
+    "richesse": 19
+   },
+   "notes": "Plus de terres, plus de vassaux, plus de trésor : trois dragons et un nom que trois cents ans n’ont pas effacé.",
+   "evenements": [
+    {
+     "annee": "283 AC",
+     "titre": "Fin de la dynastie",
+     "texte": "Rhaegar tombe au Trident, Aerys meurt sous l’épée de son garde. Les enfants survivants passent la mer.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "rhaegar-targaryen",
+      "aerys-targaryen",
+      "jaime-lannister"
+     ]
+    },
+    {
+     "annee": "298 AC",
+     "titre": "Le mariage dothraki",
+     "texte": "Viserys vend sa sœur contre une armée. Il n’obtiendra qu’une couronne d’or fondu.",
+     "lieu": "Pentos",
+     "personnes": [
+      "viserys-targaryen",
+      "daenerys-targaryen",
+      "drogo"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "nemesis",
+     "label": "Rickard, Brandon, et Lyanna",
+     "revolu": true
+    },
+    {
+     "maison": "baratheon",
+     "type": "nemesis",
+     "label": "La rébellion qui a pris le trône"
+    },
+    {
+     "maison": "dothraki",
+     "type": "allie",
+     "label": "Le khalasar de Drogo"
+    },
+    {
+     "maison": "martell",
+     "type": "allie",
+     "label": "Le mariage de Rhaegar et Elia",
+     "revolu": true
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "tyrell": {
+   "label": "Tyrell",
+   "couleur": "#4c9a4c",
+   "devise": "Croître et se multiplier",
+   "caracteristiques": {
+    "defense": 59,
+    "influence": 82,
+    "terres": 91,
+    "loi": 56,
+    "population": 88,
+    "pouvoir": 66,
+    "richesse": 84
+   },
+   "notes": "Le Bief nourrit le royaume : c’est une arme plus sûre qu’une armée. Olenna le sait, son fils ne s’en doute pas.",
+   "evenements": [
+    {
+     "annee": "299 AC",
+     "titre": "Le camp choisi à la Néra",
+     "texte": "La cavalerie du Bief arrive au bon moment et fixe le prix : une reine.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "mace-tyrell",
+      "margaery-tyrell",
+      "tywin-lannister"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "La mort de Joffrey",
+     "texte": "Un poison au mariage, une grand-mère qui ne laisse pas sa petite-fille à ce garçon-là.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "olenna-tyrell",
+      "joffrey-baratheon",
+      "margaery-tyrell"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "baratheon",
+     "type": "allie",
+     "label": "Renly d’abord, la couronne ensuite"
+    },
+    {
+     "maison": "lannister",
+     "type": "allie",
+     "label": "Alliance de guerre, méfiance de cour"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "martell": {
+   "label": "Martell",
+   "couleur": "#e07a19",
+   "devise": "Insoumis, invaincus, intacts",
+   "caracteristiques": {
+    "defense": 77,
+    "influence": 54,
+    "terres": 73,
+    "loi": 49,
+    "population": 44,
+    "pouvoir": 51,
+    "richesse": 48
+   },
+   "notes": "Dorne n’a jamais été conquise, elle a été épousée. Elle attend depuis dix-sept ans, et elle est la seule à ne pas être pressée.",
+   "evenements": [
+    {
+     "annee": "283 AC",
+     "titre": "Elia et ses enfants",
+     "texte": "Tués pendant le sac. Doran a choisi la patience, Oberyn la vengeance.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "elia-martell",
+      "gregor-clegane",
+      "oberyn-martell",
+      "doran-martell"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Le duel judiciaire",
+     "texte": "La Vipère Rouge gagne le combat et perd le duel en voulant un aveu.",
+     "lieu": "Port-Réal",
+     "personnes": [
+      "oberyn-martell",
+      "gregor-clegane",
+      "tyrion-lannister"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "lannister",
+     "type": "nemesis",
+     "label": "Une dette de sang jamais soldée"
+    },
+    {
+     "maison": "targaryen",
+     "type": "allie",
+     "label": "Le mariage de Rhaegar et Elia",
+     "revolu": true
+    },
+    {
+     "maison": "baratheon",
+     "type": "autre",
+     "label": "Myrcella en pupille, ou en otage"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "greyjoy": {
+   "label": "Greyjoy",
+   "couleur": "#2f6f6a",
+   "devise": "Nous ne semons pas",
+   "caracteristiques": {
+    "defense": 66,
+    "influence": 34,
+    "terres": 38,
+    "loi": 22,
+    "population": 31,
+    "pouvoir": 68,
+    "richesse": 26
+   },
+   "notes": "« Nous ne semons pas. » Une flotte sans terres, une succession réglée à la hache, et une île qui n’a jamais accepté d’être une province.",
+   "evenements": [
+    {
+     "annee": "289 AC",
+     "titre": "La rébellion écrasée",
+     "texte": "Balon perd deux fils et une guerre. Theon part vers Winterfell comme garantie.",
+     "lieu": "Pyk",
+     "personnes": [
+      "balon-greyjoy",
+      "theon-greyjoy",
+      "robert-baratheon",
+      "eddard-stark"
+     ]
+    },
+    {
+     "annee": "299 AC",
+     "titre": "Winterfell prise, puis perdue",
+     "texte": "Theon choisit son père contre son frère de lait, et n’obtient ni l’un ni l’autre.",
+     "lieu": "Winterfell",
+     "personnes": [
+      "theon-greyjoy",
+      "robb-stark",
+      "ramsay-bolton"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Euron revient",
+     "texte": "Un frère jeté d’un pont, une assemblée retournée, une flotte neuve.",
+     "lieu": "Pyk",
+     "personnes": [
+      "euron-greyjoy",
+      "balon-greyjoy",
+      "yara-greyjoy"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "nemesis",
+     "label": "Otage, puis incendiaire"
+    },
+    {
+     "maison": "lannister",
+     "type": "allie",
+     "label": "L’offre d’Euron à Cersei"
+    },
+    {
+     "maison": "targaryen",
+     "type": "allie",
+     "label": "La flotte de Yara contre l’indépendance"
+    }
+   ],
+   "categorie": "grandes"
+  },
+  "bolton": {
+   "label": "Bolton",
+   "couleur": "#d17b88",
+   "devise": "Nos lames sont acérées",
+   "caracteristiques": {
+    "defense": 72,
+    "influence": 38,
+    "terres": 54,
+    "loi": 18,
+    "population": 37,
+    "pouvoir": 57,
+    "richesse": 33
+   },
+   "notes": "Fort-Terreur écorche encore, discrètement. La maison a gagné le Nord par une trahison et le perd faute de savoir le tenir.",
+   "evenements": [
+    {
+     "annee": "299 AC",
+     "titre": "Le Nord contre une trahison",
+     "texte": "Roose vend son roi à Tywin et repart gardien du Nord.",
+     "lieu": "Les Jumeaux",
+     "personnes": [
+      "roose-bolton",
+      "robb-stark",
+      "tywin-lannister"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Ramsay tue son père",
+     "texte": "Un héritier légitime venait de naître. Il n’a pas vécu la journée.",
+     "lieu": "Fort-Terreur",
+     "personnes": [
+      "ramsay-bolton",
+      "roose-bolton"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "vassal",
+     "label": "Serment tenu pendant mille ans, puis non",
+     "revolu": true
+    },
+    {
+     "maison": "lannister",
+     "type": "allie",
+     "label": "Le prix du Nord"
+    },
+    {
+     "maison": "frey",
+     "type": "allie",
+     "label": "Complices des Noces"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "frey": {
+   "label": "Frey",
+   "couleur": "#a58e6f",
+   "devise": "Nous nous tenons ensemble",
+   "caracteristiques": {
+    "defense": 68,
+    "influence": 29,
+    "terres": 47,
+    "loi": 31,
+    "population": 63,
+    "pouvoir": 52,
+    "richesse": 61
+   },
+   "notes": "Le pont rapporte plus que les terres. Quatre-vingt-dix descendants, aucun allié : tout le monde a besoin du gué, personne n’invite un Frey.",
+   "evenements": [
+    {
+     "annee": "298 AC",
+     "titre": "Le pacte du passage",
+     "texte": "Robb obtient le gué contre la promesse d’épouser une Frey.",
+     "lieu": "Les Jumeaux",
+     "personnes": [
+      "walder-frey",
+      "robb-stark",
+      "catelyn-stark"
+     ]
+    },
+    {
+     "annee": "299 AC",
+     "titre": "Noces Pourpres",
+     "texte": "Le droit d’hôte violé sous son propre toit — ce que même ses alliés ne lui pardonnent pas.",
+     "lieu": "Les Jumeaux",
+     "personnes": [
+      "walder-frey",
+      "robb-stark",
+      "roose-bolton",
+      "edmure-tully"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "tully",
+     "type": "vassal",
+     "label": "Suzerain qu’il n’a jamais aimé"
+    },
+    {
+     "maison": "stark",
+     "type": "nemesis",
+     "label": "Serment rompu des deux côtés"
+    },
+    {
+     "maison": "lannister",
+     "type": "allie",
+     "label": "L’accord qui a payé les Noces"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "mormont": {
+   "label": "Mormont",
+   "couleur": "#6b8f71",
+   "devise": "Ici nous montons la garde",
+   "caracteristiques": {
+    "defense": 54,
+    "influence": 27,
+    "terres": 41,
+    "loi": 43,
+    "population": 24,
+    "pouvoir": 39,
+    "richesse": 17
+   },
+   "notes": "L’Île-aux-Ours donne des combattants et peu d’autre chose. La parole y vaut titre.",
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "vassal",
+     "label": "Vassal du Nord, jamais pris en défaut"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "clegane": {
+   "label": "Clegane",
+   "couleur": "#8a6f5c",
+   "devise": "",
+   "caracteristiques": {
+    "defense": 28,
+    "influence": 19,
+    "terres": 17,
+    "loi": 11,
+    "population": 9,
+    "pouvoir": 44,
+    "richesse": 14
+   },
+   "notes": "Trois générations, deux frères, une réputation. Chiens de la maison Lannister.",
+   "liens": [
+    {
+     "maison": "lannister",
+     "type": "vassal",
+     "label": "Le bras armé de Tywin"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "tarth": {
+   "label": "Tarth",
+   "couleur": "#5fb0a5",
+   "devise": "",
+   "caracteristiques": {
+    "defense": 49,
+    "influence": 23,
+    "terres": 36,
+    "loi": 46,
+    "population": 21,
+    "pouvoir": 26,
+    "richesse": 33
+   },
+   "notes": "L’Île de Saphir, plus riche en nom qu’en revenus. Une héritière unique, et un serment à la fois.",
+   "liens": [
+    {
+     "maison": "baratheon",
+     "type": "vassal",
+     "label": "Vassal d’Accalmie"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "tarly": {
+   "label": "Tarly",
+   "couleur": "#7d8f4f",
+   "devise": "Le premier au combat",
+   "caracteristiques": {
+    "defense": 57,
+    "influence": 44,
+    "terres": 52,
+    "loi": 51,
+    "population": 39,
+    "pouvoir": 55,
+    "richesse": 42
+   },
+   "notes": "Corcolline compte parmi les meilleures épées du Bief. L’héritier a préféré les livres.",
+   "liens": [
+    {
+     "maison": "tyrell",
+     "type": "vassal",
+     "label": "Vassal du Bief"
+    }
+   ],
+   "categorie": "vassales"
+  },
+  "nuit": {
+   "label": "Garde de Nuit",
+   "couleur": "#4a4e57",
+   "devise": "Je suis l'épée dans les ténèbres",
+   "caracteristiques": {
+    "defense": 81,
+    "influence": 12,
+    "terres": 26,
+    "loi": 38,
+    "population": 19,
+    "pouvoir": 34,
+    "richesse": 9
+   },
+   "notes": "Dix-neuf forts, trois occupés. La Garde ne prend pas parti dans les guerres du sud — et le sud a cessé de l’approvisionner.",
+   "evenements": [
+    {
+     "annee": "299 AC",
+     "titre": "Mutinerie à Manoir Craster",
+     "texte": "Le Lord Commandant tué par ses propres frères jurés.",
+     "lieu": "Au-delà du Mur",
+     "personnes": [
+      "jeor-mormont",
+      "jon-snow",
+      "samwell-tarly"
+     ]
+    },
+    {
+     "annee": "300 AC",
+     "titre": "Le poignard des frères",
+     "texte": "Élu, puis frappé pour avoir laissé passer le peuple libre. « Pour la Garde. »",
+     "lieu": "Châteaunoir",
+     "personnes": [
+      "jon-snow",
+      "melisandre"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "stark",
+     "type": "allie",
+     "label": "Le Nord a toujours fourni la Garde"
+    },
+    {
+     "maison": "libres",
+     "type": "nemesis",
+     "label": "Huit mille ans, puis une alliance forcée"
+    }
+   ],
+   "categorie": "ordres"
+  },
+  "libres": {
+   "label": "Peuple libre",
+   "couleur": "#b0a48b",
+   "devise": "Le peuple libre ne s'agenouille pas",
+   "caracteristiques": {
+    "defense": 31,
+    "influence": 8,
+    "terres": 62,
+    "loi": 6,
+    "population": 71,
+    "pouvoir": 58,
+    "richesse": 4
+   },
+   "notes": "Cent clans qui ne se reconnaissent aucun roi, réunis une fois par siècle par ce qui les pousse vers le sud.",
+   "evenements": [
+    {
+     "annee": "300 AC",
+     "titre": "Passage du Mur",
+     "texte": "Ce qu’aucun Lord Commandant n’avait accepté : les faire passer plutôt que les laisser mourir.",
+     "lieu": "Fort-Levant",
+     "personnes": [
+      "tormund",
+      "jon-snow",
+      "mance-rayder"
+     ]
+    }
+   ],
+   "liens": [
+    {
+     "maison": "nuit",
+     "type": "allie",
+     "label": "Alliance contre ce qui vient",
+     "revolu": false
+    }
+   ],
+   "categorie": "ordres"
+  },
+  "dothraki": {
+   "label": "Dothraki",
+   "couleur": "#c98b3a",
+   "devise": "",
+   "caracteristiques": {
+    "defense": 14,
+    "influence": 21,
+    "terres": 44,
+    "loi": 4,
+    "population": 66,
+    "pouvoir": 79,
+    "richesse": 23
+   },
+   "notes": "Un khalasar n’est pas une maison : il vaut ce que vaut son khal, et pas un jour de plus.",
+   "liens": [
+    {
+     "maison": "targaryen",
+     "type": "allie",
+     "label": "Le khalasar de Drogo, puis celui de Daenerys"
+    }
+   ],
+   "categorie": "ordres"
+  },
+  "autre": {
+   "label": "Sans maison",
+   "couleur": "#7a7f87",
+   "devise": "",
+   "notes": "Fourre-tout : ceux dont le pouvoir ne vient pas d’une maison — un maître des chuchoteurs, une prêtresse, une épée à louer."
+  }
+ },
+ "categories": {
+  "grandes": {
+   "label": "Grandes maisons",
+   "couleur": "#9c5c3c",
+   "ordre": 1
+  },
+  "vassales": {
+   "label": "Maisons vassales",
+   "couleur": "#4a7d6a",
+   "ordre": 2
+  },
+  "ordres": {
+   "label": "Ordres & peuples",
+   "couleur": "#5a6b8c",
+   "ordre": 3
+  }
+ },
+ "filtres": {
+  "lieu": {
+   "label": "Lieu",
+   "variable": "lieu",
+   "mode": "valeurs",
+   "segments": 8,
+   "retenus": [],
+   "gradient": {
+    "de": "#2f8f8f",
+    "vers": "#c1762f"
+   },
+   "tests": [],
+   "jointure": "et",
+   "ordre": 0
+  }
+ },
+ "joueurs": [
+  {
+   "id": "j1",
+   "nom": "Joueur 1",
+   "personnage": "Ser Aldric Rivers",
+   "couleur": "#e6c229"
+  },
+  {
+   "id": "j2",
+   "nom": "Joueur 2",
+   "personnage": "Mestre Corvin",
+   "couleur": "#5fa8d3"
+  },
+  {
+   "id": "j3",
+   "nom": "Joueur 3",
+   "personnage": "Nyra la Silencieuse",
+   "couleur": "#cf7fa5"
+  },
+  {
+   "id": "j4",
+   "nom": "Joueur 4",
+   "personnage": "Harlan Pyke",
+   "couleur": "#52b788"
+  }
+ ],
+ "personnes": [
+  {
+   "id": "rickard-stark",
+   "prenom": "Rickard",
+   "nom": "Stark",
+   "surnom": "",
+   "maison": "stark",
+   "titres": [
+    "Seigneur de Winterfell",
+    "Gardien du Nord"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "232 AC",
+   "deces": "282 AC",
+   "lieu": "Winterfell",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Brûlé vif par Aerys II avec son fils Brandon. Point de départ de la rébellion.",
+   "tags": [
+    "génération précédente"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "eddard-stark",
+   "prenom": "Eddard",
+   "nom": "Stark",
+   "surnom": "Ned",
+   "maison": "stark",
+   "titres": [
+    "Seigneur de Winterfell",
+    "Main du Roi"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "263 AC",
+   "deces": "298 AC",
+   "lieu": "Winterfell",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Pivot moral du Nord. Sa mort déclenche la guerre des Cinq Rois. Garde un secret sur la naissance de Jon.",
+   "tags": [
+    "honneur",
+    "nœud majeur"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 1,
+     "commentaire": "L'a adoubé après le siège."
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "catelyn-stark",
+   "prenom": "Catelyn",
+   "nom": "Stark",
+   "surnom": "Cat",
+   "maison": "stark",
+   "titres": [
+    "Dame de Winterfell"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "264 AC",
+   "deces": "299 AC",
+   "lieu": "Winterfell",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Née Tully. Charnière entre le Nord et le Conflans. Déteste Jon Snow.",
+   "tags": [
+    "née Tully"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "brandon-stark-aine",
+   "prenom": "Brandon",
+   "nom": "Stark",
+   "surnom": "le Sauvage",
+   "maison": "stark",
+   "titres": [
+    "Héritier de Winterfell"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "262 AC",
+   "deces": "282 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Frère aîné d'Eddard, étranglé par le mécanisme d'Aerys II.",
+   "tags": [
+    "génération précédente"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "lyanna-stark",
+   "prenom": "Lyanna",
+   "nom": "Stark",
+   "surnom": "",
+   "maison": "stark",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "266 AC",
+   "deces": "283 AC",
+   "lieu": "Tour de la Joie",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sa disparition avec Rhaegar sert de casus belli à la rébellion. Morte en couches.",
+   "tags": [
+    "secret"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "benjen-stark",
+   "prenom": "Benjen",
+   "nom": "Stark",
+   "surnom": "",
+   "maison": "nuit",
+   "titres": [
+    "Premier Patrouilleur"
+   ],
+   "genre": "homme",
+   "statut": "inconnu",
+   "naissance": "267 AC",
+   "deces": null,
+   "lieu": "Châteaunoir",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Disparu au-delà du Mur. Statut volontairement flou.",
+   "tags": [
+    "disparu"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "robb-stark",
+   "prenom": "Robb",
+   "nom": "Stark",
+   "surnom": "le Jeune Loup",
+   "maison": "stark",
+   "titres": [
+    "Roi du Nord"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "283 AC",
+   "deces": "299 AC",
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Invaincu au champ de bataille, détruit par la diplomatie. Tué aux Noces Pourpres.",
+   "tags": [
+    "Noces Pourpres"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "sansa-stark",
+   "prenom": "Sansa",
+   "nom": "Stark",
+   "surnom": "",
+   "maison": "stark",
+   "titres": [
+    "Dame de Winterfell"
+   ],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "286 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Passe de pion à joueuse. Élève involontaire de Littlefinger et de Cersei.",
+   "tags": [
+    "arc politique",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "arya-stark",
+   "prenom": "Arya",
+   "nom": "Stark",
+   "surnom": "Arry",
+   "maison": "stark",
+   "titres": [],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "289 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Liste de noms à abattre. Rapport aux joueurs très variable selon leur camp.",
+   "tags": [
+    "vengeance",
+    "assassin"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 1,
+     "commentaire": "Se sont entraînées ensemble à Braavos."
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": 1
+  },
+  {
+   "id": "bran-stark",
+   "prenom": "Brandon",
+   "nom": "Stark",
+   "surnom": "Bran",
+   "maison": "stark",
+   "titres": [
+    "Corbeau à trois yeux"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "290 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sait des choses qu'il ne devrait pas savoir. Excellent PNJ à secrets.",
+   "tags": [
+    "magie",
+    "vision",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "rickon-stark",
+   "prenom": "Rickon",
+   "nom": "Stark",
+   "surnom": "",
+   "maison": "stark",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "295 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 1,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Le plus jeune. Peu exposé.",
+   "tags": [],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "jon-snow",
+   "prenom": "Jon",
+   "nom": "Snow",
+   "surnom": "le Bâtard de Winterfell",
+   "maison": "nuit",
+   "titres": [
+    "Lord Commandant de la Garde de Nuit",
+    "Roi du Nord"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "283 AC",
+   "deces": null,
+   "lieu": "Châteaunoir",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Filiation réelle cachée (voir liens secrets). Pont entre le Nord, la Garde et le peuple libre.",
+   "tags": [
+    "secret",
+    "nœud majeur"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 1,
+     "commentaire": "Lui doit la vie au-delà du Mur."
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "hoster-tully",
+   "prenom": "Hoster",
+   "nom": "Tully",
+   "surnom": "",
+   "maison": "tully",
+   "titres": [
+    "Seigneur de Vivesaigues"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "236 AC",
+   "deces": "299 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Père de Catelyn et Lysa. Architecte des alliances du Conflans.",
+   "tags": [
+    "génération précédente"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "edmure-tully",
+   "prenom": "Edmure",
+   "nom": "Tully",
+   "surnom": "",
+   "maison": "tully",
+   "titres": [
+    "Seigneur de Vivesaigues"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "267 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Bien intentionné, souvent à contretemps. Marié de force à une Frey.",
+   "tags": [
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "lysa-arryn",
+   "prenom": "Lysa",
+   "nom": "Arryn",
+   "surnom": "",
+   "maison": "arryn",
+   "titres": [
+    "Dame des Eyrié"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "266 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Née Tully. Manipulée par Littlefinger depuis l'enfance : c'est elle qui allume la mèche de la guerre.",
+   "tags": [
+    "née Tully",
+    "instable"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "brynden-tully",
+   "prenom": "Brynden",
+   "nom": "Tully",
+   "surnom": "le Silure",
+   "maison": "tully",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "238 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Oncle rebelle, meilleur commandant du Conflans.",
+   "tags": [
+    "militaire"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "jon-arryn",
+   "prenom": "Jon",
+   "nom": "Arryn",
+   "surnom": "",
+   "maison": "arryn",
+   "titres": [
+    "Main du Roi",
+    "Seigneur des Eyrié"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "219 AC",
+   "deces": "298 AC",
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Père de substitution de Robert et Eddard. Empoisonné pour avoir découvert l'inceste Lannister.",
+   "tags": [
+    "génération précédente",
+    "enquête"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "robin-arryn",
+   "prenom": "Robin",
+   "nom": "Arryn",
+   "surnom": "",
+   "maison": "arryn",
+   "titres": [
+    "Seigneur des Eyrié"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "292 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 1,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Enfant malléable, donc dangereux entre de mauvaises mains.",
+   "tags": [
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "tywin-lannister",
+   "prenom": "Tywin",
+   "nom": "Lannister",
+   "surnom": "",
+   "maison": "lannister",
+   "titres": [
+    "Seigneur de Castral Roc",
+    "Main du Roi"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "242 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Tout passe par lui : dettes, alliances, massacres. Tué par Tyrion.",
+   "tags": [
+    "nœud majeur",
+    "argent"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "joanna-lannister",
+   "prenom": "Joanna",
+   "nom": "Lannister",
+   "surnom": "",
+   "maison": "lannister",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "245 AC",
+   "deces": "273 AC",
+   "lieu": "",
+   "importance": 1,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Morte en donnant naissance à Tyrion — origine de la haine de Tywin.",
+   "tags": [
+    "génération précédente"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "cersei-lannister",
+   "prenom": "Cersei",
+   "nom": "Lannister",
+   "surnom": "",
+   "maison": "lannister",
+   "titres": [
+    "Reine régente",
+    "Reine des Sept Couronnes"
+   ],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "266 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Paranoïa lucide : elle a souvent raison sur les menaces, jamais sur les remèdes.",
+   "tags": [
+    "nœud majeur",
+    "cour",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "jaime-lannister",
+   "prenom": "Jaime",
+   "nom": "Lannister",
+   "surnom": "le Régicide",
+   "maison": "lannister",
+   "titres": [
+    "Lord Commandant de la Garde Royale"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "266 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Arc de rédemption suspendu. Le seul lien qui compte vraiment pour lui est Cersei.",
+   "tags": [
+    "chevalier",
+    "arc de rédemption"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "tyrion-lannister",
+   "prenom": "Tyrion",
+   "nom": "Lannister",
+   "surnom": "le Lutin",
+   "maison": "lannister",
+   "titres": [
+    "Main de la Reine"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "273 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Meilleur allié possible pour les joueurs : information, or, et cynisme utile.",
+   "tags": [
+    "nœud majeur",
+    "conseil",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 1,
+     "commentaire": "Complicité de bibliothèque."
+    },
+    "j3": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "kevan-lannister",
+   "prenom": "Kevan",
+   "nom": "Lannister",
+   "surnom": "",
+   "maison": "lannister",
+   "titres": [
+    "Régent du royaume"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "244 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "L'ombre loyale de Tywin. Le seul frein raisonnable à Cersei.",
+   "tags": [],
+   "relations_joueurs": {
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "robert-baratheon",
+   "prenom": "Robert",
+   "nom": "Baratheon",
+   "surnom": "l'Usurpateur",
+   "maison": "baratheon",
+   "titres": [
+    "Roi des Sept Couronnes"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "262 AC",
+   "deces": "298 AC",
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Roi absent de son propre règne. Sa mort ouvre la crise de succession.",
+   "tags": [
+    "couronne"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "stannis-baratheon",
+   "prenom": "Stannis",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [
+    "Seigneur de Peyredragon",
+    "Prétendant au Trône"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "264 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Légitimité juridique parfaite, capital politique nul. Sensible à Melisandre.",
+   "tags": [
+    "prétendant",
+    "rigide"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "renly-baratheon",
+   "prenom": "Renly",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [
+    "Seigneur d'Accalmie",
+    "Prétendant au Trône"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "277 AC",
+   "deces": "299 AC",
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Populaire et illégitime. Tué par l'ombre de Melisandre.",
+   "tags": [
+    "prétendant"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "joffrey-baratheon",
+   "prenom": "Joffrey",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [
+    "Roi des Sept Couronnes"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "286 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Fils de l'inceste. Empoisonné aux Noces Pourpres.",
+   "tags": [
+    "couronne",
+    "cruel"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "myrcella-baratheon",
+   "prenom": "Myrcella",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [
+    "Princesse"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "290 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Envoyée à Dorne comme garantie diplomatique.",
+   "tags": [
+    "otage diplomatique",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "tommen-baratheon",
+   "prenom": "Tommen",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [
+    "Roi des Sept Couronnes"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "291 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Doux, donc instrumentalisé par tout le monde.",
+   "tags": [
+    "couronne",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "shireen-baratheon",
+   "prenom": "Shireen",
+   "nom": "Baratheon",
+   "surnom": "",
+   "maison": "baratheon",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "289 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sacrifiée par son propre père. Point de rupture de la loyauté envers Stannis.",
+   "tags": [
+    "tragédie"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 1,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "gendry",
+   "prenom": "Gendry",
+   "nom": "",
+   "surnom": "le Forgeron",
+   "maison": "baratheon",
+   "titres": [],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "285 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Bâtard de Robert. Sang royal ignoré, donc convoité.",
+   "tags": [
+    "bâtard",
+    "artisan"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "aerys-targaryen",
+   "prenom": "Aerys",
+   "nom": "Targaryen",
+   "surnom": "le Roi Fou",
+   "maison": "targaryen",
+   "titres": [
+    "Roi des Sept Couronnes"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "244 AC",
+   "deces": "283 AC",
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sa folie est la cause racine de presque tous les conflits actuels.",
+   "tags": [
+    "génération précédente",
+    "folie"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "rhaegar-targaryen",
+   "prenom": "Rhaegar",
+   "nom": "Targaryen",
+   "surnom": "",
+   "maison": "targaryen",
+   "titres": [
+    "Prince de Peyredragon"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "259 AC",
+   "deces": "283 AC",
+   "lieu": "Le Trident",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Tué par Robert au Trident. Sa véritable descendance est le secret le mieux gardé du royaume.",
+   "tags": [
+    "secret",
+    "génération précédente"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "viserys-targaryen",
+   "prenom": "Viserys",
+   "nom": "Targaryen",
+   "surnom": "le Roi Mendiant",
+   "maison": "targaryen",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "276 AC",
+   "deces": "298 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Vend sa sœur pour une armée, meurt d'une couronne d'or fondu.",
+   "tags": [
+    "exil"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "daenerys-targaryen",
+   "prenom": "Daenerys",
+   "nom": "Targaryen",
+   "surnom": "Mère des Dragons",
+   "maison": "targaryen",
+   "titres": [
+    "Khaleesi",
+    "Briseuse de Chaînes",
+    "Reine de Meereen"
+   ],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "284 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Puissance extérieure qui rebat toutes les cartes. Loyauté exigeante.",
+   "tags": [
+    "nœud majeur",
+    "dragons",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "drogo",
+   "prenom": "Drogo",
+   "nom": "",
+   "surnom": "Khal Drogo",
+   "maison": "dothraki",
+   "titres": [
+    "Khal"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "270 AC",
+   "deces": "298 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Première armée de Daenerys, première perte.",
+   "tags": [],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "elia-martell",
+   "prenom": "Elia",
+   "nom": "Martell",
+   "surnom": "",
+   "maison": "martell",
+   "titres": [
+    "Princesse de Dorne"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "257 AC",
+   "deces": "283 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Assassinée lors du sac de Port-Réal. Origine de la vendetta dornienne.",
+   "tags": [
+    "vendetta"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "oberyn-martell",
+   "prenom": "Oberyn",
+   "nom": "Martell",
+   "surnom": "la Vipère Rouge",
+   "maison": "martell",
+   "titres": [
+    "Prince de Dorne"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "258 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Vient à Port-Réal pour une seule raison : venger sa sœur.",
+   "tags": [
+    "vendetta",
+    "duelliste"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "doran-martell",
+   "prenom": "Doran",
+   "nom": "Martell",
+   "surnom": "",
+   "maison": "martell",
+   "titres": [
+    "Prince de Dorne"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "250 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Joue vingt ans à l'avance, ce que personne autour de lui ne supporte.",
+   "tags": [
+    "patience",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "olenna-tyrell",
+   "prenom": "Olenna",
+   "nom": "Tyrell",
+   "surnom": "la Reine des Épines",
+   "maison": "tyrell",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "228 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Commanditaire réelle de l'empoisonnement de Joffrey.",
+   "tags": [
+    "intrigue"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "mace-tyrell",
+   "prenom": "Mace",
+   "nom": "Tyrell",
+   "surnom": "",
+   "maison": "tyrell",
+   "titres": [
+    "Seigneur de Hautjardin"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "258 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Nominalement le chef de maison ; en pratique, sa mère décide.",
+   "tags": [
+    "chef de maison"
+   ],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "margaery-tyrell",
+   "prenom": "Margaery",
+   "nom": "Tyrell",
+   "surnom": "",
+   "maison": "tyrell",
+   "titres": [
+    "Reine des Sept Couronnes"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "283 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Épouse successivement trois rois. Maîtrise l'opinion publique mieux que Cersei.",
+   "tags": [
+    "cour",
+    "intrigue",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "loras-tyrell",
+   "prenom": "Loras",
+   "nom": "Tyrell",
+   "surnom": "le Chevalier des Fleurs",
+   "maison": "tyrell",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "282 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sa liaison avec Renly est une arme politique aux mains de la Foi.",
+   "tags": [
+    "chevalier"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "balon-greyjoy",
+   "prenom": "Balon",
+   "nom": "Greyjoy",
+   "surnom": "",
+   "maison": "greyjoy",
+   "titres": [
+    "Roi des Îles de Fer"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "253 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Deux rébellions, aucun gain. Renie son fils.",
+   "tags": [],
+   "relations_joueurs": {},
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "theon-greyjoy",
+   "prenom": "Theon",
+   "nom": "Greyjoy",
+   "surnom": "Schlingue",
+   "maison": "greyjoy",
+   "titres": [
+    "Pupille de Winterfell"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "282 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Otage élevé comme un frère, traître par besoin d'appartenance, brisé par Ramsay.",
+   "tags": [
+    "otage",
+    "trahison",
+    "rédemption"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "yara-greyjoy",
+   "prenom": "Yara",
+   "nom": "Greyjoy",
+   "surnom": "",
+   "maison": "greyjoy",
+   "titres": [
+    "Capitaine du Vent Noir"
+   ],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "277 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Seule à tenter de récupérer son frère. Alliée naturelle de Daenerys.",
+   "tags": [
+    "marine",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "euron-greyjoy",
+   "prenom": "Euron",
+   "nom": "Greyjoy",
+   "surnom": "Œil-de-Choucas",
+   "maison": "greyjoy",
+   "titres": [
+    "Roi des Îles de Fer"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "256 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Agent du chaos. Fratricide, oncle de Theon et Yara.",
+   "tags": [
+    "chaos",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "roose-bolton",
+   "prenom": "Roose",
+   "nom": "Bolton",
+   "surnom": "",
+   "maison": "bolton",
+   "titres": [
+    "Seigneur de Fort-Terreur",
+    "Gardien du Nord"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "258 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Trahison froide et rentable. Tué par son bâtard.",
+   "tags": [
+    "Noces Pourpres",
+    "traître"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "ramsay-bolton",
+   "prenom": "Ramsay",
+   "nom": "Bolton",
+   "surnom": "le Bâtard",
+   "maison": "bolton",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "281 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sadique sans plafond. Antagoniste de proximité idéal.",
+   "tags": [
+    "bâtard légitimé",
+    "sadique",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "walder-frey",
+   "prenom": "Walder",
+   "nom": "Frey",
+   "surnom": "",
+   "maison": "frey",
+   "titres": [
+    "Seigneur du Pont"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "208 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Le péage fait le pouvoir. Hôte des Noces Pourpres.",
+   "tags": [
+    "Noces Pourpres",
+    "traître",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "petyr-baelish",
+   "prenom": "Petyr",
+   "nom": "Baelish",
+   "surnom": "Littlefinger",
+   "maison": "autre",
+   "titres": [
+    "Grand Argentier",
+    "Seigneur suzerain du Conflans"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "268 AC",
+   "deces": null,
+   "lieu": "Winterfell",
+   "importance": 5,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Cause première du conflit : le poignard, le mensonge sur Jon Arryn, la trahison d'Eddard. Nœud d'intrigue central.",
+   "tags": [
+    "nœud majeur",
+    "manipulateur",
+    "traître"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "varys",
+   "prenom": "Varys",
+   "nom": "",
+   "surnom": "l'Araignée",
+   "maison": "autre",
+   "titres": [
+    "Maître des Chuchoteurs"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "257 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Sert « le royaume ». Réseau d'informateurs utilisable comme service de renseignement pour les joueurs.",
+   "tags": [
+    "espionnage",
+    "information"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "sandor-clegane",
+   "prenom": "Sandor",
+   "nom": "Clegane",
+   "surnom": "le Limier",
+   "maison": "clegane",
+   "titres": [],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "270 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 4,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Brûlé par son frère, terrifié par le feu. Protecteur malgré lui.",
+   "tags": [
+    "garde",
+    "rédemption"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "gregor-clegane",
+   "prenom": "Gregor",
+   "nom": "Clegane",
+   "surnom": "la Montagne",
+   "maison": "clegane",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "264 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Arme brute de Tywin puis de Cersei. Meurtrier d'Elia.",
+   "tags": [
+    "exécuteur"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 7,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 7,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "jorah-mormont",
+   "prenom": "Jorah",
+   "nom": "Mormont",
+   "surnom": "",
+   "maison": "mormont",
+   "titres": [
+    "Chevalier exilé"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "263 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Commence comme espion de Varys, finit comme le plus loyal des gardes.",
+   "tags": [
+    "exil",
+    "loyauté",
+    "héritier"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "jeor-mormont",
+   "prenom": "Jeor",
+   "nom": "Mormont",
+   "surnom": "le Vieil Ours",
+   "maison": "nuit",
+   "titres": [
+    "Lord Commandant de la Garde de Nuit"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "235 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Père de Jorah. Mentor de Jon, tué lors de la mutinerie de Craster.",
+   "tags": [
+    "Mur",
+    "chef de maison"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "davos-seaworth",
+   "prenom": "Davos",
+   "nom": "Seaworth",
+   "surnom": "le Chevalier Oignon",
+   "maison": "baratheon",
+   "titres": [
+    "Main du Roi"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "260 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Conscience morale de Stannis. Ancien contrebandier : contacts utiles partout.",
+   "tags": [
+    "contrebande",
+    "loyauté"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 1,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "melisandre",
+   "prenom": "Melisandre",
+   "nom": "",
+   "surnom": "la Femme Rouge",
+   "maison": "autre",
+   "titres": [
+    "Prêtresse de R'hllor"
+   ],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "250 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Magie réelle, interprétations douteuses. Ressuscite Jon Snow.",
+   "tags": [
+    "magie",
+    "religion"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "brienne-tarth",
+   "prenom": "Brienne",
+   "nom": "Tarth",
+   "surnom": "la Pucelle de Torth",
+   "maison": "tarth",
+   "titres": [
+    "Chevalier"
+   ],
+   "genre": "femme",
+   "statut": "vivant",
+   "naissance": "280 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Le serment prime tout. Utile comme garde du corps de PJ.",
+   "tags": [
+    "serment",
+    "chevalier"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j3": {
+     "note": 2,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "samwell-tarly",
+   "prenom": "Samwell",
+   "nom": "Tarly",
+   "surnom": "Sam",
+   "maison": "tarly",
+   "titres": [],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "283 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Accès aux archives de la Citadelle : la meilleure source d'information du groupe.",
+   "tags": [
+    "Mur",
+    "savoir"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "ygritte",
+   "prenom": "Ygritte",
+   "nom": "",
+   "surnom": "",
+   "maison": "libres",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "281 AC",
+   "deces": "300 AC",
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Lien affectif qui coûte à Jon sa neutralité.",
+   "tags": [
+    "Mur"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "mance-rayder",
+   "prenom": "Mance",
+   "nom": "Rayder",
+   "surnom": "le Roi d'au-delà du Mur",
+   "maison": "libres",
+   "titres": [],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "250 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "A unifié quatre-vingt-dix clans. Ancien frère juré : connaît la Garde de l'intérieur.",
+   "tags": [
+    "Mur",
+    "déserteur"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "tormund",
+   "prenom": "Tormund",
+   "nom": "Fléau-d'Ogres",
+   "surnom": "",
+   "maison": "libres",
+   "titres": [],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "265 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Allié fiable une fois la confiance gagnée. Bon contact pour du recrutement au nord.",
+   "tags": [
+    "Mur"
+   ],
+   "relations_joueurs": {
+    "j4": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "bronn",
+   "prenom": "Bronn",
+   "nom": "",
+   "surnom": "",
+   "maison": "autre",
+   "titres": [
+    "Chevalier de la Néra"
+   ],
+   "genre": "homme",
+   "statut": "vivant",
+   "naissance": "270 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Loyal au plus offrant, mais transparent sur le tarif — donc prévisible.",
+   "tags": [
+    "mercenaire"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 4,
+     "commentaire": ""
+    },
+    "j4": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "shae",
+   "prenom": "Shae",
+   "nom": "",
+   "surnom": "",
+   "maison": "autre",
+   "titres": [],
+   "genre": "femme",
+   "statut": "mort",
+   "naissance": "280 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 2,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Témoignage à charge contre Tyrion lors de son procès.",
+   "tags": [
+    "trahison"
+   ],
+   "relations_joueurs": {
+    "j2": {
+     "note": 5,
+     "commentaire": ""
+    }
+   },
+   "decalage": null,
+   "generation": null
+  },
+  {
+   "id": "barristan-selmy",
+   "prenom": "Barristan",
+   "nom": "Selmy",
+   "surnom": "Barristan le Hardi",
+   "maison": "autre",
+   "titres": [
+    "Lord Commandant de la Garde Royale"
+   ],
+   "genre": "homme",
+   "statut": "mort",
+   "naissance": "237 AC",
+   "deces": null,
+   "lieu": "",
+   "importance": 3,
+   "avatar": null,
+   "couleur": null,
+   "notes": "Renvoyé par Joffrey, se rallie à Daenerys. Mémoire vivante de la cour.",
+   "tags": [
+    "chevalier",
+    "mémoire"
+   ],
+   "relations_joueurs": {
+    "j1": {
+     "note": 1,
+     "commentaire": ""
+    },
+    "j2": {
+     "note": 2,
+     "commentaire": ""
+    }
+   },
+   "decalage": [
+    191,
+    -72
+   ],
+   "generation": null
+  }
+ ],
+ "relations": [
+  {
+   "id": "r-rickard-eddard",
+   "source": "rickard-stark",
+   "cible": "eddard-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-rickard-brandon",
+   "source": "rickard-stark",
+   "cible": "brandon-stark-aine",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-rickard-lyanna",
+   "source": "rickard-stark",
+   "cible": "lyanna-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-rickard-benjen",
+   "source": "rickard-stark",
+   "cible": "benjen-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-eddard-catelyn",
+   "source": "eddard-stark",
+   "cible": "catelyn-stark",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage d'alliance devenu sincère",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-eddard-robb",
+   "source": "eddard-stark",
+   "cible": "robb-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-eddard-sansa",
+   "source": "eddard-stark",
+   "cible": "sansa-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-eddard-arya",
+   "source": "eddard-stark",
+   "cible": "arya-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-eddard-bran",
+   "source": "eddard-stark",
+   "cible": "bran-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-eddard-rickon",
+   "source": "eddard-stark",
+   "cible": "rickon-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-catelyn-robb",
+   "source": "catelyn-stark",
+   "cible": "robb-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-catelyn-sansa",
+   "source": "catelyn-stark",
+   "cible": "sansa-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-catelyn-arya",
+   "source": "catelyn-stark",
+   "cible": "arya-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-catelyn-bran",
+   "source": "catelyn-stark",
+   "cible": "bran-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-catelyn-rickon",
+   "source": "catelyn-stark",
+   "cible": "rickon-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-eddard-jon",
+   "source": "eddard-stark",
+   "cible": "jon-snow",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Père officiel",
+   "notes": "Version publique : bâtard d'Eddard.",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-rhaegar-jon",
+   "source": "rhaegar-targaryen",
+   "cible": "jon-snow",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Filiation réelle",
+   "notes": "Union secrète avec Lyanna.",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-lyanna-jon",
+   "source": "lyanna-stark",
+   "cible": "jon-snow",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Mère réelle",
+   "notes": "Morte en couches à la Tour de la Joie.",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-rhaegar-lyanna",
+   "source": "rhaegar-targaryen",
+   "cible": "lyanna-stark",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Union secrète",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-catelyn-jon",
+   "source": "catelyn-stark",
+   "cible": "jon-snow",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Rejet",
+   "notes": "Voit en lui la preuve d'une infidélité.",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-eddard-robert",
+   "source": "eddard-stark",
+   "cible": "robert-baratheon",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Frères d'armes",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jonarryn-eddard",
+   "source": "jon-arryn",
+   "cible": "eddard-stark",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "Père de substitution",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jonarryn-robert",
+   "source": "jon-arryn",
+   "cible": "robert-baratheon",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-hoster-catelyn",
+   "source": "hoster-tully",
+   "cible": "catelyn-stark",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-hoster-lysa",
+   "source": "hoster-tully",
+   "cible": "lysa-arryn",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-hoster-edmure",
+   "source": "hoster-tully",
+   "cible": "edmure-tully",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-brynden-hoster",
+   "source": "brynden-tully",
+   "cible": "hoster-tully",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "Frères brouillés",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-brynden-edmure",
+   "source": "brynden-tully",
+   "cible": "edmure-tully",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-jonarryn-lysa",
+   "source": "jon-arryn",
+   "cible": "lysa-arryn",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage politique",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-jonarryn-robin",
+   "source": "jon-arryn",
+   "cible": "robin-arryn",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-lysa-robin",
+   "source": "lysa-arryn",
+   "cible": "robin-arryn",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Fusionnelle",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-petyr-lysa",
+   "source": "petyr-baelish",
+   "cible": "lysa-arryn",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage d'opportunité",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2,
+   "emoji": "🗝️"
+  },
+  {
+   "id": "r-petyr-lysa-complot",
+   "source": "petyr-baelish",
+   "cible": "lysa-arryn",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Empoisonnement de Jon Arryn",
+   "notes": "Il lui fait tuer son mari puis accuser les Lannister.",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🗝️"
+  },
+  {
+   "id": "r-petyr-catelyn",
+   "source": "petyr-baelish",
+   "cible": "catelyn-stark",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Amour d'enfance non partagé",
+   "notes": "Moteur secret de toutes ses manœuvres.",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-petyr-eddard",
+   "source": "petyr-baelish",
+   "cible": "eddard-stark",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Le poignard à la gorge",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-petyr-sansa",
+   "source": "petyr-baelish",
+   "cible": "sansa-stark",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "Apprentissage sous contrainte",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-petyr-varys",
+   "source": "petyr-baelish",
+   "cible": "varys",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Rivalité de renseignement",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🗝️"
+  },
+  {
+   "id": "r-tywin-cersei",
+   "source": "tywin-lannister",
+   "cible": "cersei-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-tywin-jaime",
+   "source": "tywin-lannister",
+   "cible": "jaime-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-tywin-tyrion",
+   "source": "tywin-lannister",
+   "cible": "tyrion-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-joanna-cersei",
+   "source": "joanna-lannister",
+   "cible": "cersei-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-joanna-jaime",
+   "source": "joanna-lannister",
+   "cible": "jaime-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-joanna-tyrion",
+   "source": "joanna-lannister",
+   "cible": "tyrion-lannister",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-tywin-joanna",
+   "source": "tywin-lannister",
+   "cible": "joanna-lannister",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-tywin-kevan",
+   "source": "tywin-lannister",
+   "cible": "kevan-lannister",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-tywin-tyrion-haine",
+   "source": "tywin-lannister",
+   "cible": "tyrion-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Haine paternelle",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-jaime",
+   "source": "cersei-lannister",
+   "cible": "jaime-lannister",
+   "type": "amant",
+   "humeur": 4,
+   "label": "Inceste",
+   "notes": "Le secret qui a coûté la vie à Jon Arryn et à Eddard.",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-tyrion",
+   "source": "cersei-lannister",
+   "cible": "tyrion-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Le tient pour responsable de la mort de leur mère",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-robert",
+   "source": "cersei-lannister",
+   "cible": "robert-baratheon",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage de la rébellion",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-cersei-robert-trahison",
+   "source": "cersei-lannister",
+   "cible": "robert-baratheon",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Chasse arrangée",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-joffrey",
+   "source": "cersei-lannister",
+   "cible": "joffrey-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-myrcella",
+   "source": "cersei-lannister",
+   "cible": "myrcella-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-tommen",
+   "source": "cersei-lannister",
+   "cible": "tommen-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-robert-joffrey",
+   "source": "robert-baratheon",
+   "cible": "joffrey-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Père officiel",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-robert-myrcella",
+   "source": "robert-baratheon",
+   "cible": "myrcella-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Père officiel",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-robert-tommen",
+   "source": "robert-baratheon",
+   "cible": "tommen-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Père officiel",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-jaime-joffrey",
+   "source": "jaime-lannister",
+   "cible": "joffrey-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Filiation réelle",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-jaime-myrcella",
+   "source": "jaime-lannister",
+   "cible": "myrcella-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Filiation réelle",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-jaime-tommen",
+   "source": "jaime-lannister",
+   "cible": "tommen-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Filiation réelle",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-robert-gendry",
+   "source": "robert-baratheon",
+   "cible": "gendry",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Bâtard non reconnu",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-robert-stannis",
+   "source": "robert-baratheon",
+   "cible": "stannis-baratheon",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-robert-renly",
+   "source": "robert-baratheon",
+   "cible": "renly-baratheon",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-stannis-renly",
+   "source": "stannis-baratheon",
+   "cible": "renly-baratheon",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Guerre de succession",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-stannis-shireen",
+   "source": "stannis-baratheon",
+   "cible": "shireen-baratheon",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "Amour réel, sacrifice réel.",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-stannis-melisandre",
+   "source": "melisandre",
+   "cible": "stannis-baratheon",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "Emprise religieuse",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-davos-stannis",
+   "source": "davos-seaworth",
+   "cible": "stannis-baratheon",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Loyauté personnelle",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-davos-stannis-ami",
+   "source": "davos-seaworth",
+   "cible": "stannis-baratheon",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Le seul à lui dire non",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-davos-melisandre",
+   "source": "davos-seaworth",
+   "cible": "melisandre",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Après le sacrifice de Shireen",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-melisandre-jon",
+   "source": "melisandre",
+   "cible": "jon-snow",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Résurrection",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-renly-loras",
+   "source": "renly-baratheon",
+   "cible": "loras-tyrell",
+   "type": "amant",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-renly-margaery",
+   "source": "renly-baratheon",
+   "cible": "margaery-tyrell",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage de façade",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-joffrey-margaery",
+   "source": "joffrey-baratheon",
+   "cible": "margaery-tyrell",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-tommen-margaery",
+   "source": "tommen-baratheon",
+   "cible": "margaery-tyrell",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-olenna-mace",
+   "source": "olenna-tyrell",
+   "cible": "mace-tyrell",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-mace-margaery",
+   "source": "mace-tyrell",
+   "cible": "margaery-tyrell",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-mace-loras",
+   "source": "mace-tyrell",
+   "cible": "loras-tyrell",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-olenna-margaery",
+   "source": "olenna-tyrell",
+   "cible": "margaery-tyrell",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "École de l'intrigue",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-olenna-joffrey",
+   "source": "olenna-tyrell",
+   "cible": "joffrey-baratheon",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Commanditaire de l'empoisonnement",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-olenna-cersei",
+   "source": "olenna-tyrell",
+   "cible": "cersei-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-cersei-margaery",
+   "source": "cersei-lannister",
+   "cible": "margaery-tyrell",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Rivalité de reines",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-lannister-tyrell",
+   "source": "tywin-lannister",
+   "cible": "olenna-tyrell",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Alliance de guerre (fragile)",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🤝"
+  },
+  {
+   "id": "r-tywin-gregor",
+   "source": "gregor-clegane",
+   "cible": "tywin-lannister",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Bras armé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-sandor-gregor",
+   "source": "sandor-clegane",
+   "cible": "gregor-clegane",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-sandor-gregor-haine",
+   "source": "sandor-clegane",
+   "cible": "gregor-clegane",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Le visage brûlé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-sandor-joffrey",
+   "source": "sandor-clegane",
+   "cible": "joffrey-baratheon",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Garde royale, abandonné en pleine bataille",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2,
+   "revolu": true
+  },
+  {
+   "id": "r-sandor-arya",
+   "source": "sandor-clegane",
+   "cible": "arya-stark",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Compagnons de route hostiles",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-sandor-sansa",
+   "source": "sandor-clegane",
+   "cible": "sansa-stark",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Protection ambiguë",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-oberyn-elia",
+   "source": "oberyn-martell",
+   "cible": "elia-martell",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-doran-elia",
+   "source": "doran-martell",
+   "cible": "elia-martell",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-doran-oberyn",
+   "source": "doran-martell",
+   "cible": "oberyn-martell",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "Deux stratégies opposées",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-rhaegar-elia",
+   "source": "rhaegar-targaryen",
+   "cible": "elia-martell",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage politique",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-gregor-elia",
+   "source": "gregor-clegane",
+   "cible": "elia-martell",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Meurtrier",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-oberyn-gregor",
+   "source": "oberyn-martell",
+   "cible": "gregor-clegane",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Duel judiciaire",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-oberyn-tywin",
+   "source": "oberyn-martell",
+   "cible": "tywin-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Commanditaire présumé du meurtre d'Elia",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-oberyn-tyrion",
+   "source": "oberyn-martell",
+   "cible": "tyrion-lannister",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Champion au procès",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-myrcella-dorne",
+   "source": "doran-martell",
+   "cible": "myrcella-baratheon",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Pupille / otage diplomatique",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3,
+   "emoji": "💍"
+  },
+  {
+   "id": "r-aerys-rhaegar",
+   "source": "aerys-targaryen",
+   "cible": "rhaegar-targaryen",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-aerys-viserys",
+   "source": "aerys-targaryen",
+   "cible": "viserys-targaryen",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-aerys-daenerys",
+   "source": "aerys-targaryen",
+   "cible": "daenerys-targaryen",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-jaime-aerys",
+   "source": "jaime-lannister",
+   "cible": "aerys-targaryen",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Régicide",
+   "notes": "A empêché l'incendie de Port-Réal ; personne ne le sait.",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🗡️"
+  },
+  {
+   "id": "r-jaime-aerys-vassal",
+   "source": "jaime-lannister",
+   "cible": "aerys-targaryen",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Garde royale",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2,
+   "emoji": "🗡️",
+   "revolu": true
+  },
+  {
+   "id": "r-robert-rhaegar",
+   "source": "robert-baratheon",
+   "cible": "rhaegar-targaryen",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Le Trident",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-robert-aerys",
+   "source": "robert-baratheon",
+   "cible": "aerys-targaryen",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Rébellion",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-rickard-aerys",
+   "source": "aerys-targaryen",
+   "cible": "rickard-stark",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Exécution par le feu",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-viserys-daenerys",
+   "source": "viserys-targaryen",
+   "cible": "daenerys-targaryen",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "Fratrie abusive",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-daenerys-drogo",
+   "source": "daenerys-targaryen",
+   "cible": "drogo",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jorah-daenerys",
+   "source": "jorah-mormont",
+   "cible": "daenerys-targaryen",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Serment personnel",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "👑"
+  },
+  {
+   "id": "r-jorah-daenerys-trahison",
+   "source": "jorah-mormont",
+   "cible": "daenerys-targaryen",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Espion de Varys au départ",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3,
+   "emoji": "👑"
+  },
+  {
+   "id": "r-varys-jorah",
+   "source": "varys",
+   "cible": "jorah-mormont",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Recruteur d'informateur",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3,
+   "emoji": "🗝️"
+  },
+  {
+   "id": "r-jeor-jorah",
+   "source": "jeor-mormont",
+   "cible": "jorah-mormont",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Déshonoré par l'exil de son fils",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-jeor-jon",
+   "source": "jeor-mormont",
+   "cible": "jon-snow",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "Intendant du Lord Commandant",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jon-sam",
+   "source": "jon-snow",
+   "cible": "samwell-tarly",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Frères jurés",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jon-ygritte",
+   "source": "jon-snow",
+   "cible": "ygritte",
+   "type": "amant",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-jon-mance",
+   "source": "jon-snow",
+   "cible": "mance-rayder",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Respect entre ennemis",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-mance-ygritte",
+   "source": "mance-rayder",
+   "cible": "ygritte",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Combattante de son ost",
+   "notes": "",
+   "secret": false,
+   "dirige": true,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3,
+   "revolu": true
+  },
+  {
+   "id": "r-mance-tormund",
+   "source": "tormund",
+   "cible": "mance-rayder",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-jon-tormund",
+   "source": "jon-snow",
+   "cible": "tormund",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Alliance improbable",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🕊️"
+  },
+  {
+   "id": "r-jon-benjen",
+   "source": "benjen-stark",
+   "cible": "jon-snow",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Oncle et modèle",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-jon-daenerys",
+   "source": "jon-snow",
+   "cible": "daenerys-targaryen",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Alliance contre le Nord glacé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🤝"
+  },
+  {
+   "id": "r-tyrion-daenerys",
+   "source": "tyrion-lannister",
+   "cible": "daenerys-targaryen",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Main de la Reine",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "👑"
+  },
+  {
+   "id": "r-tyrion-varys",
+   "source": "tyrion-lannister",
+   "cible": "varys",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Échange d'informations",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-tyrion-bronn",
+   "source": "bronn",
+   "cible": "tyrion-lannister",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Épée à louer",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-tyrion-bronn-dette",
+   "source": "tyrion-lannister",
+   "cible": "bronn",
+   "type": "dette",
+   "humeur": 4,
+   "label": "Un château promis",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "💰"
+  },
+  {
+   "id": "r-tyrion-shae",
+   "source": "tyrion-lannister",
+   "cible": "shae",
+   "type": "amant",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-shae-tyrion",
+   "source": "shae",
+   "cible": "tyrion-lannister",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Témoignage au procès",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-tyrion-tywin",
+   "source": "tyrion-lannister",
+   "cible": "tywin-lannister",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Parricide",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-tyrion-jaime",
+   "source": "tyrion-lannister",
+   "cible": "jaime-lannister",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "Le seul lien familial sain",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-catelyn-tyrion",
+   "source": "catelyn-stark",
+   "cible": "tyrion-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Enlèvement sur une fausse accusation",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-jaime-brienne",
+   "source": "jaime-lannister",
+   "cible": "brienne-tarth",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Respect né de la captivité",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🕊️"
+  },
+  {
+   "id": "r-jaime-brienne-dette",
+   "source": "jaime-lannister",
+   "cible": "brienne-tarth",
+   "type": "dette",
+   "humeur": 4,
+   "label": "Dette d'honneur (Vipère d'Or)",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "💰"
+  },
+  {
+   "id": "r-brienne-catelyn",
+   "source": "brienne-tarth",
+   "cible": "catelyn-stark",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Serment de ramener ses filles",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "revolu": true
+  },
+  {
+   "id": "r-brienne-renly",
+   "source": "brienne-tarth",
+   "cible": "renly-baratheon",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Garde Arc-en-ciel",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "revolu": true
+  },
+  {
+   "id": "r-brienne-stannis",
+   "source": "brienne-tarth",
+   "cible": "stannis-baratheon",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Vengeance de Renly",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-brienne-sansa",
+   "source": "brienne-tarth",
+   "cible": "sansa-stark",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Protectrice jurée",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-arya-gendry",
+   "source": "arya-stark",
+   "cible": "gendry",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Fuite commune",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-arya-walder",
+   "source": "arya-stark",
+   "cible": "walder-frey",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Sur sa liste",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "⚔️"
+  },
+  {
+   "id": "r-arya-cersei",
+   "source": "arya-stark",
+   "cible": "cersei-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Sur sa liste",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-sansa-joffrey",
+   "source": "sansa-stark",
+   "cible": "joffrey-baratheon",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Fiançailles subies",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "💍"
+  },
+  {
+   "id": "r-sansa-cersei",
+   "source": "cersei-lannister",
+   "cible": "sansa-stark",
+   "type": "mentor",
+   "humeur": 4,
+   "label": "Leçons de survie à la cour",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-sansa-tyrion",
+   "source": "sansa-stark",
+   "cible": "tyrion-lannister",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage forcé, non consommé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-sansa-ramsay",
+   "source": "sansa-stark",
+   "cible": "ramsay-bolton",
+   "type": "conjoint",
+   "humeur": 4,
+   "label": "Mariage forcé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-sansa-ramsay-nemesis",
+   "source": "sansa-stark",
+   "cible": "ramsay-bolton",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-petyr-ramsay",
+   "source": "petyr-baelish",
+   "cible": "ramsay-bolton",
+   "type": "allie",
+   "humeur": 4,
+   "label": "A livré Sansa aux Bolton",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-roose-ramsay",
+   "source": "roose-bolton",
+   "cible": "ramsay-bolton",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Bâtard légitimé",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-ramsay-roose",
+   "source": "ramsay-bolton",
+   "cible": "roose-bolton",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Parricide",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-ramsay-theon",
+   "source": "ramsay-bolton",
+   "cible": "theon-greyjoy",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Tortionnaire",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5
+  },
+  {
+   "id": "r-roose-eddard",
+   "source": "roose-bolton",
+   "cible": "eddard-stark",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Vassal du Nord",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2,
+   "revolu": true
+  },
+  {
+   "id": "r-roose-robb",
+   "source": "roose-bolton",
+   "cible": "robb-stark",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Noces Pourpres",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-walder-robb",
+   "source": "walder-frey",
+   "cible": "robb-stark",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Noces Pourpres",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-walder-robb-allie",
+   "source": "walder-frey",
+   "cible": "robb-stark",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Pacte de mariage rompu",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2,
+   "emoji": "💍",
+   "revolu": true
+  },
+  {
+   "id": "r-walder-hoster",
+   "source": "walder-frey",
+   "cible": "hoster-tully",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Vassal réticent",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 2
+  },
+  {
+   "id": "r-walder-tywin",
+   "source": "walder-frey",
+   "cible": "tywin-lannister",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Accord préalable aux Noces",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-roose-tywin",
+   "source": "roose-bolton",
+   "cible": "tywin-lannister",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Le Nord contre une trahison",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-robb-edmure",
+   "source": "robb-stark",
+   "cible": "edmure-tully",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Alliance Nord–Conflans",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🤝"
+  },
+  {
+   "id": "r-robb-theon",
+   "source": "robb-stark",
+   "cible": "theon-greyjoy",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Élevés comme des frères",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "revolu": true
+  },
+  {
+   "id": "r-theon-robb",
+   "source": "theon-greyjoy",
+   "cible": "robb-stark",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Prise de Winterfell",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-balon-theon",
+   "source": "balon-greyjoy",
+   "cible": "theon-greyjoy",
+   "type": "parent",
+   "humeur": 4,
+   "label": "Renié",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-balon-yara",
+   "source": "balon-greyjoy",
+   "cible": "yara-greyjoy",
+   "type": "parent",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-balon-euron",
+   "source": "balon-greyjoy",
+   "cible": "euron-greyjoy",
+   "type": "fratrie",
+   "humeur": 4,
+   "label": "",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 1
+  },
+  {
+   "id": "r-euron-balon",
+   "source": "euron-greyjoy",
+   "cible": "balon-greyjoy",
+   "type": "trahison",
+   "humeur": 4,
+   "label": "Fratricide",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "🩸"
+  },
+  {
+   "id": "r-yara-theon",
+   "source": "yara-greyjoy",
+   "cible": "theon-greyjoy",
+   "type": "ami",
+   "humeur": 4,
+   "label": "Tentative de sauvetage",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-yara-daenerys",
+   "source": "yara-greyjoy",
+   "cible": "daenerys-targaryen",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Flotte contre indépendance",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🤝"
+  },
+  {
+   "id": "r-euron-cersei",
+   "source": "euron-greyjoy",
+   "cible": "cersei-lannister",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Alliance intéressée",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-eddard-theon",
+   "source": "eddard-stark",
+   "cible": "theon-greyjoy",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Tuteur / geôlier",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-barristan-robert",
+   "source": "barristan-selmy",
+   "cible": "robert-baratheon",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Garde royale",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "revolu": true
+  },
+  {
+   "id": "r-barristan-joffrey",
+   "source": "joffrey-baratheon",
+   "cible": "barristan-selmy",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Renvoi humiliant",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-barristan-daenerys",
+   "source": "barristan-selmy",
+   "cible": "daenerys-targaryen",
+   "type": "vassal",
+   "humeur": 4,
+   "label": "Retour au serment d'origine",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 5,
+   "emoji": "👑"
+  },
+  {
+   "id": "r-varys-daenerys",
+   "source": "varys",
+   "cible": "daenerys-targaryen",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Soutien conditionnel au royaume",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-sam-jon-savoir",
+   "source": "samwell-tarly",
+   "cible": "bran-stark",
+   "type": "allie",
+   "humeur": 4,
+   "label": "Découverte de la filiation de Jon",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-bran-jon",
+   "source": "bran-stark",
+   "cible": "jon-snow",
+   "type": "autre",
+   "humeur": 4,
+   "label": "Détient la vérité sur sa naissance",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-gendry-davos",
+   "source": "davos-seaworth",
+   "cible": "gendry",
+   "type": "ami",
+   "humeur": 4,
+   "label": "L'a sauvé de Melisandre",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4
+  },
+  {
+   "id": "r-melisandre-gendry",
+   "source": "melisandre",
+   "cible": "gendry",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Sang royal convoité",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-kevan-cersei",
+   "source": "kevan-lannister",
+   "cible": "cersei-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "Désaccord sur la régence",
+   "notes": "",
+   "secret": false,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 3
+  },
+  {
+   "id": "r-jonarryn-enquete",
+   "source": "jon-arryn",
+   "cible": "cersei-lannister",
+   "type": "nemesis",
+   "humeur": 4,
+   "label": "A découvert l'inceste",
+   "notes": "",
+   "secret": true,
+   "dirige": null,
+   "depuis": null,
+   "jusqu_a": null,
+   "intensite": 4,
+   "emoji": "🗝️"
+  },
+  {
+   "id": "ev-harrenhal",
+   "source": "rhaegar-targaryen",
+   "cible": "lyanna-stark",
+   "type": "historique",
+   "humeur": 3,
+   "label": "Tournoi de Harrenhal",
+   "notes": "La couronne d'amour et de beauté posée sur les genoux de la mauvaise femme.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "281 AC",
+   "jusqu_a": "281 AC",
+   "revolu": true,
+   "lieu": "Harrenhal",
+   "emoji": "👑"
+  },
+  {
+   "id": "ev-trident",
+   "source": "robert-baratheon",
+   "cible": "rhaegar-targaryen",
+   "type": "historique",
+   "humeur": 7,
+   "label": "Bataille du Trident",
+   "notes": "Le marteau contre le rubis. Fin de la dynastie Targaryen.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "283 AC",
+   "jusqu_a": "283 AC",
+   "revolu": true,
+   "lieu": "Le Trident",
+   "emoji": "⚔️"
+  },
+  {
+   "id": "ev-sac-port-real",
+   "source": "gregor-clegane",
+   "cible": "elia-martell",
+   "type": "historique",
+   "humeur": 7,
+   "label": "Sac de Port-Réal",
+   "notes": "Ce que Dorne n’a jamais pardonné, et que Port-Réal préfère oublier.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "283 AC",
+   "jusqu_a": "283 AC",
+   "revolu": true,
+   "lieu": "Port-Réal",
+   "emoji": "🩸"
+  },
+  {
+   "id": "ev-nera",
+   "source": "stannis-baratheon",
+   "cible": "tyrion-lannister",
+   "type": "historique",
+   "humeur": 6,
+   "label": "Bataille de la Néra",
+   "notes": "Le feu grégeois, la chaîne, et une main qui n’a jamais été remerciée.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "299 AC",
+   "jusqu_a": "299 AC",
+   "revolu": true,
+   "lieu": "La Néra",
+   "emoji": "⚔️"
+  },
+  {
+   "id": "ev-noces-pourpres",
+   "source": "walder-frey",
+   "cible": "robb-stark",
+   "type": "historique",
+   "humeur": 7,
+   "label": "Noces Pourpres",
+   "notes": "Le droit d’hôte violé aux Jumeaux. Le Nord s’en souvient.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "299 AC",
+   "jusqu_a": "299 AC",
+   "revolu": true,
+   "lieu": "Les Jumeaux",
+   "emoji": "🩸"
+  },
+  {
+   "id": "ev-rebellion-greyjoy",
+   "source": "robert-baratheon",
+   "cible": "balon-greyjoy",
+   "type": "historique",
+   "humeur": 6,
+   "label": "Rébellion Greyjoy",
+   "notes": "Pyk tombe ; Theon part vers le nord comme otage sous le nom de pupille.",
+   "secret": false,
+   "dirige": false,
+   "depuis": "289 AC",
+   "jusqu_a": "289 AC",
+   "revolu": true,
+   "lieu": "Pyk",
+   "emoji": "🤝"
+  }
+ ]
+}

@@ -17,7 +17,6 @@
     <table class="donnees">
       <tbody>
         <tr><th>Adresse de courriel</th><td id="email">…</td></tr>
-        <tr><th>Nom affiché</th><td id="nom">…</td></tr>
         <tr><th>Compte créé le</th><td id="creeLe">…</td></tr>
         <tr><th>Dernier accès</th><td id="dernierAcces">…</td></tr>
         <tr><th>Sauvegardes</th><td id="sauvegardes">…</td></tr>
@@ -49,8 +48,10 @@
     <p>
       <strong>Vous</strong>, et <strong>les administrateurs de cette
       instance</strong>. C’est dit à l’inscription, et redit ici : les
-      administrateurs peuvent consulter les arbres créés sur ce service. Ils ne
-      peuvent pas les modifier, et ne peuvent pas lire votre mot de passe.
+      administrateurs peuvent consulter <em>et modifier</em> les arbres créés
+      sur ce service — c’est ce qui permet à un meneur de jeu de tenir la fiche
+      de ses joueurs. Toute modification faite chez quelqu’un d’autre laisse une
+      trace horodatée. Ils ne peuvent pas lire votre mot de passe.
     </p>
     <p>
       Les autres membres, eux, ne voient <strong>rien</strong> de vos
@@ -69,6 +70,26 @@
       locale. Rien n’y dépend de ce service.
     </p>
     <a class="principal" id="telecharger" href="/api/export/zip" download>⤓ Télécharger toutes mes données</a>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Le code de secours ne s'impose plus à l'inscription : il se demande
+       ici, quand on sait à quoi il sert. -->
+  <div class="carte" id="carteSecours">
+    <h2>Code de secours</h2>
+    <p>
+      Un code à noter quelque part, qui permet de <strong>reprendre votre compte
+      sans passer par personne</strong> si vous oubliez votre mot de passe.
+      Utile surtout si vous n’êtes pas sûr de garder accès à votre adresse de
+      courriel.
+    </p>
+    <p class="mention">
+      Il n’est affiché <strong>qu’une fois</strong> : la base n’en garde qu’une
+      empreinte. En demander un nouveau <strong>annule le précédent</strong>.
+    </p>
+    <button class="principal" id="genererSecours" type="button">Obtenir un code de secours</button>
+    <div id="codeSecoursAffiche" class="code" hidden></div>
+    <div id="messageSecours" class="message"></div>
   </div>
 
   <!-- ------------------------------------------------------------------ -->

@@ -143,6 +143,73 @@ export async function ecrireDocument(
   };
 }
 
+/** Ce qu'il faut savoir d'un document pour l'insérer, déjà mesuré. */
+export interface Contenu {
+  texte: string;
+  octets: number;
+  personnes: number;
+  relations: number;
+  schema: number;
+}
+
+/**
+ * Crée une sauvegarde et son contenu. **Le seul chemin de création.**
+ *
+ * `ecrireDocument` remplace un document existant ; celle-ci en pose un premier.
+ * Les deux vivent ici pour la même raison : le jour où une règle s'ajoute (un
+ * quota, une trace, un champ), il n'y a que deux endroits à toucher, et ils
+ * sont l'un sous l'autre.
+ */
+export async function creerDocument(
+  base: D1Database,
+  utilisateurId: string,
+  sauvegardeActiveCourante: string | null,
+  nom: string,
+  contenu: Contenu
+): Promise<Fiche> {
+  const id = crypto.randomUUID();
+  const le = maintenant();
+
+  await base.batch([
+    base
+      .prepare(
+        `INSERT INTO sauvegardes
+           (id, utilisateur_id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+      )
+      .bind(
+        id,
+        utilisateurId,
+        nom,
+        contenu.schema,
+        contenu.personnes,
+        contenu.relations,
+        contenu.octets,
+        le,
+        le
+      ),
+    base
+      .prepare('INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)')
+      .bind(id, contenu.texte),
+  ]);
+
+  // Première sauvegarde du compte : elle devient l'active, sinon les routes du
+  // domaine répondraient « aucune sauvegarde active » juste après une création.
+  if (!sauvegardeActiveCourante) await activer(base, utilisateurId, id);
+
+  return {
+    id,
+    nom,
+    schema_version: contenu.schema,
+    personnes: contenu.personnes,
+    relations: contenu.relations,
+    taille: contenu.octets,
+    revision: 1,
+    cree_le: le,
+    modifie_le: le,
+  };
+}
+
 /* --------------------------------------------------------------------------
  * La sauvegarde active
  * -------------------------------------------------------------------------- */

@@ -25,6 +25,10 @@ const GEO = {
   deportBarre: 20,
   echelleFocusMin: 0.62,
   margeSeparation: 8, // en deçà, deux fiches se repoussent
+  // Au-delà de cette longueur, la pastille d'un lien se répète au milieu :
+  // deux fiches assez écartées ne tiennent plus ensemble dans le regard.
+  pastilleMilieu: 260,
+  retraitPastille: 24,
 };
 
 const COULEURS_STATUT = { vivant: '#3fa877', mort: '#9a6a6a', inconnu: '#8a8f98' };
@@ -1102,6 +1106,84 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     const couleurFiliation = couleurType('parent', '#8a94a0');
     const couleurUnion = couleurType('conjoint', '#b9836f');
 
+    // Pastilles : dessinées après les traits pour passer par-dessus, mais avant
+    // les prises, qui doivent rester le dernier mot pour le survol et le clic.
+    const pastilles = [];
+
+    /**
+     * Pose l'emoji d'un lien près de chacune de ses deux extrémités, et une
+     * troisième fois au milieu quand le trait est long.
+     *
+     * Aux extrémités parce que c'est là qu'on regarde : en partant d'une fiche,
+     * on veut savoir ce que ce trait-là raconte sans le suivre des yeux. Au
+     * milieu en plus dès que les fiches s'écartent, sinon les deux pastilles
+     * sortent du champ de vision en même temps que les fiches.
+     */
+    const poserPastilles = (arete, debut, fin, milieu, longueur, attenue, ecart = null) => {
+      if (!arete.emoji) return;
+      const candidats = [debut, fin];
+      if (longueur > GEO.pastilleMilieu && milieu) candidats.push(milieu);
+
+      // Deux fiches côte à côte — un couple, une fratrie serrée — ramènent les
+      // deux extrémités au même endroit. Empiler deux fois le même emoji ne
+      // dit rien de plus et l'assombrit : on n'en garde qu'un.
+      const points = [];
+      for (const brut of candidats) {
+        if (!Number.isFinite(brut.x) || !Number.isFinite(brut.y)) continue;
+        // Deux personnes peuvent être liées deux fois — alliées *et* trahies.
+        // Les traits se confondent ; les pastilles, elles, doivent rester
+        // lisibles, d'où l'écart perpendiculaire par rang de parallèle.
+        const point = ecart ? { x: brut.x + ecart.x, y: brut.y + ecart.y } : brut;
+        const colle = points.some(
+          (deja) => Math.hypot(deja.x - point.x, deja.y - point.y) < GEO.retraitPastille
+        );
+        if (!colle) points.push(point);
+      }
+
+      const classes = `lien-pastille${attenue ? ' attenue' : ''}${
+        arete.revolu ? ' revolu' : ''
+      }`;
+      const texte = echapper(arete.emoji);
+      points.forEach((point) => {
+        pastilles.push(
+          `<circle class="lien-pastille-fond${attenue ? ' attenue' : ''}"
+                   cx="${point.x}" cy="${point.y}" r="9" />` +
+            `<text class="${classes}" x="${point.x}" y="${point.y}"
+                   text-anchor="middle" dominant-baseline="central">${texte}</text>`
+        );
+      });
+    };
+
+    /**
+     * Écart perpendiculaire d'un lien parmi ses parallèles.
+     *
+     * Le serveur numérote les liens qui relient la même paire
+     * (`parallele_rang` / `parallele_total`). Les traits, eux, se superposent —
+     * c'est ainsi depuis toujours et ça se lit très bien. Les pastilles, non :
+     * trois emojis au même pixel n'en montrent qu'un. On les range donc de part
+     * et d'autre du trait, centrés sur lui.
+     */
+    const ecartParallele = (arete, depart, arrivee) => {
+      const total = arete.parallele_total || 1;
+      if (total < 2) return null;
+      const rang = arete.parallele_rang || 0;
+      const pas = (rang - (total - 1) / 2) * 16;
+      const dx = arrivee.x - depart.x;
+      const dy = arrivee.y - depart.y;
+      const longueur = Math.hypot(dx, dy) || 1;
+      // Normale unitaire au segment.
+      return { x: (-dy / longueur) * pas, y: (dx / longueur) * pas };
+    };
+
+    /** Retrait le long d'un segment : la pastille se pose près du bout, pas dessus. */
+    const versLInterieur = (de, vers, distance) => {
+      const dx = vers.x - de.x;
+      const dy = vers.y - de.y;
+      const longueur = Math.hypot(dx, dy) || 1;
+      const pas = Math.min(distance, longueur / 3);
+      return { x: de.x + (dx / longueur) * pas, y: de.y + (dy / longueur) * pas };
+    };
+
     // --- descendance ------------------------------------------------------
     disposition.familles.forEach((famille) => {
       if (!typeVisible('parent')) return;
@@ -1181,6 +1263,16 @@ export function creerRenduCartes(conteneur, contexte = {}) {
           `M${parent.x + parent.l / 2},${parent.y + parent.h}V${barreParents} ` +
             `M${enfant.x + enfant.l / 2},${barreEnfants}V${enfant.y}`
         );
+        // Une filiation se dessine en tronc partagé : la seule géométrie qui
+        // appartienne vraiment à ce lien-là, ce sont ses deux pattes.
+        poserPastilles(
+          arete,
+          { x: parent.x + parent.l / 2, y: (parent.y + parent.h + barreParents) / 2 },
+          { x: enfant.x + enfant.l / 2, y: (barreEnfants + enfant.y) / 2 },
+          null,
+          0,
+          false
+        );
       });
     });
 
@@ -1198,6 +1290,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       morceaux.push(
         `<path class="lien-fratrie" d="${chemin}" stroke="${couleurFratrie}" />`
       );
+      poserPastilles(
+        arete,
+        { x: ca, y: (a.y + barre) / 2 },
+        { x: cb, y: (b.y + barre) / 2 },
+        { x: (ca + cb) / 2, y: barre },
+        Math.abs(cb - ca),
+        false
+      );
       prise(arete, chemin);
     });
 
@@ -1213,6 +1313,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       const xm = (gauche.x + gauche.l + droite.x) / 2;
       const chemin = `M${gauche.x + gauche.l},${y1}H${xm}V${y2}H${droite.x}`;
       morceaux.push(`<path class="lien-union" d="${chemin}" stroke="${couleurUnion}" />`);
+      poserPastilles(
+        union,
+        { x: Math.min(gauche.x + gauche.l + GEO.retraitPastille, xm), y: y1 },
+        { x: Math.max(droite.x - GEO.retraitPastille, xm), y: y2 },
+        { x: xm, y: (y1 + y2) / 2 },
+        droite.x - (gauche.x + gauche.l),
+        false
+      );
       prise(union, chemin);
     });
 
@@ -1236,6 +1344,15 @@ export function creerRenduCartes(conteneur, contexte = {}) {
                stroke-dasharray="${arete.revolu ? '1 6' : arete.style === 'pointille' ? '2 5' : '7 5'}"
                ${arete.dirige && !arete.revolu ? `marker-end="url(#fl-${arete.couleur.replace('#', '')})"` : ''} />`
       );
+      poserPastilles(
+        arete,
+        versLInterieur(depart, arrivee, GEO.retraitPastille),
+        versLInterieur(arrivee, depart, GEO.retraitPastille),
+        { x: (depart.x + arrivee.x) / 2, y: (depart.y + arrivee.y) / 2 },
+        Math.hypot(arrivee.x - depart.x, arrivee.y - depart.y),
+        attenue,
+        ecartParallele(arete, depart, arrivee)
+      );
       prise(arete, chemin);
     });
 
@@ -1249,7 +1366,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       )
       .join('');
 
-    coucheLiens.innerHTML = [...morceaux, ...prises].join('');
+    coucheLiens.innerHTML = [...morceaux, ...pastilles, ...prises].join('');
 
     coucheLiens.querySelectorAll('.lien-prise[data-relation]').forEach((element) => {
       const id = element.dataset.relation;

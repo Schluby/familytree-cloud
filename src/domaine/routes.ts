@@ -391,36 +391,71 @@ routesDomaine.get('/dataset', async (c) => {
 });
 
 /**
- * L'année courante de la campagne — la seule clé de `meta` que l'application
- * sache écrire.
+ * Les deux clés de `meta` que l'application sache écrire : l'année de la
+ * campagne, et l'adresse de son document.
  *
- * Elle est **volontairement du texte libre**, au même format que le champ
+ * L'année est **volontairement du texte libre**, au même format que le champ
  * « Naissance » d'une fiche (« 300 AC ») : Westeros ne compte pas les années
  * comme nous, et un `number` obligerait à trancher une convention que la table
  * n'a pas forcément adoptée. Ce qui compte, c'est qu'on puisse en extraire un
  * entier — c'est lui qui fait les âges, côté navigateur.
  *
- * Le reste de `meta` (titre, univers, document…) vient du fichier de
- * sauvegarde et ne s'édite pas ici : ce n'est pas un oubli.
+ * Le document est passé d'une constante du client à une donnée de la
+ * sauvegarde (lot 9.C). Tant que l'application était privée, une adresse en dur
+ * suffisait ; à partir du moment où n'importe qui peut ouvrir un monde, le
+ * bouton « 📜 » ne doit renvoyer que vers ce que *cette* table y a mis.
+ *
+ * Le reste de `meta` (titre, univers…) vient du fichier de sauvegarde et ne
+ * s'édite pas ici : ce n'est pas un oubli.
  */
 routesDomaine.patch('/meta', async (c) => {
   const courant = await monde(c);
   if (courant instanceof Response) return courant;
   const corps = await corpsDe(c);
 
-  if (!Object.hasOwn(corps, 'annee_courante')) {
-    return c.json({ erreur: 'rien à modifier : seule « annee_courante » est éditable' }, 400);
+  const donneAnnee = Object.hasOwn(corps, 'annee_courante');
+  const donneDocument = Object.hasOwn(corps, 'document');
+  if (!donneAnnee && !donneDocument) {
+    return c.json(
+      { erreur: 'rien à modifier : « annee_courante » et « document » sont les seules clés' },
+      400
+    );
   }
 
-  const brut = corps.annee_courante;
-  if (brut === null || brut === '') {
-    delete courant.dataset.meta.annee_courante;
-  } else {
-    const texte = String(brut).trim().slice(0, 40);
-    if (!/-?\d/.test(texte)) {
-      return c.json({ erreur: "l'année doit contenir un nombre (« 300 AC », « 1482 »…)" }, 400);
+  if (donneAnnee) {
+    const brut = corps.annee_courante;
+    if (brut === null || brut === '') {
+      delete courant.dataset.meta.annee_courante;
+    } else {
+      const texte = String(brut).trim().slice(0, 40);
+      if (!/-?\d/.test(texte)) {
+        return c.json({ erreur: "l'année doit contenir un nombre (« 300 AC », « 1482 »…)" }, 400);
+      }
+      courant.dataset.meta.annee_courante = texte;
     }
-    courant.dataset.meta.annee_courante = texte;
+  }
+
+  if (donneDocument) {
+    const brut = corps.document;
+    if (brut === null || brut === '') {
+      delete courant.dataset.meta.document;
+    } else {
+      // Cette valeur finit dans le `href` d'un lien. Sans ce filtre, un
+      // `javascript:…` rangé dans une sauvegarde s'exécuterait au clic — chez
+      // son auteur, mais aussi chez l'administrateur qui ouvre l'arbre par
+      // procuration. Seuls `http` et `https` passent.
+      const texte = String(brut).trim().slice(0, 2000);
+      let adresse: URL;
+      try {
+        adresse = new URL(texte);
+      } catch {
+        return c.json({ erreur: 'adresse illisible : il faut une URL complète' }, 400);
+      }
+      if (adresse.protocol !== 'http:' && adresse.protocol !== 'https:') {
+        return c.json({ erreur: 'seules les adresses http(s) sont acceptées' }, 400);
+      }
+      courant.dataset.meta.document = texte;
+    }
   }
 
   try {

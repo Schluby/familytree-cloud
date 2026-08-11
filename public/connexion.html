@@ -23,10 +23,6 @@
         <input id="email" type="email" required autocomplete="username" placeholder="vous@exemple.fr">
       </label>
 
-      <label id="ligneNom" class="cache">Nom affiché <span style="opacity:.7">(facultatif)</span>
-        <input id="nom" type="text" maxlength="80" autocomplete="nickname">
-      </label>
-
       <label>Mot de passe
         <input id="motDePasse" type="password" required minlength="8" autocomplete="current-password">
       </label>
@@ -44,12 +40,12 @@
 
     <!-- Dit avant de créer le compte, pas enfoui dans une page de mentions. -->
     <div id="mention" class="mention cache">
-      <strong>Ce qui est stocké :</strong> votre adresse, un nom d'affichage si
-      vous en mettez un, et vos arbres.
+      <strong>Ce qui est stocké :</strong> votre adresse et vos arbres. Rien
+      d'autre ne vous est demandé.
       <strong>Votre mot de passe n'est jamais transmis</strong> — votre
       navigateur en calcule une empreinte irréversible, et c'est elle qui part.
-      <strong>Les administrateurs du service peuvent consulter les arbres</strong>
-      créés sur cette instance. Vous pouvez
+      <strong>Les administrateurs du service peuvent consulter et modifier les
+      arbres</strong> créés sur cette instance. Vous pouvez
       <a href="/donnees.html">tout télécharger ou tout supprimer</a>, à tout
       moment.
     </div>
@@ -79,9 +75,9 @@
     </div>
 
     <p id="aideSecours" style="font-size:.88rem">
-      Le <strong>code de secours</strong> donné à l'inscription permet de
-      reprendre la main tout seul. Sans lui, il faut passer par un
-      administrateur.
+      Si vous avez demandé un <strong>code de secours</strong> depuis
+      <a href="/donnees.html">Vos données</a>, il permet de reprendre la main
+      tout seul. Sinon, il faut passer par un administrateur.
     </p>
     <form id="formulaireRecuperation">
       <label>Adresse de courriel

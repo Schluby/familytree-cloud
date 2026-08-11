@@ -14,6 +14,16 @@
          referme pas — on ne doit jamais oublier chez qui on écrit. -->
     <div class="bandeau-procuration" id="bandeau-procuration" hidden></div>
 
+    <!-- Essai sans compte. Discret tant qu'on regarde, insistant dès qu'on a
+         modifié quelque chose : c'est à ce moment-là qu'il y a quelque chose à
+         perdre, et c'est là qu'il faut le dire. -->
+    <div class="bandeau-essai" id="bandeau-essai" hidden>
+      <span class="bandeau-essai-texte" id="bandeau-essai-texte"></span>
+      <a class="bouton bouton-primaire bouton-plat" href="/connexion.html?creer=1">Créer un compte</a>
+      <button class="bouton bouton-icone bandeau-essai-fermer" id="bandeau-essai-fermer"
+              type="button" title="Masquer ce rappel">✕</button>
+    </div>
+
     <header class="barre-haut">
       <div class="marque">
         <span class="marque-icone">⚔</span>
@@ -50,6 +60,13 @@
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
         <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
         <span class="groupe-compte">
+          <!-- Essai sans compte : l'invitation vit là où on cherche son compte,
+               en haut à droite, et pas dans une fenêtre qui coupe le travail. -->
+          <span class="groupe-essai" id="groupe-essai" hidden>
+            <a class="bouton bouton-primaire" href="/connexion.html?creer=1"
+               title="Garder ce travail : votre adresse et un mot de passe, rien d'autre">Créer un compte</a>
+            <a class="bouton" href="/connexion.html">Se connecter</a>
+          </span>
           <span class="compte" id="compte" title="Compte connecté">…</span>
           <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden>⚙</a>
           <a class="bouton bouton-icone" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer">🛡</a>

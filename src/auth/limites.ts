@@ -12,6 +12,16 @@
 const SEUIL_CONNEXION = 5;
 const ATTENTE_MAXIMALE = 300; // 5 minutes
 const INSCRIPTIONS_PAR_HEURE = 3;
+/**
+ * Les visiteurs sans compte ont leur propre compteur, plus large.
+ *
+ * Il faut bien qu'il existe : chaque visiteur coûte une ligne et 90 Ko de
+ * sauvegarde de départ, et rien ne l'oblige à taper une adresse. Mais il ne
+ * peut pas être aussi serré qu'une inscription — derrière une seule adresse IP
+ * il y a parfois un foyer, un lycée ou une salle de jeu, et le troisième
+ * arrivant ne doit pas tomber sur une porte close.
+ */
+const INVITES_PAR_HEURE = 8;
 
 interface Tentative {
   echecs: number;
@@ -64,9 +74,26 @@ export async function inscriptionAutorisee(base: D1Database, ip: string): Promis
   return tentative.echecs < INSCRIPTIONS_PAR_HEURE;
 }
 
+/** Vrai si l'adresse a encore droit à un essai sans compte dans l'heure. */
+export async function inviteAutorise(base: D1Database, ip: string): Promise<boolean> {
+  const tentative = await lire(base, `invite:ip:${ip}`);
+  if (!tentative) return true;
+  const ecoule = Math.floor(Date.now() / 1000) - tentative.dernier_le;
+  if (ecoule >= 3600) return true;
+  return tentative.echecs < INVITES_PAR_HEURE;
+}
+
+export async function noterInvite(base: D1Database, ip: string): Promise<void> {
+  await compter(base, `invite:ip:${ip}`);
+}
+
 export async function noterInscription(base: D1Database, ip: string): Promise<void> {
+  await compter(base, `inscription:ip:${ip}`);
+}
+
+/** Un compteur horaire : il repart de 1 dès que la dernière heure est passée. */
+async function compter(base: D1Database, cle: string): Promise<void> {
   const maintenant = Math.floor(Date.now() / 1000);
-  const cle = `inscription:ip:${ip}`;
   const tentative = await lire(base, cle);
   const repart = !tentative || maintenant - tentative.dernier_le >= 3600;
 

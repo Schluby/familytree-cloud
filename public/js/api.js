@@ -35,14 +35,71 @@ function versConnexion() {
   location.replace(`/connexion.html?retour=${encodeURIComponent(retour)}`);
 }
 
-async function requete(chemin, options = {}) {
+/* --------------------------------------------------- l'essai sans compte
+ *
+ * Personne n'est renvoyé vers un formulaire pour *voir* l'outil : sans session,
+ * on en ouvre une d'essai et la page continue comme si de rien n'était (lot
+ * 9.C). Le serveur crée un compte de rôle `invite` avec la sauvegarde de
+ * départ ; tout le reste du client l'ignore.
+ *
+ * Trois endroits n'y ont pas droit, et pour la même raison — ce sont des pages
+ * *de compte*, où « vous n'êtes pas connecté » est la bonne réponse :
+ * la connexion elle-même, « Vos données », l'administration. La procuration non
+ * plus : elle n'a de sens que pour un administrateur déjà identifié.
+ */
+const PAGES_SANS_ESSAI = ['/connexion', '/donnees', '/admin'];
+
+/**
+ * Marqueur local : ce navigateur a déjà vu un vrai compte.
+ *
+ * Sans lui, la session expirée d'un membre le ferait retomber dans un essai
+ * tout neuf — il croirait avoir perdu son travail alors qu'il lui suffit de se
+ * reconnecter. Ce n'est pas une sécurité, c'est un aiguillage.
+ */
+const MEMOIRE_COMPTE = 'familytree-compte-connu';
+
+export function memoriserCompte(role) {
+  if (role && role !== 'invite') localStorage.setItem(MEMOIRE_COMPTE, '1');
+  else localStorage.removeItem(MEMOIRE_COMPTE);
+}
+
+function essaiPossible() {
+  if (ARBRE_VISE) return false;
+  if (localStorage.getItem(MEMOIRE_COMPTE)) return false;
+  return !PAGES_SANS_ESSAI.some((page) => location.pathname.startsWith(page));
+}
+
+// Une seule tentative en vol : au chargement, plusieurs appels partent
+// ensemble et prendraient 401 en même temps. Sans ce verrou, la page créerait
+// autant de comptes d'essai qu'elle a de requêtes.
+let essaiEnCours = null;
+
+function ouvrirEssai() {
+  if (!essaiEnCours) {
+    essaiEnCours = fetch('/api/auth/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((reponse) => (reponse.ok ? reponse.json() : null))
+      .catch(() => null);
+  }
+  return essaiEnCours;
+}
+
+async function requete(chemin, options = {}, reessai = true) {
   const reponse = await fetch(chemin, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  // La session a expiré, ou l'onglet a été rouvert des jours plus tard : la
-  // page ne peut rien afficher d'utile, on renvoie à la connexion.
   if (reponse.status === 401) {
+    // Pas de session, et rien qui dise que ce navigateur en a déjà eu une :
+    // on en ouvre une d'essai et on rejoue l'appel une fois.
+    if (reessai && essaiPossible()) {
+      const ouvert = await ouvrirEssai();
+      if (ouvert) return requete(chemin, options, false);
+    }
+    // La session a expiré, ou l'onglet a été rouvert des jours plus tard : la
+    // page ne peut rien afficher d'utile, on renvoie à la connexion.
     versConnexion();
     throw new Error('session expirée');
   }
@@ -52,6 +109,9 @@ async function requete(chemin, options = {}) {
     const message = (corps && corps.erreur) || `HTTP ${reponse.status}`;
     throw new Error(message);
   }
+  // Une écriture vient de réussir. C'est le seul endroit du client par lequel
+  // elles passent toutes — d'où le crochet ici plutôt que sur chaque geste.
+  if (options.method && options.method !== 'GET') Api.surEcriture?.();
   return corps;
 }
 
@@ -97,22 +157,29 @@ async function listerSauvegardes() {
 export const Api = {
   /** L'arbre d'un autre qu'on édite, ou `''` : c'est le sien. */
   procuration: ARBRE_VISE,
+  /**
+   * Appelé après **toute** écriture réussie. `main.js` s'en sert pour savoir
+   * qu'un visiteur sans compte a maintenant quelque chose à perdre.
+   */
+  surEcriture: null,
   sante: () => requete('/api/sante'),
   referentiels: () => requete(`${DOMAINE}/referentiels`),
 
   vues: () => requete(`${DOMAINE}/vues`),
   vue: (id, parametres) => requete(`${DOMAINE}/vue/${id}${versQuery(parametres)}`),
 
-  /** L'année courante de la campagne : la seule clé de `meta` qui s'écrit. */
-  majAnnee: (annee) =>
+  /** Les deux clés de `meta` qui s'écrivent : `annee_courante` et `document`. */
+  majMeta: (patch) =>
     requete(`${DOMAINE}/meta`, {
       method: 'PATCH',
-      body: JSON.stringify({ annee_courante: annee }),
+      body: JSON.stringify(patch),
     }),
 
   // ------------------------------------------------------------- le compte
   moi: () => requete('/api/auth/moi'),
   deconnexion: () => requete('/api/auth/deconnexion', { method: 'POST' }),
+  /** Fabrique un nouveau code de secours et l'affiche une seule fois. */
+  codeSecours: () => requete('/api/auth/code-secours', { method: 'POST' }),
 
   // -------------------------------------------------------- les sauvegardes
   sauvegardes: listerSauvegardes,

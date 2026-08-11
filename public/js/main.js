@@ -5,7 +5,7 @@
  * contrôles du rail sont générés à partir des paramètres déclarés par la vue.
  */
 
-import { Api } from './api.js';
+import { Api, memoriserCompte } from './api.js';
 import { obtenirRendu } from './registry.js';
 import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
@@ -87,6 +87,10 @@ const elements = {
   panneauVolet: document.getElementById('panneau'),
   aidePlafonds: document.getElementById('aide-plafonds'),
   bandeauProcuration: document.getElementById('bandeau-procuration'),
+  groupeEssai: document.getElementById('groupe-essai'),
+  bandeauEssai: document.getElementById('bandeau-essai'),
+  bandeauEssaiTexte: document.getElementById('bandeau-essai-texte'),
+  bandeauEssaiFermer: document.getElementById('bandeau-essai-fermer'),
 };
 
 /**
@@ -99,13 +103,8 @@ const elements = {
  */
 const PROCURATION = Api.procuration;
 
-// Le document de campagne : celui de Maxime par défaut, mais chaque sauvegarde
-// peut pointer ailleurs via `meta.document` — un autre univers, un autre doc.
 // Même palette que le moteur de rendu pour les générations.
 const COULEURS_GENERATION = ['#a8559f', '#8265c0', '#5b7fc4', '#2f97a8', '#2f9e78'];
-
-const DOCUMENT_PAR_DEFAUT =
-  'https://docs.google.com/document/d/1A_vnCVjB8EmC1uJHGS_SWfnewpjLfU5J/edit?usp=drivesdk&ouid=108401150327151060336&rtpof=true&sd=true';
 
 const etat = {
   vues: [],
@@ -134,6 +133,11 @@ const etat = {
   lienEnAttente: null,
   compte: null,
   plafonds: null,
+  // Essai sans compte (lot 9.C) : le rôle vaut `invite`, et `essaiModifie`
+  // passe à vrai à la première écriture — le moment où il y a quelque chose à
+  // perdre, donc le moment où l'invitation cesse d'être discrète.
+  invite: false,
+  essaiModifie: false,
   // Joueur en cours d'édition rapide : la liste de droite devient une
   // grille d'humeurs envers lui.
   joueurActif: null,
@@ -219,6 +223,7 @@ const editeurCategorieRapide = creerEditeurCategorie({
 // repartent du serveur, sinon on lirait des âges d'avant la bascule.
 const editeurAnnee = creerEditeurAnnee({
   annee: () => anneeCourante(),
+  document: () => etat.referentiels.meta?.document || '',
   surChangement: async (meta) => {
     etat.referentiels = { ...etat.referentiels, meta };
     dessinerAnnee();
@@ -372,7 +377,11 @@ async function chargerUnivers() {
   const meta = referentiels.meta || {};
   elements.univers.textContent = meta.sauvegarde || meta.titre || '';
   elements.univers.title = meta.titre || '';
-  elements.lienDocument.href = meta.document || DOCUMENT_PAR_DEFAUT;
+  // Le bouton n'existe que si *cette* sauvegarde nomme un document. Il pointait
+  // autrefois vers une adresse en dur, ce qui n'avait de sens que tant que
+  // l'application n'avait qu'un seul lecteur (lot 9.C).
+  elements.lienDocument.href = meta.document || '#';
+  elements.lienDocument.hidden = !meta.document;
   dessinerAnnee();
   remplirSelecteurCouleur();
 }
@@ -2052,7 +2061,7 @@ function infobulleLien(arete, evenement) {
 
   const titre = document.createElement('div');
   titre.className = 'ib-titre';
-  titre.textContent = arete.type_label;
+  titre.textContent = arete.emoji ? `${arete.emoji} ${arete.type_label}` : arete.type_label;
   titre.style.color = arete.couleur;
 
   const sous = document.createElement('div');
@@ -2221,6 +2230,17 @@ async function dessinerCompte() {
     return; // 401 : `Api` a déjà renvoyé vers la page de connexion.
   }
   const compte = etat.compte || {};
+  memoriserCompte(compte.role);
+
+  // Un visiteur sans compte : pas d'adresse à afficher, et se « déconnecter »
+  // ne voudrait rien dire — il n'y a rien où revenir.
+  etat.invite = compte.role === 'invite';
+  if (elements.groupeEssai) elements.groupeEssai.hidden = !etat.invite;
+  elements.compte.hidden = etat.invite;
+  elements.btnDeconnexion.hidden = etat.invite;
+  document.body.classList.toggle('en-essai', etat.invite);
+  if (etat.invite) dessinerBandeauEssai();
+
   elements.compte.textContent = compte.nom_affiche || compte.email || '';
   elements.compte.title =
     `${compte.email || ''}${compte.role === 'admin' ? ' · administrateur' : ''}`;
@@ -2229,6 +2249,48 @@ async function dessinerCompte() {
   // sert personne.
   if (elements.lienAdmin) elements.lienAdmin.hidden = compte.role !== 'admin';
 }
+
+/* ------------------------------------------------------- l'essai sans compte
+ *
+ * Le visiteur travaille dans un vrai monde, écrit en base comme tout le monde.
+ * Ce qui lui manque, c'est une adresse pour le retrouver — et c'est ce que le
+ * bandeau dit, une fois posément et une fois qu'il y a de quoi.
+ */
+
+const ESSAI_MASQUE = 'familytree-essai-masque';
+
+function dessinerBandeauEssai() {
+  if (!elements.bandeauEssai) return;
+  if (localStorage.getItem(ESSAI_MASQUE) && !etat.essaiModifie) {
+    elements.bandeauEssai.hidden = true;
+    return;
+  }
+  elements.bandeauEssai.hidden = false;
+  elements.bandeauEssai.classList.toggle('presse', etat.essaiModifie);
+  elements.bandeauEssaiTexte.textContent = etat.essaiModifie
+    ? 'Vos modifications sont enregistrées, mais rattachées à ce navigateur seulement. Un compte suffit à les garder — adresse et mot de passe, rien d’autre.'
+    : 'Essai sans compte : vous pouvez tout modifier. Créez un compte quand vous voudrez retrouver ce travail ailleurs.';
+}
+
+/**
+ * Première écriture d'un visiteur : là, il a quelque chose à perdre.
+ *
+ * On ne l'interrompt pas — pas de fenêtre à fermer au milieu d'un geste — mais
+ * le bandeau change de ton, et réapparaît même s'il l'avait masqué.
+ */
+function marquerEssaiModifie() {
+  if (!etat.invite || etat.essaiModifie) return;
+  etat.essaiModifie = true;
+  dessinerBandeauEssai();
+}
+
+Api.surEcriture = () => marquerEssaiModifie();
+
+elements.bandeauEssaiFermer?.addEventListener('click', () => {
+  localStorage.setItem(ESSAI_MASQUE, '1');
+  etat.essaiModifie = false;
+  elements.bandeauEssai.hidden = true;
+});
 
 async function seDeconnecter() {
   try {

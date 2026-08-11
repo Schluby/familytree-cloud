@@ -102,9 +102,17 @@ CLE_B="$(node outils/deriver.mjs "$EMAIL_B" "$MDP_B")"
 CLE_FAUSSE="$(node outils/deriver.mjs "$EMAIL_A" "mauvais-mot-de-passe")"
 
 echo "-- inscription"
-verifier "A s'inscrit" 201 "$(code "$BOCAL_A" POST /api/auth/inscription "{\"email\":\"$EMAIL_A\",\"cle\":\"$CLE_A\",\"nom_affiche\":\"Compte A\"}")"
+verifier "A s'inscrit" 201 "$(code "$BOCAL_A" POST /api/auth/inscription "{\"email\":\"$EMAIL_A\",\"cle\":\"$CLE_A\"}")"
+# Lot 9.D : l'inscription ne demande plus rien d'autre que l'adresse et le mot
+# de passe, et ne jette plus un code de secours au visage de quelqu'un qui vient
+# de choisir son mot de passe.
+verifier "  aucun code de secours n'est impose" non "$(contient '"code_secours"')"
+verifier "  et le compte part sans nom d'affichage" oui "$(contient '"nom_affiche":""')"
+# Il reste disponible, mais on vient le chercher — c'est tout le changement.
+verifier "un code de secours se demande" 200 "$(code "$BOCAL_A" POST /api/auth/code-secours)"
 CODE_SECOURS_A="$(lire code_secours)"
-verifier "un code de secours est renvoye" oui "$([ -n "$CODE_SECOURS_A" ] && echo oui || echo non)"
+verifier "  et il est bien renvoye" oui "$([ -n "$CODE_SECOURS_A" ] && echo oui || echo non)"
+verifier "  pas sans session" 401 "$(code - POST /api/auth/code-secours)"
 verifier "la meme adresse est refusee" 409 "$(code - POST /api/auth/inscription "{\"email\":\"$EMAIL_A\",\"cle\":\"$CLE_A\"}")"
 verifier "adresse invalide refusee" 400 "$(code - POST /api/auth/inscription "{\"email\":\"pas-une-adresse\",\"cle\":\"$CLE_A\"}")"
 verifier "cle mal formee refusee" 400 "$(code - POST /api/auth/inscription "{\"email\":\"x-$MARQUE@exemple.test\",\"cle\":\"trop-court\"}")"
@@ -132,7 +140,11 @@ verifier "le cookie de A donne toujours A" "$EMAIL_A" "$(lire compte.email)"
 
 echo "-- sauvegardes : creer, lire, renommer"
 verifier "A liste ses sauvegardes" 200 "$(code "$BOCAL_A" GET /api/sauvegardes)"
-verifier "  un compte neuf n'en a aucune" 0 "$(lire sauvegardes.length)"
+# Lot 9.B : un compte neuf n'ouvre plus sur une page blanche. Il recoit la
+# sauvegarde de depart, active d'emblee — c'etait « 0 » jusqu'au lot 8.
+verifier "  un compte neuf recoit un monde" 1 "$(lire sauvegardes.length)"
+verifier "  et c'est Westeros" Westeros "$(lire sauvegardes.0.nom)"
+verifier "  deja peuplee" 67 "$(lire sauvegardes.0.personnes)"
 verifier "  le plafond est annonce" 10 "$(lire plafonds.sauvegardes)"
 verifier "sans nom, refus" 400 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"   "}')"
 verifier "A cree une sauvegarde vierge" 201 "$(code "$BOCAL_A" POST /api/sauvegardes '{"nom":"Essai"}')"
@@ -207,7 +219,9 @@ verifier "B ne renomme pas la sauvegarde de A" 404 "$(code "$BOCAL_B" PATCH /api
 verifier "B ne copie pas la sauvegarde de A" 404 "$(code "$BOCAL_B" POST /api/sauvegardes "{\"nom\":\"vol\",\"depuis\":\"$ID_IMPORT\"}")"
 verifier "B ne supprime pas la sauvegarde de A" 404 "$(code "$BOCAL_B" DELETE /api/sauvegardes/$ID_IMPORT)"
 code "$BOCAL_B" GET /api/sauvegardes > /dev/null
-verifier "la liste de B reste vide" 0 "$(lire sauvegardes.length)"
+# B garde exactement ce qu'il avait : sa sauvegarde de depart, et rien de A.
+verifier "la liste de B n'a pas grossi" 1 "$(lire sauvegardes.length)"
+verifier "  et ne nomme pas celle de A" non "$(contient "$ID_IMPORT")"
 verifier "sans cookie, pas de liste" 401 "$(code - GET /api/sauvegardes)"
 code "$BOCAL_A" GET /api/sauvegardes/$ID_IMPORT > /dev/null
 verifier "et A n'a rien perdu au passage" 2 "$(lire sauvegarde.revision)"
@@ -224,9 +238,12 @@ verifier "une vue inconnue" 404 "$(code "$BOCAL_A" GET /api/vue/inexistante)"
 verifier "une personne inconnue" 404 "$(code "$BOCAL_A" GET /api/personnes/fantome)"
 verifier "sans cookie, pas de domaine" 401 "$(code - GET /api/personnes)"
 verifier "B n'active pas la sauvegarde de A" 404 "$(code "$BOCAL_B" POST /api/sauvegardes/$ID_IMPORT/activer)"
-verifier "B sans sauvegarde n'a pas de monde" 409 "$(code "$BOCAL_B" GET /api/personnes)"
 verifier "B se cree un monde a lui" 201 "$(code "$BOCAL_B" POST /api/sauvegardes '{"nom":"Le monde de B"}')"
-verifier "  qui est vide, pas celui de A" 200 "$(code "$BOCAL_B" GET /api/personnes)"
+ID_MONDE_B="$(lire sauvegarde.id)"
+verifier "  il l'active" 200 "$(code "$BOCAL_B" POST /api/sauvegardes/$ID_MONDE_B/activer)"
+verifier "  et le domaine repond" 200 "$(code "$BOCAL_B" GET /api/personnes)"
+# Une sauvegarde creee de zero reste vierge : la sauvegarde de depart est
+# offerte a l'inscription, elle n'est pas recopiee dans chaque nouveau monde.
 verifier "  aucune fiche heritee" 0 "$(lire personnes.length)"
 verifier "B cree une fiche chez lui" 201 "$(code "$BOCAL_B" POST /api/personnes '{"prenom":"Test","nom":"Chez B"}')"
 code "$BOCAL_A" GET /api/personnes > /dev/null
@@ -545,6 +562,109 @@ verifier "un lien sans jeton" 400 "$(code - GET /api/auth/reinitialisation)"
 verifier "un jeton invente" 410 "$(code - GET /api/auth/reinitialisation?jeton=jamais-emis)"
 verifier "  et il ne change aucun mot de passe" 410 "$(code - POST /api/auth/nouveau-mot-de-passe "{\"jeton\":\"jamais-emis\",\"nouvelle_cle\":\"$CLE_B\"}")"
 verifier "une demande incomplete" 400 "$(code - POST /api/auth/nouveau-mot-de-passe '{"jeton":"x"}')"
+
+# ---------------------------------------------------------------------------
+# Lot 9.A : la pastille d'un lien
+#
+# Un champ de plus sur une relation. Ce qui merite d'etre verifie, ce n'est pas
+# qu'il se stocke — c'est qu'il ne se stocke QUE s'il porte quelque chose, sinon
+# un document qui ne s'en sert pas grossirait a chaque aller-retour.
+# ---------------------------------------------------------------------------
+
+# Le signe dollar plutot qu'un emoji : le champ accepte n'importe quel texte
+# court, et un litteral ASCII traverse les shells Windows sans se faire
+# reencoder en chemin. Les vrais emojis sont verifies sur la sauvegarde de
+# depart, plus bas, ou ils sont deja en base.
+echo "-- pastilles de lien (9.A)"
+verifier "un lien prend une pastille" 200 "$(code "$BOCAL_B" PATCH /api/relations/$ID_LIEN '{"emoji":"$"}')"
+verifier "  et la rend" oui "$(contient '"emoji":"$"')"
+verifier "une pastille trop longue est rognee" 200 "$(code "$BOCAL_B" PATCH /api/relations/$ID_LIEN '{"emoji":"123456789012345678901234567890"}')"
+verifier "  a huit points de code" oui "$(contient '"emoji":"12345678"')"
+code "$BOCAL_B" GET /api/vue/sociogramme > /dev/null
+verifier "la vue la descend au moteur de rendu" oui "$(contient '"emoji":"12345678"')"
+code "$BOCAL_B" GET /api/export/csv?table=relations > /dev/null
+verifier "l'export la nomme" oui "$(contient 'Pastille')"
+verifier "une pastille vide s'efface" 200 "$(code "$BOCAL_B" PATCH /api/relations/$ID_LIEN '{"emoji":""}')"
+verifier "  et ne laisse pas de champ derriere" non "$(contient '"emoji"')"
+
+# ---------------------------------------------------------------------------
+# Lot 9.C : l'essai sans compte
+#
+# Un visiteur recoit un vrai compte, de role `invite`, avec la sauvegarde de
+# depart. Les deux choses a prouver : il ne peut rien faire d'un administrateur,
+# et son travail lui reste quand il s'inscrit.
+# ---------------------------------------------------------------------------
+
+echo "-- essai sans compte (9.C)"
+BOCAL_I="$DOSSIER/invite.txt"
+verifier "un visiteur ouvre un essai" 201 "$(code "$BOCAL_I" POST /api/auth/invite)"
+verifier "  son role le dit" invite "$(lire compte.role)"
+verifier "  et il n'a aucune adresse" "" "$(lire compte.email)"
+verifier "le meme cookie ne refabrique rien" 200 "$(code "$BOCAL_I" POST /api/auth/invite)"
+ID_INVITE="$(lire compte.id)"
+code "$BOCAL_I" GET /api/sauvegardes > /dev/null
+verifier "il arrive dans un monde deja peuple" 1 "$(lire sauvegardes.length)"
+verifier "  et c'est Westeros" Westeros "$(lire sauvegardes.0.nom)"
+SAUVEGARDE_INVITE="$(lire sauvegardes.0.id)"
+
+# La sauvegarde de depart, c'est la demonstration : si elle perd ses maisons ou
+# ses evenements, plus personne ne voit ce que l'outil sait faire.
+code "$BOCAL_I" GET /api/referentiels > /dev/null
+verifier "  avec l'annee de campagne" oui "$(contient '"annee_courante"')"
+verifier "  et sans document de personne" non "$(contient 'docs.google.com')"
+verifier "  le type « evenement passe » est la" oui "$(contient '"historique"')"
+code "$BOCAL_I" GET /api/vue/maisons > /dev/null
+verifier "  les maisons ont leurs caracteristiques" oui "$(contient '"richesse"')"
+code "$BOCAL_I" GET /api/vue/sociogramme > /dev/null
+verifier "  des liens portent une pastille" oui "$(contient '"emoji"')"
+verifier "  et d'autres sont revolus" oui "$(contient '"revolu":true')"
+verifier "  des rangs de maison sont poses" oui "$(contient 'chef de maison')"
+
+verifier "un invite edite son monde" 200 "$(code "$BOCAL_I" PATCH /api/meta '{"annee_courante":"305 AC"}')"
+
+# Le cas « plus aucune sauvegarde » n'arrive plus a l'inscription, mais il reste
+# atteignable : il suffit de tout supprimer. L'interface a une branche pour lui
+# (`demarrer()` dans public/js/main.js), donc il doit rester verifie — sur un
+# essai jetable, pour ne rien casser des comptes suivants.
+BOCAL_VIDE="$DOSSIER/vide.txt"
+code "$BOCAL_VIDE" POST /api/auth/invite > /dev/null
+code "$BOCAL_VIDE" GET /api/sauvegardes > /dev/null
+verifier "un essai supprime sa seule sauvegarde" 204 "$(code "$BOCAL_VIDE" DELETE /api/sauvegardes/$(lire sauvegardes.0.id))"
+verifier "  et le domaine dit qu'il n'y a plus de monde" 409 "$(code "$BOCAL_VIDE" GET /api/personnes)"
+verifier "un invite n'est pas administrateur" 403 "$(code "$BOCAL_I" GET /api/admin/utilisateurs)"
+verifier "  ni par la porte d'edition" 403 "$(code "$BOCAL_I" GET /api/admin/arbres/$SAUVEGARDE_INVITE/referentiels)"
+verifier "il n'a pas de code de secours a demander" 409 "$(code "$BOCAL_I" POST /api/auth/code-secours)"
+
+echo "-- l'essai devient un compte (9.C)"
+EMAIL_I="essai-i-$MARQUE@exemple.test"
+CLE_I="$(node outils/deriver.mjs "$EMAIL_I" "mot-de-passe-I-2026")"
+verifier "il s'inscrit depuis son essai" 201 "$(code "$BOCAL_I" POST /api/auth/inscription "{\"email\":\"$EMAIL_I\",\"cle\":\"$CLE_I\"}")"
+verifier "  c'est une reprise, pas un compte neuf" true "$(lire reprise)"
+verifier "  le meme identifiant qu'avant" "$ID_INVITE" "$(lire compte.id)"
+verifier "  et il n'est plus invite" membre "$(lire compte.role)"
+code "$BOCAL_I" GET /api/sauvegardes > /dev/null
+verifier "son monde l'a suivi" "$SAUVEGARDE_INVITE" "$(lire sauvegardes.0.id)"
+code "$BOCAL_I" GET /api/referentiels > /dev/null
+verifier "  avec ce qu'il y avait change" oui "$(contient '"annee_courante":"305 AC"')"
+verifier "maintenant il peut demander un code" 200 "$(code "$BOCAL_I" POST /api/auth/code-secours)"
+
+# ---------------------------------------------------------------------------
+# Lot 9.C : le document de campagne appartient a la sauvegarde
+#
+# Il etait en dur dans le client. A partir du moment ou n'importe qui ouvre un
+# monde, ce bouton ne doit renvoyer que vers ce que cette table y a mis — et
+# surtout pas executer ce qu'on y aurait glisse.
+# ---------------------------------------------------------------------------
+
+echo "-- document de campagne (9.C)"
+verifier "une adresse https est acceptee" 200 "$(code "$BOCAL_B" PATCH /api/meta '{"document":"https://exemple.test/campagne"}')"
+verifier "  et relue" oui "$(contient 'https://exemple.test/campagne')"
+verifier "un javascript: est refuse" 400 "$(code "$BOCAL_B" PATCH /api/meta '{"document":"javascript:alert(1)"}')"
+verifier "  un data: aussi" 400 "$(code "$BOCAL_B" PATCH /api/meta '{"document":"data:text/html,<script>"}')"
+verifier "  une adresse incomplete aussi" 400 "$(code "$BOCAL_B" PATCH /api/meta '{"document":"pas une adresse"}')"
+verifier "un patch vide ne passe pas" 400 "$(code "$BOCAL_B" PATCH /api/meta '{"titre":"tentative"}')"
+verifier "le document s'efface" 200 "$(code "$BOCAL_B" PATCH /api/meta '{"document":""}')"
+verifier "  et ne laisse rien" non "$(contient '"document"')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

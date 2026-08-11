@@ -33,10 +33,12 @@ import { squelette } from './squelette';
 import {
   activer,
   CHAMPS_FICHE,
+  creerDocument,
   ecrireDocument,
   ErreurPlafond,
   ficheDe,
   maintenant,
+  type Contenu,
   type Fiche,
 } from './depot';
 
@@ -149,52 +151,9 @@ async function verifierNombre(c: Contexte): Promise<Response | null> {
 }
 
 /** Écrit une sauvegarde neuve (création, copie ou import) et rend sa fiche. */
-async function creerSauvegarde(
-  c: Contexte,
-  nom: string,
-  contenu: { texte: string; octets: number; personnes: number; relations: number; schema: number }
-): Promise<Fiche> {
+async function creerSauvegarde(c: Contexte, nom: string, contenu: Contenu): Promise<Fiche> {
   const compte = c.get('compte');
-  const id = crypto.randomUUID();
-  const le = maintenant();
-
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO sauvegardes
-         (id, utilisateur_id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
-    ).bind(
-      id,
-      compte.id,
-      nom,
-      contenu.schema,
-      contenu.personnes,
-      contenu.relations,
-      contenu.octets,
-      le,
-      le
-    ),
-    c.env.DB.prepare('INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)').bind(
-      id,
-      contenu.texte
-    ),
-  ]);
-
-  // Première sauvegarde du compte : elle devient l'active, sinon les routes du
-  // domaine répondraient « aucune sauvegarde active » juste après une création.
-  if (!compte.sauvegarde_active) await activer(c.env.DB, compte.id, id);
-
-  return {
-    id,
-    nom,
-    schema_version: contenu.schema,
-    personnes: contenu.personnes,
-    relations: contenu.relations,
-    taille: contenu.octets,
-    revision: 1,
-    cree_le: le,
-    modifie_le: le,
-  };
+  return creerDocument(c.env.DB, compte.id, compte.sauvegarde_active, nom, contenu);
 }
 
 /* --------------------------------------------------------------------------

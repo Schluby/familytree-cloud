@@ -257,10 +257,26 @@ const ATTENDUES = [
     prefixes: ['categories'],
     raison: 'lot 8.D : catégorie de liens « historique »',
   },
+  {
+    chemin: '/api/vue/sociogramme',
+    // Les champs ajoutés à chaque arête : `revolu`, `depuis`, `jusqu_a` et
+    // `lieu` au lot 8.D, `emoji` au lot 9.A. Ils partent toujours, même vides —
+    // le moteur de rendu les lit sans se demander s'ils existent. Le document
+    // stocké, lui, ne les écrit que s'ils portent quelque chose : c'est là que
+    // se joue la compatibilité avec la version locale, pas ici.
+    prefixes: ['aretes'],
+    raison: 'lots 8.D et 9.A : champs de lien (révolu, dates, lieu, pastille)',
+  },
 ];
 
+/**
+ * La règle se cherche sur le **chemin seul**, sans la requête : la vue
+ * sociogramme est comparée sous une dizaine de réglages, et ils partagent tous
+ * le même écart.
+ */
 function attendue(chemin, ecarts) {
-  const regle = ATTENDUES.find((r) => r.chemin === chemin);
+  const sansRequete = chemin.split('?')[0];
+  const regle = ATTENDUES.find((r) => r.chemin === sansRequete);
   if (!regle) return null;
   const dehors = ecarts.filter((e) => !regle.prefixes.some((p) => e.chemin.startsWith(p)));
   return dehors.length ? null : regle;
