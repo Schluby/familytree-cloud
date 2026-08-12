@@ -685,3 +685,78 @@ garde l'identifiant **et** ce qui avait été modifié avant l'inscription, et u
 projet. Elles disaient qu'un compte neuf n'a aucune sauvegarde ; c'est devenu
 faux exprès. Le cas « plus aucun monde » (409) reste vérifié, sur un essai
 jetable qui supprime la sienne.
+
+---
+
+# Lot 10.A — les lots d'administration (12/08/2026)
+
+Le lot 8.F a donné à l'administrateur le droit d'écrire dans l'arbre de
+quelqu'un d'autre — **un** arbre, à la main. Depuis le lot 9, tout le monde part
+du même monde : une table qui joue à six a six arbres qui se ressemblent, et le
+meneur de jeu doit pouvoir y poser la même maison, la même date, le même lien
+sans les rouvrir un par un. Ce lot fait passer la procuration à l'échelle.
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 10.A.1 | Sélection multiple de comptes, résolue en sauvegardes (`toutes` ou l'active). | `src/admin/lots.ts` |
+| 10.A.2 | Sept opérations posables en lot, toutes idempotentes. | `src/admin/lots.ts` |
+| 10.A.3 | Panorama : ce que les comptes ont en commun, ce qui diverge. | `panorama()`, `POST /lots/panorama` |
+| 10.A.4 | Cases à cocher, formulaires, aperçu obligatoire, application. | `admin.html`, `js/admin.js` |
+| 10.A.5 | Validation de `meta` factorisée, partagée par le domaine et les lots. | `src/domaine/meta.ts` |
+
+**Aucune migration.** Rien de neuf en base : un lot n'est qu'une suite
+d'écritures ordinaires.
+
+## Les quatre décisions qui méritent d'être relues
+
+**L'aperçu et l'application sont deux adresses, pas un booléen.**
+`POST /api/admin/lots/apercu` ne sait pas écrire ; `POST .../appliquer` est la
+seule route de la famille qui touche aux données. Un client qui oublie un drapeau
+`simulation: true` écrirait chez cinquante personnes en croyant regarder ; un
+client qui se trompe de chemin lit. C'est la même logique que `lectureSeule`,
+posée sur le chemin plutôt que sur chaque route.
+
+**L'identifiant est calculé une fois pour tout le lot.** Les routes du domaine
+appellent `idsLibres()`, qui suffixe en cas de collision — parfait pour une
+création à l'unité, désastreux pour un lot : « Tully » posée deux fois donnerait
+`tully` chez les uns et `tully-2` chez les autres. Ici l'identifiant vient du nom,
+une seule fois, et une clé déjà présente est **mise à jour**. C'est ce qui rend un
+lot rejouable, donc rattrapable.
+
+**Un refus n'arrête pas le lot.** Un compte au plafond, une fiche absente, une
+couleur illisible : on note et on continue. Le rapport dit ensuite, ligne par
+ligne, qui est passé et qui ne l'est pas. Un lot tout-ou-rien aurait obligé à
+retirer les comptes gênants un par un pour servir les autres.
+
+**Le plafond appliqué est celui du propriétaire.** Comme dans la procuration :
+un administrateur ne peut rien faire qu'un utilisateur ne pourrait faire
+lui-même. Un compte serré refuse le lot, les autres passent.
+
+## Ce qui manque, et c'est dit
+
+L'opération `filtre` existe côté serveur (elle sert au panorama et à l'API) mais
+**n'a pas de formulaire** : construire un filtre demande une variable, des
+segments, un dégradé et des tests — c'est un second constructeur de filtres, pas
+un champ de plus. Les six autres opérations ont leur formulaire.
+
+## Une correction au passage
+
+Le bandeau d'`admin.html` annonçait encore « **Lecture seule** […] vous ne pouvez
+pas les modifier — l'API le refuse ». Faux depuis le 8.F. La page `donnees.html`
+avait été corrigée au lot 9 ; celle-ci était restée. Et le journal affichait
+`edition` en brut, faute d'un libellé.
+
+## Vérification
+
+**320/320** au harnais, contre 274 à la fin du lot 9. Les 46 vérifications
+neuves couvrent : les trois routes fermées aux membres et sans session,
+l'aperçu qui **n'écrit rien** (relu chez les deux comptes après coup), le même
+lot rejoué qui ne crée aucun doublon, un `javascript:` refusé en lot comme à
+l'unité, deux refus qui n'empêchent pas le reste, une ligne de journal par
+sauvegarde touchée, et le panorama qui sépare le commun du divergent.
+
+Vérifié aussi dans le navigateur, sur la vraie page : sélection de deux comptes
+(3 sauvegardes), aperçu, modification d'un champ qui **rééteint** « Appliquer »,
+nouvel aperçu, application. Les trois sauvegardes portent la maison avec sa
+devise, sa couleur et ses caractéristiques ; le journal porte exactement trois
+lignes `edition`, deux pour le compte à deux arbres et une pour l'autre.

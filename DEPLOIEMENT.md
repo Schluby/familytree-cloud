@@ -228,6 +228,45 @@ journal, et un bandeau rappelle en permanence chez qui l'on écrit.
 
 Fait le **11/08/2026** pour `maxschlub@gmail.com`.
 
+## Les lots : agir sur plusieurs comptes à la fois (lot 10.A)
+
+La page d'administration porte, sous la liste des comptes, une **case à cocher
+par ligne**. Dès qu'un compte est coché, deux cartes apparaissent : « Agir sur la
+sélection » et « Comment ils ont structuré leurs vues ».
+
+**La marche à suivre, et elle n'a pas de raccourci :**
+
+1. Cocher les comptes. Le compteur annonce combien de **sauvegardes** seraient
+   touchées — pas combien de comptes : c'est le nombre d'écritures réelles.
+2. Choisir la portée : *toutes les sauvegardes du compte*, ou *seulement celle
+   qu'il a ouverte*. Par défaut, toutes.
+3. Choisir quoi poser : informations générales (date de campagne, lien de
+   campagne), une maison avec ses sept caractéristiques, une fiche, un lien, un
+   type de lien, une catégorie.
+4. **Aperçu.** Rien n'est écrit. Le tableau dit, sauvegarde par sauvegarde, ce
+   qui serait créé, mis à jour, déjà en place ou refusé — avec la raison.
+5. **Appliquer**, après une confirmation qui rappelle qu'il n'y a pas de retour.
+
+Trois propriétés à connaître avant de s'en servir :
+
+- **Un lot est rejouable.** L'identifiant est calculé à partir du nom, une fois
+  pour tout le lot : le repasser met à jour au lieu de créer un doublon. C'est ce
+  qui permet de corriger un lot mal réglé en le rejouant avec les bonnes valeurs.
+- **Un refus n'arrête pas le reste.** Un compte au plafond ou une fiche absente
+  fait échouer *sa* sauvegarde, pas le lot. Le tableau le dit.
+- **Chaque sauvegarde écrite laisse sa ligne au journal.** Un lot de trente
+  arbres y laisse trente traces. Le journal ne s'efface pas.
+
+Le bouton « Relever la sélection » répond à la question qui précède tout lot de
+groupe : **qu'est-ce que ces comptes ont en commun ?** Les étiquettes vertes sont
+partagées par tous les comptes cochés ; les grises n'appartiennent qu'à certains,
+avec le nombre de comptes concernés. Poser un lot sur ce qui est commun est sûr ;
+sur ce qui diverge, on écrase quelque chose chez quelqu'un.
+
+Un lot est plafonné à **100 sauvegardes** et **200 comptes** par requête. Au-delà,
+la réponse est un refus explicite : c'est la limite de ce qu'un Worker peut mener
+à bien sans être coupé en plein milieu — donc appliqué à moitié.
+
 ## Les visiteurs sans compte (lot 9)
 
 Depuis le lot 9, **ouvrir la page suffit** : sans session, le serveur crée un

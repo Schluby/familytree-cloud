@@ -667,6 +667,104 @@ verifier "le document s'efface" 200 "$(code "$BOCAL_B" PATCH /api/meta '{"docume
 verifier "  et ne laisse rien" non "$(contient '"document"')"
 
 # ---------------------------------------------------------------------------
+# Lot 10.A : les lots — le meme geste sur les arbres de plusieurs comptes
+#
+# A redevient administrateur pour cette section : il avait ete retrograde a la
+# fin du 8.F, expres. Les cibles sont B et I, deux comptes qui n'ont rien en
+# commun sinon d'exister — c'est justement ce qu'un lot doit savoir mener.
+# ---------------------------------------------------------------------------
+
+echo "-- les lots sont fermes comme le reste (10.A)"
+verifier "sans session, l'apercu est refuse" 401 "$(code - POST /api/admin/lots/apercu '{}')"
+verifier "un membre est refuse" 403 "$(code "$BOCAL_B" POST /api/admin/lots/apercu '{}')"
+verifier "  sur l'application aussi" 403 "$(code "$BOCAL_B" POST /api/admin/lots/appliquer '{}')"
+verifier "  et sur le panorama" 403 "$(code "$BOCAL_B" POST /api/admin/lots/panorama '{}')"
+
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+verifier "A redevient administrateur" 200 "$(code "$BOCAL_A" GET /api/admin/utilisateurs)"
+# Les formulaires de lot se construisent a partir des catalogues du domaine.
+# Ils ne doivent PAS passer par /api/referentiels, qui exige une sauvegarde
+# active : un administrateur sans monde a lui perdrait ses formulaires.
+verifier "les catalogues repondent" 200 "$(code "$BOCAL_A" GET /api/admin/catalogues)"
+verifier "  avec les sept caracteristiques" oui "$(contient 'caracteristiques_maison')"
+
+echo "-- ce qu'un lot refuse d'emblee"
+verifier "sans compte selectionne" 400 "$(code "$BOCAL_A" POST /api/admin/lots/apercu '{"comptes":[],"operation":{"type":"meta"}}')"
+verifier "operation inconnue" 400 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "{\"comptes\":[\"$ID_COMPTE_B\"],\"operation\":{\"type\":\"pillage\"}}")"
+verifier "compte sans la moindre sauvegarde" 404 "$(code "$BOCAL_A" POST /api/admin/lots/apercu '{"comptes":["inexistant"],"operation":{"type":"meta","annee_courante":"1 AC"}}')"
+TROP="$(node -e "process.stdout.write(JSON.stringify({comptes:Array.from({length:201},(_,i)=>'c'+i),operation:{type:'meta',annee_courante:'1 AC'}}))")"
+verifier "selection trop large" 400 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "$TROP")"
+
+echo "-- l'apercu ne touche a rien"
+CIBLES="\"$ID_COMPTE_B\",\"$ID_INVITE\""
+LOT_MAISON="{\"comptes\":[$CIBLES],\"portee\":\"active\",\"operation\":{\"type\":\"maison\",\"label\":\"Maison du lot\",\"devise\":\"Posee par lot\",\"caracteristiques\":{\"richesse\":400,\"defense\":30}}}"
+verifier "l'apercu repond" 200 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "$LOT_MAISON")"
+verifier "  il se dit simulation" oui "$(contient '"simulation":true')"
+verifier "  et annonce deux creations" 2 "$(lire resume.creees)"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  mais rien n'est entre chez B" non "$(contient 'Maison du lot')"
+code "$BOCAL_I" GET /api/referentiels > /dev/null
+verifier "  ni chez I" non "$(contient 'Maison du lot')"
+
+echo "-- l'application, elle, ecrit"
+verifier "le lot passe" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_MAISON")"
+verifier "  deux sauvegardes servies" 2 "$(lire resume.creees)"
+verifier "  et aucun refus" 0 "$(lire resume.refusees)"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "B a la maison sans avoir rien fait" oui "$(contient 'Maison du lot')"
+verifier "  les bornes tiennent (400 -> 100)" oui "$(contient '"richesse":100')"
+code "$BOCAL_I" GET /api/referentiels > /dev/null
+verifier "I aussi" oui "$(contient 'Maison du lot')"
+
+echo "-- rejouer un lot ne duplique rien"
+verifier "le meme lot repasse" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_MAISON")"
+verifier "  plus rien a creer" 0 "$(lire resume.creees)"
+verifier "  tout est deja en place" 2 "$(lire resume.inchangees)"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  et aucun doublon n'est apparu" non "$(contient 'maison-du-lot-2')"
+
+echo "-- les informations generales, en lot"
+LOT_META="{\"comptes\":[$CIBLES],\"portee\":\"toutes\",\"operation\":{\"type\":\"meta\",\"annee_courante\":\"999 AC\",\"document\":\"https://exemple.test/lot\"}}"
+verifier "la date et le lien partent ensemble" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_META")"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  B porte la nouvelle date" oui "$(contient '"annee_courante":"999 AC"')"
+verifier "  et le lien de campagne" oui "$(contient 'https://exemple.test/lot')"
+code "$BOCAL_I" GET /api/referentiels > /dev/null
+verifier "  I aussi" oui "$(contient '"annee_courante":"999 AC"')"
+# La validation est la meme des deux cotes : elle vit dans src/domaine/meta.ts,
+# et le lot ne la contourne pas.
+LOT_SALE="{\"comptes\":[$CIBLES],\"operation\":{\"type\":\"meta\",\"document\":\"javascript:alert(1)\"}}"
+verifier "un javascript: est refuse en lot aussi" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_SALE")"
+verifier "  ecrit nulle part" 0 "$(lire resume.mises_a_jour)"
+code "$BOCAL_B" GET /api/referentiels > /dev/null
+verifier "  et B garde son lien honnete" oui "$(contient 'https://exemple.test/lot')"
+
+echo "-- un refus n'arrete pas le lot"
+LOT_LIEN="{\"comptes\":[$CIBLES],\"portee\":\"active\",\"operation\":{\"type\":\"relation\",\"source\":\"fantome-absolu\",\"cible\":\"autre-fantome\",\"type_lien\":\"autre\"}}"
+verifier "un lien vers des fiches absentes" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_LIEN")"
+verifier "  chaque sauvegarde le dit" 2 "$(lire resume.refusees)"
+verifier "  et rien n'a ete cree" 0 "$(lire resume.creees)"
+verifier "  avec la raison en clair" oui "$(contient 'fantome-absolu')"
+
+echo "-- le journal porte les ecritures du lot"
+code "$BOCAL_A" GET /api/admin/journal > /dev/null
+verifier "l'edition y figure" oui "$(contient '"action":"edition"')"
+# I n'avait jamais ete touche par A avant ce lot : son adresse ne peut venir
+# que de la.
+verifier "  et le compte I y apparait" oui "$(contient "$EMAIL_I")"
+
+echo "-- comment ils ont structure leurs vues"
+verifier "le panorama repond" 200 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES]}")"
+verifier "  un compte par ligne" 2 "$(lire comptes.length)"
+verifier "  il separe le commun" oui "$(contient '"commun"')"
+verifier "  et ce qui diverge" oui "$(contient '"divergent"')"
+verifier "  la maison posee partout y figure" oui "$(contient 'Maison du lot')"
+
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
+verifier "A redevient membre, les lots se referment" 403 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "$LOT_MAISON")"
+verifier "  et le panorama aussi" 403 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES]}")"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

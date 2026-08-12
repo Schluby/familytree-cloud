@@ -6,7 +6,7 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 et 9** — deux tranches qui
+**Les sept lots du plan sont livrés, puis les lots 8, 9 et 10.A** — des tranches qui
 n'étaient pas au plan d'origine, demandées les 10 et 11/08/2026. En ligne sur
 https://familytree.schlub-perso.workers.dev.
 
@@ -40,6 +40,28 @@ Le lot 9, en une phrase par morceau :
   « Vos données », quand on sait à quoi il sert.
 - **9.E — connexion Google.** **Évaluée, pas faite** : bloquée sur un projet
   Google Cloud et des identifiants à créer. Voir « Et après ? ».
+
+Le lot 10.A, ajouté le 12/08/2026, **fait passer la procuration à l'échelle** :
+l'administrateur agit désormais sur une **sélection de comptes**, pas sur un
+arbre à la fois. Quatre choses à retenir :
+
+- **Deux adresses, une seule qui écrit.** `POST /api/admin/lots/apercu` ne sait
+  pas écrire ; `POST /api/admin/lots/appliquer` est la seule de la famille qui
+  touche aux données. Ce n'est **pas** un drapeau `simulation` qu'on pourrait
+  oublier — c'est le chemin qui décide, comme pour `lectureSeule`.
+- **Un lot est idempotent.** L'identifiant est calculé une fois pour tout le lot,
+  à partir du nom : une clé déjà présente est mise à jour, pas dupliquée. On peut
+  rejouer un lot sans fabriquer de `tully-2`.
+- **Un refus n'arrête rien.** Chaque sauvegarde est traitée pour elle-même ; le
+  rapport dit ligne par ligne qui est passé. Le plafond appliqué est **celui du
+  propriétaire**, jamais celui de l'administrateur.
+- **Une ligne de journal par sauvegarde écrite.** Un lot de trente arbres laisse
+  trente traces, pas une.
+
+Le panorama (`POST /api/admin/lots/panorama`) répond à la question qui précède
+tout lot de groupe : **qu'est-ce que ces comptes ont en commun ?** Ce qui est
+partagé par tous supporte un lot ; ce qui n'est qu'à certains serait écrasé sans
+le dire.
 
 Le lot 8, en une phrase par morceau :
 
@@ -159,10 +181,22 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
 - **`semerDepart` ne vérifie aucun plafond**, exprès : c'est nous qui offrons la
   sauvegarde, pas l'utilisateur qui l'importe. Un compte au plafond plus petit
   que le cadeau serait bloqué avant d'avoir rien fait.
-- **`meta.document` finit dans un `href`.** La route `/meta` n'accepte que
-  `http:` et `https:` — sans ce filtre, un `javascript:` rangé dans une
-  sauvegarde s'exécuterait au clic, y compris chez l'administrateur qui ouvre
-  l'arbre par procuration.
+- **`meta.document` finit dans un `href`.** La validation n'accepte que `http:`
+  et `https:` — sans ce filtre, un `javascript:` rangé dans une sauvegarde
+  s'exécuterait au clic, y compris chez l'administrateur qui ouvre l'arbre par
+  procuration. Depuis le lot 10.A elle vit dans **`src/domaine/meta.ts`**, parce
+  qu'elle sert des deux côtés : le `PATCH /meta` d'un propriétaire et les lots
+  d'administration. **Ne pas la recopier** dans un troisième appelant : une
+  validation dupliquée est une validation qui divergera.
+- **Un lot est une suite d'écritures ordinaires, pas un raccourci.** Chaque
+  sauvegarde touchée passe par `ecrireDocument`, avec le plafond de **son**
+  propriétaire, et laisse sa propre ligne de journal. Ne jamais céder à la
+  tentation d'un `UPDATE` en masse : il court-circuiterait les compteurs, le
+  retrait des portraits `data:` et le plafond d'un coup.
+- **L'identifiant d'un lot se calcule une fois, avant la boucle**
+  (`identifiantDuLot`). Le réflexe naturel — appeler `idsLibres()` par
+  sauvegarde, comme le font les routes du domaine — fabriquerait `tully` chez
+  les uns et `tully-2` chez les autres, et rendrait le lot non rejouable.
 
 **Ce que l'administration ne doit jamais devenir :**
 
@@ -178,6 +212,18 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
 - **`journal_admin` ne s'efface pas.** Aucune route ne le supprime, et il ne
   faut pas en ajouter une. L'action `edition` est inscrite **après** coup et
   seulement si l'écriture a réussi — une tentative refusée n'a rien changé.
+- **Trois chemins pour les lots, un seul qui écrit** : `/lots/panorama` et
+  `/lots/apercu` lisent, `/lots/appliquer` écrit. Ne jamais les réunir derrière
+  un booléen de corps de requête : c'est précisément le genre de drapeau qu'on
+  oublie, et l'oublier écrit chez des dizaines de personnes.
+- **L'aperçu emprunte exactement le même code que l'application**
+  (`appliquerLot(..., simulation)`), auquel on retire l'écriture et le journal.
+  Un aperçu qui prendrait un raccourci ne prédirait pas ce que fait l'autre
+  bouton, et ne vaudrait donc rien comme garde-fou.
+- **`/api/admin/catalogues` existe pour ne pas dépendre d'une sauvegarde
+  active.** `GET /api/referentiels` dit la même chose mais répond 409 à un
+  administrateur qui n'a pas de monde à lui — ses formulaires de lot
+  disparaîtraient. Le harnais vérifie ce cas.
 
 **Côté interface :**
 
@@ -235,7 +281,10 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **274 vérifications.**
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **320 vérifications.**
+- **Attention aux guillemets dans `contient`.** L'argument est entre guillemets
+  simples : y écrire `\"` cherche un antislash littéral et l'assertion échoue
+  toujours. Sept vérifications du lot 10.A sont tombées pour cette seule raison.
 - **Le lot 9 a réécrit quatre assertions du harnais**, ce qui n'était jamais
   arrivé. Elles disaient « un compte neuf n'a aucune sauvegarde » ; c'est
   devenu faux exprès. Le cas « plus aucun monde » (409) reste vérifié, sur un
@@ -267,7 +316,7 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   vérifier la branche « service configuré » — jeton créé, réponse identique,
   échec d'envoi journalisé — sans compte chez personne.
 - Les comptes d'essai (`essai-%`, `mesure-%`, `comparaison-%`, `atelier%`,
-  `mathias%`, `navigateur%`, `repris%` `@exemple.test`) se nettoient à la main,
+  `mathias%`, `navigateur%`, `repris%`, `patron%` `@exemple.test`) se nettoient à la main,
   en local **et** en ligne. Les invités laissés par les essais s'effacent avec
   `DELETE FROM utilisateurs WHERE role = 'invite'`.
 - **`outils/construire-depart.mjs` n'est pas une étape de compilation.** Il lit
