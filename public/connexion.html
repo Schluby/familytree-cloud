@@ -74,25 +74,34 @@
       <hr style="border:0;border-top:1px solid var(--bord);margin:18px 0">
     </div>
 
-    <p id="aideSecours" style="font-size:.88rem">
-      Si vous avez demandé un <strong>code de secours</strong> depuis
-      <a href="/donnees.html">Vos données</a>, il permet de reprendre la main
-      tout seul. Sinon, il faut passer par un administrateur.
-    </p>
-    <form id="formulaireRecuperation">
-      <label>Adresse de courriel
-        <input id="emailRecuperation" type="email" required>
-      </label>
-      <label>Code de secours
-        <input id="codeSecours" type="text" required placeholder="XXXXX-XXXXX-XXXXX-XXXXX">
-      </label>
-      <label>Nouveau mot de passe
-        <input id="nouveauMotDePasse" type="password" required minlength="8" autocomplete="new-password">
-      </label>
-      <button id="validerRecuperation" class="principal" type="submit">Changer le mot de passe</button>
-    </form>
+    <!-- Le code de secours est un recours, pas la porte d'entrée : quand le
+         lien par courriel est disponible, il attend derrière ce bouton. -->
+    <button id="lienSecours" class="lien cache" type="button">
+      Je n’ai plus accès à ma boîte de courriel
+    </button>
+
+    <div id="blocSecours">
+      <p id="aideSecours" style="font-size:.88rem">
+        Si vous avez demandé un <strong>code de secours</strong> depuis
+        <a href="/donnees.html">Vos données</a>, il permet de reprendre la main
+        tout seul. Sinon, il faut passer par un administrateur.
+      </p>
+      <form id="formulaireRecuperation">
+        <label>Adresse de courriel
+          <input id="emailRecuperation" type="email" required>
+        </label>
+        <label>Code de secours
+          <input id="codeSecours" type="text" required placeholder="XXXXX-XXXXX-XXXXX-XXXXX">
+        </label>
+        <label>Nouveau mot de passe
+          <input id="nouveauMotDePasse" type="password" required minlength="8" autocomplete="new-password">
+        </label>
+        <button id="validerRecuperation" class="principal" type="submit">Changer le mot de passe</button>
+      </form>
+      <div id="messageRecuperation" class="message"></div>
+    </div>
+
     <button id="lienRetour" class="lien" type="button">Revenir à la connexion</button>
-    <div id="messageRecuperation" class="message"></div>
   </div>
 
   <!-- ------------------------------------------------------------------ -->

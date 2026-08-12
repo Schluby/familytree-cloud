@@ -73,6 +73,26 @@
   </div>
 
   <!-- ------------------------------------------------------------------ -->
+  <!-- Changer son mot de passe ne demande ni l'ancien, ni le code de secours :
+       un lien part à l'adresse du compte (lot 10.B). -->
+  <div class="carte" id="carteMotDePasse">
+    <h2>Changer votre mot de passe</h2>
+    <p>
+      Nous vous envoyons un lien à l’adresse de ce compte. Il dure une heure et
+      ne sert qu’une fois. <strong>Vos sauvegardes ne sont pas touchées</strong> :
+      seul le mot de passe change, et les autres appareils encore connectés
+      seront déconnectés.
+    </p>
+    <p class="mention">
+      Ni l’ancien mot de passe ni le code de secours ne sont demandés. Le code
+      de secours sert à reprendre un compte dont on a <em>perdu</em> la clé —
+      pas à en changer quand on l’a sous la main.
+    </p>
+    <button class="principal" id="envoyerLienMdp" type="button">M’envoyer le lien</button>
+    <div id="messageMotDePasse" class="message"></div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
   <!-- Le code de secours ne s'impose plus à l'inscription : il se demande
        ici, quand on sait à quoi il sert. -->
   <div class="carte" id="carteSecours">

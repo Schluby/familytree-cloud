@@ -142,14 +142,23 @@ $('lienOubli').addEventListener('click', async () => {
 
   // Le bloc « lien par courriel » n'apparaît que si le serveur sait envoyer :
   // promettre un message qui n'arrivera jamais est pire que ne rien proposer.
+  //
+  // Et quand il est là, le code de secours **recule derrière un bouton**. Ce
+  // n'est pas de la mise en page : deux formulaires côte à côte laissent croire
+  // qu'il faut choisir, alors que l'un demande un code que presque personne n'a
+  // demandé. Sans service d'envoi, il reste le seul chemin et reste donc visible.
   const { donnees } = await appeler('/api/auth/moyens');
   if (donnees?.courriel) {
     $('blocCourriel').classList.remove('cache');
-    $('aideSecours').insertAdjacentText(
-      'afterbegin',
-      'Sans accès à votre boîte ? '
-    );
+    $('blocSecours').classList.add('cache');
+    $('lienSecours').classList.remove('cache');
   }
+});
+
+$('lienSecours').addEventListener('click', () => {
+  $('blocSecours').classList.remove('cache');
+  $('lienSecours').classList.add('cache');
+  $('emailRecuperation').focus();
 });
 
 /* ----------------------------------------------- mot de passe oublié (8.G) */

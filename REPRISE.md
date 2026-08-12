@@ -63,6 +63,23 @@ tout lot de groupe : **qu'est-ce que ces comptes ont en commun ?** Ce qui est
 partagé par tous supporte un lot ; ce qui n'est qu'à certains serait écrasé sans
 le dire.
 
+Le lot 10.B, du même jour, **sort le code de secours du chemin normal** :
+
+- `POST /api/auth/mot-de-passe` envoie un lien à l'adresse d'un compte **déjà
+  connecté**. Ni l'ancien mot de passe, ni le code de secours : la preuve de
+  possession est faite deux fois, par la session puis par la boîte.
+- L'émission du jeton est factorisée dans `emettreLien()`, partagée avec
+  `/mot-de-passe-oublie`. Même jeton, même heure, même usage unique, même règle
+  d'invalidation du précédent.
+- **Sans clé d'envoi, cette porte refuse — et c'est la seule du service qui le
+  fasse.** Ailleurs on bascule sur le code de secours ; pour quelqu'un de déjà
+  connecté il n'y a pas de second chemin honnête. Le 409 porte un `indice` que
+  la page affiche. **En production c'est le comportement actuel**, la clé Resend
+  n'étant pas posée.
+- Le formulaire de code de secours n'est pas supprimé : il recule derrière « Je
+  n'ai plus accès à ma boîte de courriel », et **redevient visible d'emblée**
+  quand l'envoi n'est pas configuré.
+
 Le lot 8, en une phrase par morceau :
 
 - **8.A — tactile.** L'appui long remplace le clic droit, partout (fiche, lien,
@@ -281,7 +298,12 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **320 vérifications.**
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **329 vérifications.**
+- **La section 10.B branche sur `/api/auth/moyens`.** En local `.dev.vars` porte
+  une clé d'envoi factice, donc l'instance se dit configurée ; en ligne elle ne
+  l'est pas. Le harnais vérifie le comportement **attendu dans chaque cas**
+  plutôt que de se sauter lui-même — un « saute » silencieux laisserait croire
+  que la surface est testée.
 - **Attention aux guillemets dans `contient`.** L'argument est entre guillemets
   simples : y écrire `\"` cherche un antislash littéral et l'assertion échoue
   toujours. Sept vérifications du lot 10.A sont tombées pour cette seule raison.

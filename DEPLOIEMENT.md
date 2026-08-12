@@ -301,9 +301,21 @@ compte, mais ne laisse aucune adresse pour vous écrire.
 
 ## Brancher l'envoi de courriel (« mot de passe oublié »)
 
-**Facultatif, et l'application marche sans.** Sans clé, le lien par courriel
-n'est pas proposé du tout, et la récupération se fait par le **code de secours**
-donné à l'inscription — c'est l'état actuel.
+**Facultatif, mais moins qu'avant.** Sans clé, le lien par courriel n'est pas
+proposé, et la récupération se fait par le **code de secours** — c'est l'état
+actuel de la production, où `/api/auth/moyens` répond `{"courriel":false}`.
+
+⚠ **Deux choses en dépendent maintenant, et pas seulement l'oubli :**
+
+- Depuis le lot 9.D, **le code de secours n'est plus donné à l'inscription** :
+  il se demande depuis « Vos données ». Quelqu'un qui n'en a jamais demandé et
+  qui perd son mot de passe n'a plus que vous, en SQL.
+- Depuis le lot 10.B, **« Changer votre mot de passe » refuse franchement** tant
+  qu'il n'y a pas de clé (409, avec un renvoi vers le code de secours). C'est le
+  seul endroit du service où l'absence de configuration ferme une porte : pour
+  quelqu'un de déjà connecté, il n'existe pas de second chemin honnête.
+
+Poser la clé règle les deux d'un coup.
 
 Pourquoi un service extérieur : un Worker ne sait pas parler SMTP, il n'a pas
 de sockets sortantes arbitraires. Le seul moyen d'envoyer un courriel est

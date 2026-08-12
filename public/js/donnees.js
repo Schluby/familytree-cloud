@@ -51,7 +51,37 @@ async function remplir() {
 
   // Rien à récupérer tant qu'il n'y a pas de compte à qui rendre la main.
   $('carteSecours').hidden = invite;
+  // Ni de mot de passe à changer : un essai n'en a pas.
+  $('carteMotDePasse').hidden = invite;
 }
+
+/* ------------------------------------------------ mot de passe (lot 10.B) */
+
+$('envoyerLienMdp').addEventListener('click', async () => {
+  const bouton = $('envoyerLienMdp');
+  const zone = $('messageMotDePasse');
+  bouton.disabled = true;
+  zone.textContent = 'Envoi…';
+  zone.className = 'message';
+
+  const { ok, donnees } = await appeler('/api/auth/mot-de-passe', { method: 'POST' });
+  bouton.disabled = false;
+
+  if (!ok) {
+    // Le refus le plus fréquent — pas de service d'envoi branché — porte un
+    // indice qui dit quoi faire à la place. On l'affiche : renvoyer « échec »
+    // tout court laisserait quelqu'un devant une porte sans poignée.
+    zone.className = 'message erreur';
+    zone.textContent = [donnees?.erreur, donnees?.indice].filter(Boolean).join(' — ');
+    return;
+  }
+
+  zone.className = 'message reussite';
+  zone.textContent =
+    `Un lien vient de partir à ${donnees.destinataire}. Il dure une heure et ne ` +
+    'sert qu’une fois. Pensez aux indésirables.';
+  bouton.textContent = 'Renvoyer le lien';
+});
 
 /* -------------------------------------------------------------------------- */
 

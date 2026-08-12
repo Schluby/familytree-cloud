@@ -491,6 +491,44 @@ const empreinteJeton = async (jeton: string) =>
   versBase64(await sha256(new TextEncoder().encode(jeton)));
 
 /**
+ * Fabrique un lien de changement de mot de passe et l'envoie.
+ *
+ * Partagé par les deux portes : « j'ai oublié » (sans session) et « je veux le
+ * changer » (connecté). Une seule fonction parce qu'une seule chose se passe —
+ * un jeton à usage unique part par courriel — et que deux copies finiraient par
+ * ne plus avoir la même durée de vie ni la même règle d'invalidation.
+ *
+ * Ne renvoie rien d'utilisable par l'appelant : l'échec d'envoi est journalisé
+ * côté serveur. Sur la porte publique, le dire trahirait l'existence du compte.
+ */
+async function emettreLien(
+  c: { env: Env; req: { raw: Request } },
+  utilisateurId: string,
+  destinataire: string
+): Promise<void> {
+  const jeton = tirerJeton();
+  const maintenant = Math.floor(Date.now() / 1000);
+
+  // Les demandes précédentes tombent : un seul lien vivant à la fois, sinon un
+  // ancien courriel oublié dans une boîte reste une porte ouverte.
+  await c.env.DB.prepare(
+    'UPDATE reinitialisations SET utilise_le = ? WHERE utilisateur_id = ? AND utilise_le IS NULL'
+  )
+    .bind(maintenant, utilisateurId)
+    .run();
+  await c.env.DB.prepare(
+    `INSERT INTO reinitialisations (jeton_empreinte, utilisateur_id, cree_le, expire_le)
+     VALUES (?, ?, ?, ?)`
+  )
+    .bind(await empreinteJeton(jeton), utilisateurId, maintenant, maintenant + DUREE_JETON)
+    .run();
+
+  const lien = `${racinePublique(c.env, c.req.raw)}/mot-de-passe-oublie.html?jeton=${jeton}`;
+  const resultat = await envoyerLienReinitialisation(c.env, destinataire, lien);
+  if (!resultat.envoye) console.error('courriel non envoyé :', resultat.raison);
+}
+
+/**
  * De quoi dispose cette instance pour récupérer un compte.
  *
  * Une seule information, qui ne dépend que de la configuration du serveur :
@@ -530,32 +568,58 @@ routesAuth.post('/mot-de-passe-oublie', async (c) => {
     .bind(email)
     .first<{ id: string; email: string }>();
 
-  if (ligne) {
-    const jeton = tirerJeton();
-    const maintenant = Math.floor(Date.now() / 1000);
-    // Les demandes précédentes tombent : un seul lien vivant à la fois, sinon
-    // un ancien courriel oublié dans une boîte reste une porte ouverte.
-    await c.env.DB.prepare(
-      'UPDATE reinitialisations SET utilise_le = ? WHERE utilisateur_id = ? AND utilise_le IS NULL'
-    )
-      .bind(maintenant, ligne.id)
-      .run();
-    await c.env.DB.prepare(
-      `INSERT INTO reinitialisations (jeton_empreinte, utilisateur_id, cree_le, expire_le)
-       VALUES (?, ?, ?, ?)`
-    )
-      .bind(await empreinteJeton(jeton), ligne.id, maintenant, maintenant + DUREE_JETON)
-      .run();
-
-    const lien = `${racinePublique(c.env, c.req.raw)}/mot-de-passe-oublie.html?jeton=${jeton}`;
-    const resultat = await envoyerLienReinitialisation(c.env, ligne.email, lien);
-    // L'échec est journalisé côté serveur, jamais renvoyé : le dire
-    // trahirait l'existence du compte.
-    if (!resultat.envoye) console.error('courriel non envoyé :', resultat.raison);
-  }
+  if (ligne) await emettreLien(c, ligne.id, ligne.email);
 
   await noterEchecConnexion(c.env.DB, email);
   return c.json(reponse);
+});
+
+/**
+ * « Je veux changer mon mot de passe », depuis un compte ouvert (lot 10.B).
+ *
+ * **Pas d'ancien mot de passe à retaper, et surtout pas de code de secours.**
+ * Le code de secours sert à reprendre un compte dont on a perdu la clé ; s'en
+ * servir pour un changement volontaire revenait à faire payer un geste courant
+ * au prix d'un geste de détresse. On envoie un lien à l'adresse du compte,
+ * exactement comme pour un oubli — même jeton, même heure, même usage unique.
+ *
+ * Trois refus explicites, parce qu'un silence ici ressemblerait à un succès :
+ *
+ * - Pas de session : 401.
+ * - Un essai sans compte n'a pas d'adresse où envoyer quoi que ce soit : 409.
+ * - Aucun service d'envoi branché : 409, **en le disant**. C'est le seul
+ *   endroit du service où l'absence de clé d'envoi ferme une porte au lieu
+ *   d'en proposer une autre — il n'existe pas de second chemin honnête pour
+ *   quelqu'un qui est déjà connecté.
+ */
+routesAuth.post('/mot-de-passe', async (c) => {
+  const compte = await compteDeLaSession(c);
+  if (!compte) return c.json({ erreur: 'non connecté' }, 401);
+  if (compte.role === 'invite' || !compte.email) {
+    return c.json(
+      { erreur: "créez un compte d'abord : un essai n'a pas d'adresse de courriel" },
+      409
+    );
+  }
+  if (!envoiConfigure(c.env)) {
+    return c.json(
+      {
+        erreur: "l'envoi de courriel n'est pas configuré sur cette instance",
+        indice: 'demandez un code de secours ci-dessous, il permet de reprendre la main',
+      },
+      409
+    );
+  }
+
+  // Le même compteur que les échecs de connexion : une session volée ne doit
+  // pas servir à inonder la boîte de son propriétaire.
+  const email = normaliserEmail(compte.email);
+  const attente = await attenteAvantConnexion(c.env.DB, email);
+  if (attente > 0) return c.json({ erreur: `trop de demandes, réessayez dans ${attente} s` }, 429);
+
+  await emettreLien(c, compte.id, compte.email);
+  await noterEchecConnexion(c.env.DB, email);
+  return c.json({ envoye: true, destinataire: compte.email });
 });
 
 /**

@@ -765,6 +765,45 @@ verifier "A redevient membre, les lots se referment" 403 "$(code "$BOCAL_A" POST
 verifier "  et le panorama aussi" 403 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES]}")"
 
 # ---------------------------------------------------------------------------
+# Lot 10.B : changer son mot de passe sans code de secours
+#
+# Le code de secours sert a reprendre un compte dont on a PERDU la cle. S'en
+# servir pour un changement volontaire faisait payer un geste courant au prix
+# d'un geste de detresse. Depuis ce lot, un compte ouvert demande un lien.
+#
+# La branche depend de l'instance : en local, `.dev.vars` porte une cle d'envoi
+# factice, donc le service se dit configure ; en ligne, la cle n'est pas posee.
+# On interroge /moyens et on verifie le comportement ATTENDU dans chaque cas,
+# plutot que de sauter la section.
+# ---------------------------------------------------------------------------
+
+echo "-- changer son mot de passe une fois connecte (10.B)"
+verifier "sans session, refuse" 401 "$(code - POST /api/auth/mot-de-passe)"
+verifier "un essai n'a pas d'adresse ou envoyer" 409 "$(code "$BOCAL_VIDE" POST /api/auth/mot-de-passe)"
+
+code - GET /api/auth/moyens > /dev/null
+COURRIEL="$(lire courriel)"
+if [ "$COURRIEL" = "true" ]; then
+  verifier "un membre demande son lien" 200 "$(code "$BOCAL_B" POST /api/auth/mot-de-passe)"
+  verifier "  et on lui dit ou il part" oui "$(contient "$EMAIL_B")"
+  # Un second lien invalide le premier : un vieux courriel dans une boite ne
+  # doit pas rester une porte ouverte. On ne peut pas le prouver d'ici (le
+  # jeton ne vit que dans le message), mais la demande reste acceptee.
+  verifier "  en redemander un reste possible" 200 "$(code "$BOCAL_B" POST /api/auth/mot-de-passe)"
+else
+  verifier "sans service d'envoi, refus explicite" 409 "$(code "$BOCAL_B" POST /api/auth/mot-de-passe)"
+  verifier "  et il dit quoi faire a la place" oui "$(contient 'code de secours')"
+fi
+
+echo "-- les deux pages disent la meme chose que l'API"
+code - GET /donnees > /dev/null
+verifier "« Vos donnees » porte le bouton" oui "$(contient 'envoyerLienMdp')"
+verifier "  et annonce qu'aucun code n'est demande" oui "$(contient 'ni le code de secours')"
+code - GET /connexion > /dev/null
+verifier "la connexion range le code derriere un bouton" oui "$(contient 'lienSecours')"
+verifier "  sans le supprimer pour autant" oui "$(contient 'formulaireRecuperation')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

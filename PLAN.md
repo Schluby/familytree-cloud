@@ -760,3 +760,62 @@ Vérifié aussi dans le navigateur, sur la vraie page : sélection de deux compt
 nouvel aperçu, application. Les trois sauvegardes portent la maison avec sa
 devise, sa couleur et ses caractéristiques ; le journal porte exactement trois
 lignes `edition`, deux pour le compte à deux arbres et une pour l'autre.
+
+---
+
+# Lot 10.B — changer son mot de passe sans code de secours (12/08/2026)
+
+Le lot 8.G avait posé le lien par courriel pour les **oublis**. Il manquait le
+geste courant : changer son mot de passe quand on l'a encore. Il n'existait
+aucune route pour ça — il fallait se déconnecter et faire semblant d'avoir
+oublié, ou ressortir un code de secours que presque personne n'a demandé.
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 10.B.1 | `POST /api/auth/mot-de-passe` : un compte ouvert demande son lien. | `src/auth/routes.ts` |
+| 10.B.2 | L'émission du jeton factorisée, partagée par les deux portes. | `emettreLien()` |
+| 10.B.3 | Carte « Changer votre mot de passe » dans « Vos données ». | `donnees.html`, `js/donnees.js` |
+| 10.B.4 | Le code de secours recule derrière un bouton sur la connexion. | `connexion.html`, `js/connexion.js` |
+
+**Aucune migration.** La table `reinitialisations` du lot 8.G suffit : c'est le
+même jeton, la même heure, le même usage unique.
+
+## Les deux décisions qui méritent d'être relues
+
+**Ni l'ancien mot de passe, ni le code de secours.** Le code de secours sert à
+reprendre un compte dont on a *perdu* la clé ; l'exiger pour un changement
+volontaire faisait payer un geste courant au prix d'un geste de détresse. Quant
+à redemander l'ancien mot de passe, ça n'ajoute rien ici : la preuve de
+possession est déjà faite deux fois — par la session, puis par le lien envoyé à
+l'adresse du compte.
+
+**Sans clé d'envoi, cette porte se ferme, et on le dit.** C'est le seul endroit
+du service où l'absence de configuration refuse au lieu de proposer autre chose.
+Ailleurs on peut basculer sur le code de secours ; pour quelqu'un de déjà
+connecté, il n'y a pas de second chemin honnête. Le refus est un 409 qui porte
+un `indice` renvoyant vers le code de secours, affiché tel quel par la page.
+**En production, c'est aujourd'hui le comportement réel** : `/api/auth/moyens`
+répond `{"courriel":false}`. Une raison de plus de poser la clé Resend.
+
+## Ce qui n'a pas été supprimé
+
+`POST /api/auth/recuperation` (par code de secours) **reste**, et son formulaire
+aussi. Il recule seulement : quand le lien par courriel est disponible, il
+attend derrière « Je n'ai plus accès à ma boîte de courriel ». Sans service
+d'envoi, il redevient visible d'emblée — c'est alors le seul chemin. Le
+supprimer aurait laissé sans recours quelqu'un qui perd l'accès à sa boîte.
+
+## Vérification
+
+**329/329**, contre 320 à la fin du lot 10.A. La section est écrite pour être
+vraie **des deux côtés** : elle interroge `/api/auth/moyens` et vérifie le
+comportement attendu selon que l'envoi est configuré ou non, plutôt que de se
+sauter elle-même. En local, `.dev.vars` porte une clé factice, donc c'est la
+branche « configuré » qui tourne ; en ligne, c'est celle du refus.
+
+Vérifié dans le navigateur : la carte apparaît entre « Tout reprendre » et
+« Code de secours », le bouton envoie, le message nomme l'adresse — et la ligne
+correspondante existe bien dans `reinitialisations`, avec 3 600 secondes de
+durée et `utilise_le` à `NULL`. Sur la connexion, « Mot de passe oublié ? »
+n'ouvre plus que le bloc courriel, et le formulaire de code de secours attend
+derrière son bouton.
