@@ -43,6 +43,7 @@ import * as humeur from './humeur';
 import * as referentiels from './referentiels';
 import * as registre from './registre';
 import lieuxWesteros from './lieux_westeros.json';
+import { appliquerMeta } from './meta';
 import { Dataset, Personne, Relation, idsLibres, slugifier, type Objet } from './models';
 import { ErreurPortrait, normaliser as normaliserPortrait, urlPhoto } from './portraits';
 import { ErreurReferentiel } from './referentiels';
@@ -413,52 +414,15 @@ routesDomaine.patch('/meta', async (c) => {
   if (courant instanceof Response) return courant;
   const corps = await corpsDe(c);
 
-  const donneAnnee = Object.hasOwn(corps, 'annee_courante');
-  const donneDocument = Object.hasOwn(corps, 'document');
-  if (!donneAnnee && !donneDocument) {
-    return c.json(
-      { erreur: 'rien à modifier : « annee_courante » et « document » sont les seules clés' },
-      400
-    );
-  }
-
-  if (donneAnnee) {
-    const brut = corps.annee_courante;
-    if (brut === null || brut === '') {
-      delete courant.dataset.meta.annee_courante;
-    } else {
-      const texte = String(brut).trim().slice(0, 40);
-      if (!/-?\d/.test(texte)) {
-        return c.json({ erreur: "l'année doit contenir un nombre (« 300 AC », « 1482 »…)" }, 400);
-      }
-      courant.dataset.meta.annee_courante = texte;
-    }
-  }
-
-  if (donneDocument) {
-    const brut = corps.document;
-    if (brut === null || brut === '') {
-      delete courant.dataset.meta.document;
-    } else {
-      // Cette valeur finit dans le `href` d'un lien. Sans ce filtre, un
-      // `javascript:…` rangé dans une sauvegarde s'exécuterait au clic — chez
-      // son auteur, mais aussi chez l'administrateur qui ouvre l'arbre par
-      // procuration. Seuls `http` et `https` passent.
-      const texte = String(brut).trim().slice(0, 2000);
-      let adresse: URL;
-      try {
-        adresse = new URL(texte);
-      } catch {
-        return c.json({ erreur: 'adresse illisible : il faut une URL complète' }, 400);
-      }
-      if (adresse.protocol !== 'http:' && adresse.protocol !== 'https:') {
-        return c.json({ erreur: 'seules les adresses http(s) sont acceptées' }, 400);
-      }
-      courant.dataset.meta.document = texte;
-    }
-  }
-
   try {
+    // La validation vit dans `meta.ts` : elle sert aussi aux lots
+    // d'administration, qui posent ces mêmes champs chez plusieurs comptes.
+    if (!appliquerMeta(courant.dataset.meta, corps).length) {
+      return c.json(
+        { erreur: 'rien à modifier : « annee_courante » et « document » sont les seules clés' },
+        400
+      );
+    }
     await enregistrer(c, courant);
   } catch (erreur) {
     return enErreur(c, erreur);

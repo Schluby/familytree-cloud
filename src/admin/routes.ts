@@ -23,16 +23,27 @@
  * - **Le journal** — consultable, jamais effaçable.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cleValide } from '../auth/routes';
 import { empreinteMotDePasse } from '../auth/empreintes';
 import { fermerToutesLesSessions } from '../auth/sessions';
 import { tables as tablesDe, versXlsx, MIME_XLSX } from '../domaine/exports';
 import { Dataset, slugifier, type Objet } from '../domaine/models';
+import * as referentiels from '../domaine/referentiels';
 import { routesDomaine } from '../domaine/routes';
 import type { Variables } from '../intergiciels';
 import { exigerAdmin, lectureSeule } from './intergiciel';
 import { dernieres, journaliser } from './journal';
+import {
+  MAX_COMPTES,
+  MAX_SAUVEGARDES,
+  appliquerLot,
+  panorama,
+  resoudreCibles,
+  TYPES_OPERATION,
+  type Cible,
+  type Portee,
+} from './lots';
 import { parProcuration } from './procuration';
 
 export const routesAdmin = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -71,6 +82,17 @@ function fichier(nom: string, mime: string, octets: Uint8Array | string): Respon
     },
   });
 }
+
+/**
+ * Les catalogues du domaine — styles de trait, catégories de liens, les sept
+ * caractéristiques d'une maison.
+ *
+ * La page d'administration construit ses formulaires de lot à partir d'ici
+ * plutôt que d'en recopier la liste. `GET /api/referentiels` dirait la même
+ * chose, mais exige une sauvegarde active : un administrateur qui n'aurait pas
+ * de monde à lui ne doit pas perdre ses formulaires pour autant.
+ */
+routesAdmin.get('/catalogues', (c) => c.json(referentiels.decrireCatalogues()));
 
 /* --------------------------------------------------------------------------
  * Les comptes
@@ -272,6 +294,98 @@ routesAdmin.get('/sauvegardes/:id/export', async (c) => {
     return fichier(`${base}.xlsx`, MIME_XLSX, await versXlsx(tablesDe(dataset, true)));
   }
   return fichier(`${base}.json`, 'application/json; charset=utf-8', ligne.donnees);
+});
+
+/* --------------------------------------------------------------------------
+ * Les lots — un même geste sur les arbres de plusieurs comptes (lot 10.A)
+ *
+ * Trois routes, et **une seule écrit**. Ce n'est pas un drapeau `simulation`
+ * dans un corps de requête qui décide : c'est le chemin. Un client qui oublie
+ * un booléen se retrouverait à écrire chez cinquante personnes en croyant
+ * regarder ; un client qui se trompe de chemin lit.
+ * -------------------------------------------------------------------------- */
+
+type Contexte = Context<{ Bindings: Env; Variables: Variables }>;
+
+/** La sélection, validée, résolue en sauvegardes. */
+async function preparerLot(
+  c: Contexte
+): Promise<{ cibles: Cible[]; operation: Objet } | Response> {
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+
+  const bruts = Array.isArray(corps.comptes) ? corps.comptes : [];
+  const comptes = [...new Set(bruts.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))];
+  if (!comptes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  if (comptes.length > MAX_COMPTES) {
+    return c.json({ erreur: `sélection trop large : ${MAX_COMPTES} comptes au plus` }, 400);
+  }
+
+  const portee: Portee = corps.portee === 'active' ? 'active' : 'toutes';
+
+  const operation =
+    typeof corps.operation === 'object' && corps.operation !== null && !Array.isArray(corps.operation)
+      ? (corps.operation as Objet)
+      : {};
+  const type = String(operation.type ?? '');
+  if (!TYPES_OPERATION.includes(type)) {
+    return c.json(
+      { erreur: `opération inconnue : « ${type} » (${TYPES_OPERATION.join(', ')})` },
+      400
+    );
+  }
+
+  const cibles = await resoudreCibles(c.env.DB, comptes, portee);
+  if (!cibles.length) {
+    return c.json({ erreur: 'aucune sauvegarde à toucher pour cette sélection' }, 404);
+  }
+  if (cibles.length > MAX_SAUVEGARDES) {
+    return c.json(
+      {
+        erreur: `ce lot toucherait ${cibles.length} sauvegardes, au-delà des ${MAX_SAUVEGARDES} qu'une requête peut mener à bien`,
+        indice: 'restreignez la sélection, ou visez la sauvegarde active seulement',
+      },
+      400
+    );
+  }
+
+  return { cibles, operation };
+}
+
+/**
+ * Ce que les comptes ont fait de leur monde : leurs maisons, catégories, types
+ * de liens, filtres et listes, avec ce qui est **commun à toute la sélection**
+ * et ce qui n'appartient qu'à certains.
+ *
+ * C'est une lecture, malgré le POST : la sélection tient mal dans une adresse
+ * dès qu'elle dépasse la poignée de comptes.
+ */
+routesAdmin.post('/lots/panorama', async (c) => {
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+  const bruts = Array.isArray(corps.comptes) ? corps.comptes : [];
+  const comptes = [...new Set(bruts.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))];
+  if (!comptes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  if (comptes.length > MAX_COMPTES) {
+    return c.json({ erreur: `sélection trop large : ${MAX_COMPTES} comptes au plus` }, 400);
+  }
+
+  const portee: Portee = corps.portee === 'active' ? 'active' : 'toutes';
+  return c.json(panorama(await resoudreCibles(c.env.DB, comptes, portee)));
+});
+
+/** L'aperçu : exactement le même calcul, sans écrire ni journaliser. */
+routesAdmin.post('/lots/apercu', async (c) => {
+  const pret = await preparerLot(c);
+  if (pret instanceof Response) return pret;
+  return c.json(await appliquerLot(c.env.DB, c.get('compte').id, pret.cibles, pret.operation, true));
+});
+
+/** L'application. La seule route de cette famille qui touche aux données. */
+routesAdmin.post('/lots/appliquer', async (c) => {
+  const pret = await preparerLot(c);
+  if (pret instanceof Response) return pret;
+  return c.json(
+    await appliquerLot(c.env.DB, c.get('compte').id, pret.cibles, pret.operation, false)
+  );
 });
 
 /* --------------------------------------------------------------------------
