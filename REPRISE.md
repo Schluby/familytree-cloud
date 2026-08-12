@@ -80,6 +80,25 @@ Le lot 10.B, du même jour, **sort le code de secours du chemin normal** :
   n'ai plus accès à ma boîte de courriel », et **redevient visible d'emblée**
   quand l'envoi n'est pas configuré.
 
+Le lot 10.C **fait la connexion Google**, que le 9.E avait seulement évaluée :
+
+- **Flux « Authorization Code » côté serveur, pas le script de Google.** La CSP
+  est `script-src 'self'` ; charger le SDK de Google obligerait à l'élargir pour
+  tout le site. Le bouton est un `<a href>` vers `/api/auth/google/depart`.
+- **La signature de l'`id_token` n'est pas revérifiée**, et c'est motivé : il
+  arrive par une connexion TLS que le Worker ouvre lui-même vers Google, avec le
+  secret client. OpenID Connect Core § 3.1.3.7 l'autorise explicitement. **Cela
+  ne tient que parce qu'aucune route n'accepte un `id_token` en entrée** — ne
+  jamais en ajouter une sans remettre la vérification JWKS.
+- **Rattachement par `sub` d'abord, par adresse ensuite.** Une adresse se
+  réattribue, un `sub` jamais.
+- **Un compte Google n'a pas de mot de passe** : il porte le même marqueur non
+  analysable qu'un invité.
+- **Migration `0005_google.sql`** : une colonne `google_sub`, plus un index
+  unique partiel (SQLite n'accepte pas `ADD COLUMN … UNIQUE`).
+- **Sans identifiants, les deux routes répondent 404** et le bouton n'apparaît
+  pas. C'est l'état de la production.
+
 Le lot 8, en une phrase par morceau :
 
 - **8.A — tactile.** L'appui long remplace le clic droit, partout (fiche, lien,
@@ -117,6 +136,16 @@ clé, l'application ne promet rien et propose le code de secours.
 **C'est devenu plus important qu'au lot 8.** L'inscription ne montre plus de
 code de secours d'office : quelqu'un qui n'en demande pas un depuis « Vos
 données » et qui oublie son mot de passe n'a plus que vous pour le récupérer.
+Et depuis le lot 10.B, « Changer votre mot de passe » **refuse** franchement
+tant qu'il n'y a pas de clé.
+
+**La connexion Google attend deux identifiants.** Le code du lot 10.C est écrit
+et vérifié partout où il peut l'être sans compte Google ; il reste inerte —
+routes en 404, bouton masqué — jusqu'à ce que vous créiez un projet Google Cloud
+et posiez `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`. La marche à suivre est
+dans `DEPLOIEMENT.md`, « Brancher la connexion Google ». Bonne nouvelle : les
+portées demandées (`openid`, `email`) sont « non sensibles » et **ne demandent
+aucune vérification** de la part de Google.
 
 ### Ce qui attend le calendrier
 
@@ -135,15 +164,6 @@ tourné en vrai. **C'est le chiffre à regarder en premier le 17/08.**
 
 Ce qui reste « à trancher » et n'a jamais été programmé :
 
-- **La connexion Google (lot 9.E).** Évaluée le 11/08/2026, pas faite. Le code
-  serait contenu : redirection vers Google, échange du code côté serveur,
-  vérification du JWT contre son JWKS, liaison par adresse. Un compte Google n'a
-  pas de mot de passe chez nous — il se range exactement comme un invité, avec
-  le même marqueur non déchiffrable dans `mot_de_passe`. **Ce qui bloque n'est
-  pas le code** : il faut un projet Google Cloud, un écran de consentement (donc
-  une politique de confidentialité publiée, et une vérification pour sortir du
-  mode test), un identifiant et un secret à poser en secrets Worker. Même
-  dépendance que la clé d'envoi de courriel.
 - **Le partage entre membres** (un arbre en lecture seule pour quelqu'un
   d'autre) — il faudrait une table `partages`. À noter : le lot 8.F a posé le
   mécanisme qui le rendrait facile (voir la procuration).
@@ -167,7 +187,11 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
 - `Dataset` garde un index en cache : appeler `oublierIndex()` après toute
   mutation de `personnes`.
 - **Ne jamais modifier une migration déjà appliquée** ; en ajouter une. La
-  dernière est `0004_reinitialisations.sql`.
+  dernière est `0005_google.sql`.
+- **Un `INSERT` mal compté ne se voit pas au typage.** L'insertion du compte
+  Google est partie avec sept marqueurs et six valeurs liées ; `tsc` compile
+  sans rien dire, et D1 n'aurait refusé qu'à la première connexion réelle.
+  Recompter marqueurs et `bind` fait partie de la relecture d'un SQL neuf.
 - `src/domaine/zip.ts` sert **deux** consommateurs (le classeur Excel et
   l'archive du compte) : le casser casse les deux.
 - **Les champs ajoutés au lot 8 ne s'écrivent que s'ils portent quelque chose**
@@ -298,7 +322,11 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **329 vérifications.**
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **344 vérifications** en
+  local, **328 en ligne** : deux sections branchent sur la configuration de
+  l'instance (courriel, Google) et vérifient le comportement attendu de chaque
+  côté. Un écart entre les deux nombres est normal ; un écart *ailleurs* ne
+  l'est pas.
 - **La section 10.B branche sur `/api/auth/moyens`.** En local `.dev.vars` porte
   une clé d'envoi factice, donc l'instance se dit configurée ; en ligne elle ne
   l'est pas. Le harnais vérifie le comportement **attendu dans chaque cas**
@@ -334,9 +362,11 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   attente de plus de 480 ms, puis la salve `mousedown`/`mouseup`/`click` que le
   navigateur produit au lever du doigt. Sans cette salve, on ne teste pas le
   bug qui compte.
-- `.dev.vars` (non versionné) porte une **clé d'envoi factice** : de quoi
-  vérifier la branche « service configuré » — jeton créé, réponse identique,
-  échec d'envoi journalisé — sans compte chez personne.
+- `.dev.vars` (non versionné) porte une **clé d'envoi factice** et des
+  **identifiants Google factices** : de quoi vérifier les branches « service
+  configuré » — jeton créé, réponse identique, échec d'envoi journalisé ; aller
+  chez Google, témoin `state`/`nonce`, tous les refus du retour — sans compte
+  chez personne. Seul l'échange du code Google reste hors de portée.
 - Les comptes d'essai (`essai-%`, `mesure-%`, `comparaison-%`, `atelier%`,
   `mathias%`, `navigateur%`, `repris%`, `patron%` `@exemple.test`) se nettoient à la main,
   en local **et** en ligne. Les invités laissés par les essais s'effacent avec

@@ -819,3 +819,80 @@ correspondante existe bien dans `reinitialisations`, avec 3 600 secondes de
 durée et `utilise_le` à `NULL`. Sur la connexion, « Mot de passe oublié ? »
 n'ouvre plus que le bloc courriel, et le formulaire de code de secours attend
 derrière son bouton.
+
+---
+
+# Lot 10.C — la connexion Google (12/08/2026)
+
+Le lot 9.E l'avait **évaluée sans la faire**. Elle est faite.
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 10.C.1 | Le protocole : aller, retour, vérification des revendications. | `src/auth/google.ts` |
+| 10.C.2 | Les deux routes, et le rattachement des comptes. | `src/auth/routes.ts` |
+| 10.C.3 | `google_sub`, colonne additive et unique. | `migrations/0005_google.sql` |
+| 10.C.4 | Le bouton, et l'erreur de retour affichée sur la page. | `connexion.html`, `js/connexion.js` |
+
+## Les quatre décisions qui méritent d'être relues
+
+**Redirection côté serveur, pas le script de Google.** Google fournit un
+« Google Identity Services » qui dessine son bouton dans la page. S'en servir
+obligerait à élargir `script-src 'self'` **pour tout le site**. Affaiblir la
+protection de toutes les pages pour un bouton de connexion serait un mauvais
+échange. Le flux « Authorization Code » classique ne demande aucun JavaScript :
+le bouton est un `<a href>`.
+
+**On ne revérifie pas la signature du jeton, et c'est motivé.** L'`id_token`
+arrive par une connexion TLS que le Worker ouvre lui-même vers
+`oauth2.googleapis.com`, en s'authentifiant avec le secret client. OpenID
+Connect Core 1.0 § 3.1.3.7 dit que dans ce cas la validation TLS **tient lieu**
+de vérification de signature. Refaire une vérification RSA contre le JWKS
+serait du code cryptographique de plus, avec ses propres façons d'être faux,
+pour un gain nul — **tant qu'on n'accepte jamais un `id_token` venu d'ailleurs**.
+Et on n'en accepte jamais : il n'existe aucune route qui en prenne un en entrée.
+**C'est la propriété à ne pas casser.** Les revendications, elles, sont toutes
+vérifiées : émetteur, destinataire, expiration, `nonce`, `email_verified`.
+
+**Le rattachement se fait par `sub` d'abord, par adresse ensuite.** Une adresse
+peut être libérée puis réattribuée ; un `sub` ne l'est jamais. L'adresse ne sert
+qu'au premier rapprochement, et seulement parce que Google certifie
+`email_verified` — ce qui vaut exactement la preuve que donne notre propre lien
+par courriel. Refuser ce rapprochement obligerait les gens à se créer un doublon.
+
+**Un compte Google reprend l'essai en cours**, comme le fait l'inscription
+(lot 9.C). Sans ça, « connectez-vous pour garder votre travail » serait un
+mensonge pour la moitié des visiteurs.
+
+## Ce qui n'a pas pu être vérifié, et pourquoi
+
+**L'échange du code contre le jeton.** Il demande un projet Google Cloud et un
+secret client, qui n'existent pas encore — c'est au propriétaire de les créer
+(`DEPLOIEMENT.md`, « Brancher la connexion Google »). Tout ce qui l'entoure est
+vérifié, en posant des identifiants factices dans `.dev.vars` : la redirection
+et ses paramètres, le témoin `state`/`nonce` et ses attributs, et **tous** les
+refus du retour — sans témoin, témoin qui ne correspond pas, refus chez Google,
+retour vide.
+
+En production, les routes répondent **404** tant que les secrets ne sont pas
+posés, et le bouton n'apparaît pas. Rien de ce lot n'est donc actif en ligne
+avant une décision du propriétaire.
+
+## Vérification
+
+**344/344**, contre 329 à la fin du lot 10.B. La section branche sur
+`/api/auth/moyens`, comme celle du courriel : en local les identifiants factices
+font tourner la branche « configuré », en ligne celle du 404.
+
+La vérification qui compte le plus est celle du `SameSite=Lax` sur le témoin :
+en `Strict`, le navigateur ne le renverrait pas au retour de chez Google et
+**toute** connexion échouerait sur « demande expirée ». Vient ensuite le refus
+d'un `state` qui ne correspond pas — c'est lui qui empêche un tiers de faire
+aboutir chez vous une connexion qu'il a lancée lui-même.
+
+## Un défaut trouvé en relisant, que le typage ne voyait pas
+
+L'`INSERT` du compte Google avait **sept marqueurs et six valeurs liées** :
+l'identifiant manquait. TypeScript compile sans rien dire — D1 aurait refusé la
+requête à la première connexion Google réelle, c'est-à-dire au seul moment où
+personne n'aurait été là pour la voir. Trouvé en relisant le SQL à voix haute,
+pas par un outil.

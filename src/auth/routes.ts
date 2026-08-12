@@ -13,6 +13,13 @@
 import { Hono } from 'hono';
 import { envoiConfigure, envoyerLienReinitialisation, racinePublique } from './courriel';
 import {
+  adresseDAutorisation,
+  DUREE_ALLER,
+  ErreurGoogle,
+  googleConfigure,
+  identiteDepuisCode,
+} from './google';
+import {
   depuisBase64,
   empreinteCodeSecours,
   empreinteMotDePasse,
@@ -535,7 +542,9 @@ async function emettreLien(
  * y a-t-il un service d'envoi branché ? La page de connexion s'en sert pour
  * proposer le lien par courriel — ou, à défaut, pour ne rien promettre.
  */
-routesAuth.get('/moyens', (c) => c.json({ courriel: envoiConfigure(c.env) }));
+routesAuth.get('/moyens', (c) =>
+  c.json({ courriel: envoiConfigure(c.env), google: googleConfigure(c.env) })
+);
 
 /**
  * « J'ai oublié mon mot de passe. »
@@ -700,4 +709,185 @@ routesAuth.post('/nouveau-mot-de-passe', async (c) => {
   await fermerToutesLesSessions(c.env.DB, ligne.utilisateur_id);
 
   return c.json({ code_secours: nouveauCode });
+});
+
+/* --------------------------------------------------------------------------
+ * La connexion Google (lot 10.C)
+ *
+ * Deux routes, et aucune n'accepte de corps : tout passe par la redirection du
+ * navigateur. Voir `google.ts` pour le protocole et pour ce qui est vérifié.
+ *
+ * **Tant que les identifiants ne sont pas posés, ces routes répondent 404** —
+ * pas 500, pas une page blanche. Une porte qui n'existe pas est plus honnête
+ * qu'une porte qui s'ouvre sur rien.
+ * -------------------------------------------------------------------------- */
+
+/** Le cookie qui porte `state` et `nonce` entre l'aller et le retour. */
+const COOKIE_GOOGLE = 'ft_google';
+
+/**
+ * Restreint au chemin de la famille : ce témoin n'a rien à faire dans les
+ * requêtes du domaine, et `SameSite=Lax` est obligatoire — en `Strict` le
+ * navigateur ne le renverrait pas au retour de chez Google, et toute connexion
+ * échouerait sur « demande expirée ».
+ */
+function enteteCookieGoogle(url: string, valeur: string, dureeSecondes: number): string {
+  const morceaux = [
+    `${COOKIE_GOOGLE}=${valeur}`,
+    'Path=/api/auth/google',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${dureeSecondes}`,
+  ];
+  if (new URL(url).protocol === 'https:') morceaux.push('Secure');
+  return morceaux.join('; ');
+}
+
+/** Une valeur imprévisible, sans caractère à échapper dans une adresse. */
+function tirerAlea(): string {
+  return versBase64(crypto.getRandomValues(new Uint8Array(24)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/** Retour à la page de connexion en disant ce qui n'a pas marché. */
+function echecGoogle(c: { redirect: (u: string, s?: 302) => Response }, raison: string): Response {
+  return c.redirect(`/connexion.html?erreur=${encodeURIComponent(raison)}`, 302);
+}
+
+routesAuth.get('/google/depart', (c) => {
+  if (!googleConfigure(c.env)) return c.json({ erreur: 'connexion Google non configurée' }, 404);
+
+  const state = tirerAlea();
+  const nonce = tirerAlea();
+  c.header('Set-Cookie', enteteCookieGoogle(c.req.url, `${state}.${nonce}`, DUREE_ALLER));
+  return c.redirect(
+    adresseDAutorisation(c.env, racinePublique(c.env, c.req.raw), state, nonce),
+    302
+  );
+});
+
+routesAuth.get('/google/retour', async (c) => {
+  if (!googleConfigure(c.env)) return c.json({ erreur: 'connexion Google non configurée' }, 404);
+
+  // Le témoin a servi : on l'efface quoi qu'il arrive ensuite. Une demande ne
+  // vaut qu'une fois, y compris quand elle échoue.
+  c.header('Set-Cookie', enteteCookieGoogle(c.req.url, '', 0));
+
+  // Google renvoie `error=access_denied` quand on ferme son écran : ce n'est
+  // pas une panne, c'est quelqu'un qui a changé d'avis.
+  if (c.req.query('error')) return echecGoogle(c, 'connexion Google annulée');
+
+  const code = c.req.query('code') ?? '';
+  const state = c.req.query('state') ?? '';
+  const temoin = lireCookie(c.req.header('Cookie'), COOKIE_GOOGLE) ?? '';
+  const [stateAttendu, nonceAttendu] = temoin.split('.');
+
+  if (!code || !state || !stateAttendu || !nonceAttendu) {
+    return echecGoogle(c, 'demande Google expirée, recommencez');
+  }
+  // C'est ce test qui empêche un tiers de faire aboutir chez vous une connexion
+  // qu'il a lancée lui-même.
+  if (state !== stateAttendu) return echecGoogle(c, 'demande Google invalide');
+
+  let identite;
+  try {
+    identite = await identiteDepuisCode(
+      c.env,
+      racinePublique(c.env, c.req.raw),
+      code,
+      nonceAttendu
+    );
+  } catch (erreur) {
+    if (erreur instanceof ErreurGoogle) return echecGoogle(c, erreur.message);
+    console.error('google : échec inattendu', erreur);
+    return echecGoogle(c, 'connexion Google impossible');
+  }
+
+  const emailNorm = normaliserEmail(identite.email);
+  const maintenant = Math.floor(Date.now() / 1000);
+
+  // 1. Déjà lié : c'est le chemin normal, et le seul qui ne dépend pas de
+  //    l'adresse — un `sub` ne se réattribue jamais.
+  let compte = await c.env.DB.prepare(
+    'SELECT id, email, nom_affiche, role FROM utilisateurs WHERE google_sub = ?'
+  )
+    .bind(identite.sub)
+    .first<ComptePublic>();
+
+  if (!compte) {
+    // 2. Un compte existe déjà sous cette adresse : on l'attache. Google a
+    //    certifié `email_verified`, ce qui vaut exactement la preuve que donne
+    //    notre propre lien par courriel — refuser ici obligerait la personne à
+    //    se créer un doublon.
+    const parAdresse = await c.env.DB.prepare(
+      "SELECT id, email, nom_affiche, role FROM utilisateurs WHERE email_norm = ? AND role <> 'invite'"
+    )
+      .bind(emailNorm)
+      .first<ComptePublic>();
+
+    if (parAdresse) {
+      await c.env.DB.prepare('UPDATE utilisateurs SET google_sub = ?, dernier_acces = ? WHERE id = ?')
+        .bind(identite.sub, maintenant, parAdresse.id)
+        .run();
+      compte = parAdresse;
+    }
+  }
+
+  if (!compte) {
+    // 3. Personne : on crée. Et si la session en cours est un essai, **c'est
+    //    cette ligne-là qu'on reprend** — même identifiant, mêmes sauvegardes,
+    //    exactement comme le fait l'inscription (lot 9.C). Sans ça, « connectez-
+    //    vous pour garder votre travail » serait un mensonge.
+    const essai = await compteDeLaSession(c);
+    const reprise = essai?.role === 'invite';
+    const id = reprise ? (essai as ComptePublic).id : crypto.randomUUID();
+
+    if (reprise) {
+      await c.env.DB.prepare(
+        `UPDATE utilisateurs
+            SET email = ?, email_norm = ?, google_sub = ?, role = 'membre',
+                plafond_sauvegardes = 10, dernier_acces = ?
+          WHERE id = ? AND role = 'invite'`
+      )
+        .bind(identite.email, emailNorm, identite.sub, maintenant, id)
+        .run();
+    } else {
+      await c.env.DB.prepare(
+        `INSERT INTO utilisateurs
+           (id, email, email_norm, mot_de_passe, nom_affiche, google_sub, cree_le, dernier_acces)
+         VALUES (?, ?, ?, ?, '', ?, ?, ?)`
+      )
+        // Pas de mot de passe : le même marqueur non analysable que pour un
+        // essai, donc `verifierMotDePasse` répond faux avant de dériver quoi
+        // que ce soit. On ne fabrique pas un mot de passe au hasard — ce serait
+        // une empreinte valide dont personne ne connaît l'original.
+        .bind(id, identite.email, emailNorm, SANS_MOT_DE_PASSE, identite.sub, maintenant, maintenant)
+        .run();
+    }
+
+    const aDejaUnMonde = await c.env.DB.prepare(
+      'SELECT 1 AS oui FROM sauvegardes WHERE utilisateur_id = ? LIMIT 1'
+    )
+      .bind(id)
+      .first();
+    if (!aDejaUnMonde) await semerDepart(c.env.DB, id);
+
+    compte = { id, email: identite.email, nom_affiche: '', role: 'membre' };
+  } else {
+    await c.env.DB.prepare('UPDATE utilisateurs SET dernier_acces = ? WHERE id = ?')
+      .bind(maintenant, compte.id)
+      .run();
+  }
+
+  const { jeton, expireLe } = await ouvrirSession(
+    c.env.DB,
+    compte.id,
+    c.req.header('User-Agent') ?? ''
+  );
+  // Deux `Set-Cookie` : celui qui efface le témoin de la demande, et celui de
+  // la session. `c.header(..., { append: true })` sinon le second écrase.
+  c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant), { append: true });
+  return c.redirect('/', 302);
 });

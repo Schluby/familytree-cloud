@@ -34,6 +34,18 @@
       <button id="valider" class="principal" type="submit">Se connecter</button>
     </form>
 
+    <!-- La connexion Google. Un simple lien : la redirection se fait côté
+         serveur, sans script tiers — la politique de contenu du site est
+         `script-src 'self'`, et l'élargir pour un bouton affaiblirait toutes
+         les pages. Voir src/auth/google.ts. Masqué tant que les identifiants
+         ne sont pas posés. -->
+    <div id="blocGoogle" class="cache">
+      <div class="separateur"><span>ou</span></div>
+      <a id="boutonGoogle" class="bouton pleine-largeur" href="/api/auth/google/depart">
+        Continuer avec Google
+      </a>
+    </div>
+
     <button id="lienOubli" class="lien" type="button">Mot de passe oublié ?</button>
 
     <div id="message" class="message"></div>

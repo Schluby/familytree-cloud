@@ -267,6 +267,90 @@ Un lot est plafonné à **100 sauvegardes** et **200 comptes** par requête. Au-
 la réponse est un refus explicite : c'est la limite de ce qu'un Worker peut mener
 à bien sans être coupé en plein milieu — donc appliqué à moitié.
 
+## Brancher la connexion Google (lot 10.C)
+
+**Facultatif, et le service marche sans.** Sans identifiants, le bouton
+n'apparaît pas et les deux routes répondent **404** — pas une page d'erreur,
+pas un écran blanc. C'est l'état actuel de la production.
+
+Le code est écrit et vérifié jusqu'à l'échange du jeton ; seul cet échange
+demande un vrai projet Google. Voici la marche à suivre, dans l'ordre.
+
+### 1. Créer le projet et l'écran de consentement
+
+Sur [console.cloud.google.com](https://console.cloud.google.com) :
+
+1. **Nouveau projet** — un nom quelconque, par exemple `familytree`.
+2. **API et services → Écran de consentement OAuth**. Type **Externe**.
+3. Remplir : nom de l'application, adresse d'assistance, adresse du
+   développeur. Les portées demandées sont `openid` et `email`, rien d'autre —
+   ce sont des portées « non sensibles », qui **ne demandent pas de vérification
+   Google**.
+4. Tant que l'application reste **en mode Test**, seuls les comptes que vous
+   inscrivez comme « utilisateurs de test » peuvent se connecter (100 maximum).
+   Passer en **Production** ouvre à tout le monde ; avec ces deux portées-là,
+   c'est immédiat et sans examen. Il faut en revanche une **politique de
+   confidentialité publiée** — `/donnees.html` en fait office, elle dit ce qui
+   est stocké et par qui c'est lisible.
+
+### 2. Créer l'identifiant OAuth
+
+**API et services → Identifiants → Créer → ID client OAuth**, type
+**Application Web**.
+
+Dans **URI de redirection autorisés**, coller **exactement** :
+
+```
+https://familytree.schlub-perso.workers.dev/api/auth/google/retour
+```
+
+⚠ Google compare cette adresse **caractère par caractère**. Pas de barre
+oblique finale, pas de `www`. Si vous mettez le service sur un domaine à vous,
+ajoutez l'adresse correspondante ici **et** posez `ADRESSE_PUBLIQUE` (voir
+ci-dessous) : c'est elle qui construit l'adresse envoyée à Google, et les deux
+doivent coïncider.
+
+### 3. Poser les deux secrets
+
+```bash
+npx wrangler secret put GOOGLE_CLIENT_ID
+```
+
+```bash
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+Si `ADRESSE_PUBLIQUE` n'est pas déjà posée, faites-le aussi — sans elle,
+l'adresse de redirection est déduite de la requête, ce qui marche mais dépend de
+la façon dont on arrive sur le site :
+
+```bash
+npx wrangler secret put ADRESSE_PUBLIQUE
+```
+
+### 4. Vérifier
+
+```bash
+curl -s https://familytree.schlub-perso.workers.dev/api/auth/moyens
+```
+
+Doit répondre `{"courriel":…,"google":true}`. Le bouton « Continuer avec
+Google » apparaît alors sur la page de connexion.
+
+### Ce qui se passe pour les comptes existants
+
+- **Un compte qui a déjà cette adresse est rattaché**, pas dupliqué. Google
+  certifie que la personne contrôle la boîte (`email_verified`), ce qui vaut
+  exactement la preuve que donne notre propre lien par courriel. Le mot de passe
+  existant continue de fonctionner : on gagne une seconde façon d'entrer, on n'en
+  perd pas.
+- **Un compte créé par Google n'a pas de mot de passe.** Il peut s'en donner un
+  par « Mot de passe oublié ? » — à condition que la clé d'envoi soit posée.
+- **Un essai en cours est repris**, comme à l'inscription : même identifiant,
+  mêmes sauvegardes. Sauf si un compte existe déjà sous cette adresse Google —
+  dans ce cas c'est ce compte-là qui l'emporte, et le travail de l'essai reste
+  sur la ligne d'essai, qui sera effacée par le ménage nocturne.
+
 ## Les visiteurs sans compte (lot 9)
 
 Depuis le lot 9, **ouvrir la page suffit** : sans session, le serveur crée un

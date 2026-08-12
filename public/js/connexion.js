@@ -38,6 +38,25 @@ if (new URLSearchParams(location.search).get('creer')) {
   addEventListener('DOMContentLoaded', () => basculer('inscription'));
 }
 
+/* Ce que cette instance sait faire. Demandé une seule fois, au chargement :
+   deux blocs en dépendent (Google ici, le lien par courriel plus bas). */
+let moyens = null;
+const moyensCharges = appeler('/api/auth/moyens').then(({ donnees }) => {
+  moyens = donnees ?? {};
+  // Sans identifiants Google posés, la route répond 404 : mieux vaut ne pas
+  // montrer un bouton qui mène à une porte fermée.
+  if (moyens.google) $('blocGoogle').classList.remove('cache');
+  return moyens;
+});
+
+/* Le retour de Google échoue en revenant ici avec ?erreur=… — ce n'est pas
+   une page d'erreur séparée : la personne doit se retrouver devant le
+   formulaire, avec la raison sous les yeux. */
+const erreurRecue = new URLSearchParams(location.search).get('erreur');
+if (erreurRecue) {
+  addEventListener('DOMContentLoaded', () => dire(erreurRecue));
+}
+
 /* -------------------------------------------------------------------------- */
 
 function basculer(nouveau) {
@@ -147,7 +166,7 @@ $('lienOubli').addEventListener('click', async () => {
   // n'est pas de la mise en page : deux formulaires côte à côte laissent croire
   // qu'il faut choisir, alors que l'un demande un code que presque personne n'a
   // demandé. Sans service d'envoi, il reste le seul chemin et reste donc visible.
-  const { donnees } = await appeler('/api/auth/moyens');
+  const donnees = await moyensCharges;
   if (donnees?.courriel) {
     $('blocCourriel').classList.remove('cache');
     $('blocSecours').classList.add('cache');

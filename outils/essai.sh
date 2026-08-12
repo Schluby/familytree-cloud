@@ -804,6 +804,59 @@ verifier "la connexion range le code derriere un bouton" oui "$(contient 'lienSe
 verifier "  sans le supprimer pour autant" oui "$(contient 'formulaireRecuperation')"
 
 # ---------------------------------------------------------------------------
+# Lot 10.C : la connexion Google
+#
+# Le flux « Authorization Code », entierement cote serveur : pas de script
+# Google dans la page, parce que la CSP est `script-src 'self'` et que
+# l'elargir pour un bouton affaiblirait tout le site.
+#
+# Ce qui se verifie sans compte Google : l'aller (redirection, parametres,
+# temoin state/nonce) et TOUS les refus du retour. Seul l'echange du code
+# demande un vrai projet Google Cloud — en local, `.dev.vars` porte des
+# identifiants factices pour que la branche « configure » tourne quand meme.
+# ---------------------------------------------------------------------------
+
+echo "-- la connexion Google (10.C)"
+code - GET /api/auth/moyens > /dev/null
+verifier "l'instance dit si Google est branche" oui "$(contient '"google"')"
+GOOGLE="$(lire google)"
+code - GET /connexion > /dev/null
+verifier "la page porte le bloc, masque par defaut" oui "$(contient 'blocGoogle')"
+verifier "  et aucun script de Google" non "$(contient 'accounts.google.com/gsi')"
+
+if [ "$GOOGLE" = "true" ]; then
+  DEPART="$(entete - /api/auth/google/depart location)"
+  verifier "l'aller renvoie chez Google" oui "$(porte "$DEPART" 'accounts.google.com/o/oauth2/v2/auth')"
+  verifier "  avec le bon type de reponse" oui "$(porte "$DEPART" 'response_type=code')"
+  verifier "  la portee minimale" oui "$(porte "$DEPART" 'scope=openid+email')"
+  verifier "  un state" oui "$(porte "$DEPART" 'state=')"
+  verifier "  et un nonce" oui "$(porte "$DEPART" 'nonce=')"
+  TEMOIN="$(entete - /api/auth/google/depart set-cookie)"
+  verifier "il pose un temoin de demande" oui "$(porte "$TEMOIN" 'ft_google=')"
+  # SameSite=Strict ferait perdre le temoin au retour de chez Google, et TOUTE
+  # connexion echouerait sur « demande expiree ». C'est la verification qui
+  # protege le mieux cette famille de routes.
+  verifier "  en SameSite=Lax, sinon rien ne revient" oui "$(porte "$TEMOIN" 'SameSite=Lax')"
+  verifier "  et cantonne a sa famille de routes" oui "$(porte "$TEMOIN" 'Path=/api/auth/google')"
+
+  RETOUR="$(entete - '/api/auth/google/retour?code=x&state=y' location)"
+  verifier "un retour sans temoin est refuse" oui "$(porte "$RETOUR" 'erreur=')"
+  # Le coeur de la protection CSRF : sans ce test, un tiers pourrait faire
+  # aboutir chez vous une connexion qu'il a lancee lui-meme.
+  BOCAL_G="$DOSSIER/google.txt"
+  code "$BOCAL_G" GET /api/auth/google/depart > /dev/null
+  MAUVAIS="$(entete "$BOCAL_G" '/api/auth/google/retour?code=x&state=pas-le-bon' location)"
+  verifier "  un state qui ne correspond pas est refuse" oui "$(porte "$MAUVAIS" 'invalide')"
+  ANNULE="$(entete - '/api/auth/google/retour?error=access_denied' location)"
+  verifier "  un refus chez Google se dit simplement" oui "$(porte "$ANNULE" 'annul')"
+  NU="$(entete - /api/auth/google/retour location)"
+  verifier "  un retour vide aussi" oui "$(porte "$NU" 'erreur=')"
+else
+  verifier "sans identifiants, l'aller n'existe pas" 404 "$(code - GET /api/auth/google/depart)"
+  verifier "  ni le retour" 404 "$(code - GET /api/auth/google/retour)"
+fi
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

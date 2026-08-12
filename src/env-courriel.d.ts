@@ -22,4 +22,14 @@ interface Env {
   COURRIEL_EXPEDITEUR?: string;
   /** La racine des liens du courriel. Déduite de la requête si absente. */
   ADRESSE_PUBLIQUE?: string;
+
+  /**
+   * La connexion Google (lot 10.C). Mêmes règles que ci-dessus : absentes, le
+   * bouton n'apparaît pas et les routes répondent 404. Rien d'autre ne change.
+   *
+   *   npx wrangler secret put GOOGLE_CLIENT_ID
+   *   npx wrangler secret put GOOGLE_CLIENT_SECRET
+   */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }

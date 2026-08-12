@@ -344,3 +344,30 @@ input:disabled, select:disabled, textarea:disabled { opacity: .45; }
   color: var(--encre-douce);
 }
 .etiquettes li.partage { border-color: var(--reussite); color: var(--reussite); }
+
+/* ------------------------------------------- la connexion Google (10.C) */
+
+/* Un « ou » posé sur un trait : les deux façons d'entrer sont équivalentes,
+   la mise en page doit le dire. */
+.separateur {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin: 1.2rem 0 .9rem;
+  color: var(--encre-douce);
+  font-size: .82rem;
+}
+.separateur::before,
+.separateur::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--bord);
+}
+
+.bouton.pleine-largeur {
+  display: block;
+  width: 100%;
+  padding: .65rem;
+  text-align: center;
+  font-size: 1rem;
+}
