@@ -273,6 +273,12 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   autrement y est absorbé. C'est aussi là que vit le préfixe `DOMAINE` de la
   procuration : **le domaine seul est préfixé**, jamais le compte, la session
   ni les sauvegardes.
+- **La page de connexion ne renvoie automatiquement que sur `?retour=`.**
+  Signalé le 12/08 : déjà connecté, elle se refermait aussitôt, sans un mot, et
+  **changer de compte devenait impossible** — il fallait deviner le bouton de
+  déconnexion sur la page précédente. Le renvoi ne vaut plus que quand c'est
+  l'application qui envoie ici après un 401 (elle pose `?retour=`) ; une
+  navigation délibérée propose désormais « continuer » ou « changer de compte ».
 - **C'est `api.js` qui ouvre un essai, sur un 401.** Trois pages en sont
   exclues (`/connexion`, `/donnees`, `/admin`) parce que « vous n'êtes pas
   connecté » y est la bonne réponse, et la procuration aussi. Le marqueur
@@ -322,8 +328,8 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **344 vérifications** en
-  local, **328 en ligne** : deux sections branchent sur la configuration de
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **346 vérifications** en
+  local, **335 en ligne** : deux sections branchent sur la configuration de
   l'instance (courriel, Google) et vérifient le comportement attendu de chaque
   côté. Un écart entre les deux nombres est normal ; un écart *ailleurs* ne
   l'est pas.

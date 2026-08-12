@@ -802,6 +802,10 @@ verifier "  et annonce qu'aucun code n'est demande" oui "$(contient 'ni le code 
 code - GET /connexion > /dev/null
 verifier "la connexion range le code derriere un bouton" oui "$(contient 'lienSecours')"
 verifier "  sans le supprimer pour autant" oui "$(contient 'formulaireRecuperation')"
+# Signale le 12/08 : deja connecte, la page se refermait sans un mot, et
+# changer de compte devenait impossible. Elle propose maintenant le choix.
+verifier "  et propose de changer de compte" oui "$(contient 'changerDeCompte')"
+verifier "  en disant qui est connecte" oui "$(contient 'compteEnCours')"
 
 # ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google

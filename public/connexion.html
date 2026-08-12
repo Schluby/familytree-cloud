@@ -64,6 +64,21 @@
   </div>
 
   <!-- ------------------------------------------------------------------ -->
+  <!-- Déjà connecté, et venu ici volontairement. Le renvoi silencieux d'avant
+       rendait le changement de compte impossible : la page se refermait sans
+       un mot. On propose, on ne décide pas. -->
+  <div id="carteDejaConnecte" class="carte cache">
+    <h2 style="font-size:1.1rem;margin:0">Vous êtes déjà connecté</h2>
+    <p style="font-size:.88rem">
+      Ce navigateur est connecté en tant que <strong id="compteEnCours"></strong>.
+    </p>
+    <button id="continuerAinsi" class="principal" type="button">Continuer avec ce compte</button>
+    <button id="changerDeCompte" class="lien" type="button">
+      Se connecter avec un autre compte
+    </button>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
   <div id="carteRecuperation" class="carte cache">
     <h2 style="font-size:1.1rem;margin:0">Récupérer son compte</h2>
 

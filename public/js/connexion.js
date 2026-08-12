@@ -18,17 +18,51 @@ function destination() {
 /** Le jeton du courriel, s'il y en a un : il change tout ce qui suit. */
 const jetonRecu = new URLSearchParams(location.search).get('jeton');
 
-/* Déjà connecté ? Inutile de redemander — avec deux exceptions.
+/* Déjà connecté ? Ça dépend de **qui a demandé cette page**.
 
-   Un lien de réinitialisation : quelqu'un qui change son mot de passe depuis un
-   appareil où il est resté connecté ne doit pas être renvoyé sur son arbre.
+   Quand l'application nous envoie ici parce qu'elle a pris un 401, elle pose
+   `?retour=`. Si la session s'avère finalement valable, renvoyer d'où l'on
+   vient est la bonne réponse : personne n'a rien demandé.
 
-   Un essai sans compte : la session existe, mais c'est précisément pour en
-   sortir qu'on est venu ici. Le renvoyer sur son arbre le laisserait tourner
-   en rond entre « Créer un compte » et la page qu'il vient de quitter. */
+   Mais quand on tape l'adresse ou qu'on clique « Se connecter », **c'est un
+   geste délibéré** — et le renvoi silencieux d'avant rendait le changement de
+   compte impossible : la page se refermait aussitôt, sans un mot, et le seul
+   moyen d'en sortir était de trouver le bouton de déconnexion sur la page
+   précédente. On propose donc le choix, au lieu de le prendre.
+
+   Deux exceptions gardent leur comportement : un lien de réinitialisation
+   (`?jeton=`) doit s'ouvrir même sur un appareil resté connecté, et un essai
+   sans compte est justement venu ici pour en sortir. */
+const envoyeParLApplication = new URLSearchParams(location.search).has('retour');
+
 if (!jetonRecu) {
   compteConnecte().then((compte) => {
-    if (compte && compte.role !== 'invite') window.location.replace(destination());
+    if (!compte || compte.role === 'invite') return;
+    if (envoyeParLApplication) {
+      window.location.replace(destination());
+      return;
+    }
+    proposerLeChoix(compte);
+  });
+}
+
+/** « Vous êtes déjà connecté » — avec de quoi continuer ou en changer. */
+function proposerLeChoix(compte) {
+  document.querySelectorAll('.carte').forEach((c) => c.classList.add('cache'));
+  $('carteDejaConnecte').classList.remove('cache');
+  $('compteEnCours').textContent =
+    compte.email + (compte.role === 'admin' ? ' · administrateur' : '');
+
+  $('continuerAinsi').addEventListener('click', () => {
+    window.location.replace(destination());
+  });
+
+  $('changerDeCompte').addEventListener('click', async () => {
+    await appeler('/api/auth/deconnexion', { method: 'POST' });
+    // Sans ça, le marqueur ferait rouvrir un essai au prochain 401 alors qu'on
+    // vient justement de se déconnecter pour saisir une autre adresse.
+    localStorage.removeItem('familytree-compte-connu');
+    location.replace('/connexion.html');
   });
 }
 
