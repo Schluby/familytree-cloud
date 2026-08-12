@@ -13,10 +13,11 @@
 
   <!-- Dit à l'administrateur ce qu'il engage, avant qu'il ne clique. -->
   <div class="bandeau">
-    <strong>Lecture seule.</strong> Vous pouvez consulter et exporter les arbres
-    des autres comptes ; vous ne pouvez pas les modifier — l’API le refuse, pas
-    seulement cette page. <strong>Chaque consultation et chaque export laissent
-    une trace</strong> dans le journal, en bas de page.
+    <strong>Vous écrivez chez les autres.</strong> Vous pouvez consulter,
+    exporter, et <strong>modifier</strong> les arbres des autres comptes — un par
+    un avec « ✎ Éditer », ou plusieurs d’un coup avec les lots ci-dessous.
+    <strong>Chaque lecture et chaque écriture laissent une trace</strong> dans le
+    journal, en bas de page, et ce journal ne s’efface pas.
   </div>
 
   <!-- ------------------------------------------------------------------ -->
@@ -26,12 +27,83 @@
       <table class="donnees serree" id="tableComptes">
         <thead>
           <tr>
+            <th class="coche"><input type="checkbox" id="toutCocher" title="Tout sélectionner"></th>
             <th>Adresse</th><th>Rôle</th><th>Arbres</th><th>Contenu</th>
             <th>Place</th><th>Dernier accès</th><th></th>
           </tr>
         </thead>
-        <tbody id="corpsComptes"><tr><td colspan="7">Chargement…</td></tr></tbody>
+        <tbody id="corpsComptes"><tr><td colspan="8">Chargement…</td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Les lots (10.A) : le même geste sur les arbres de plusieurs comptes. -->
+  <div class="carte cache" id="carteLots">
+    <h2>Agir sur la sélection</h2>
+    <p id="portee">Aucun compte sélectionné.</p>
+
+    <div class="rangee">
+      <label for="choixPortee">Sur quelles sauvegardes
+        <select id="choixPortee">
+          <option value="toutes">toutes celles du compte</option>
+          <option value="active">seulement celle qu’il a ouverte</option>
+        </select>
+      </label>
+      <label for="choixOperation">Quoi poser
+        <select id="choixOperation">
+          <option value="meta">Informations générales (date, lien de campagne)</option>
+          <option value="maison">Une maison, et ses caractéristiques</option>
+          <option value="personne">Une fiche (profil)</option>
+          <option value="relation">Un lien entre deux fiches</option>
+          <option value="type-relation">Un type de lien</option>
+          <option value="categorie">Une catégorie de maisons</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="formulaireLot"></div>
+
+    <p class="note">
+      Le même identifiant est posé dans chaque sauvegarde : <strong>rejouer un
+      lot met à jour au lieu de dupliquer</strong>. Rien n’est écrit tant que
+      vous n’avez pas vu l’aperçu et confirmé.
+    </p>
+
+    <div class="actions" id="actionsLot">
+      <button type="button" class="bouton" id="btnApercu">Aperçu</button>
+      <button type="button" class="bouton accent" id="btnAppliquer" disabled>Appliquer…</button>
+    </div>
+
+    <div class="cache" id="blocResultat">
+      <p class="note" id="resumeLot"></p>
+      <div class="defilant">
+        <table class="donnees serree">
+          <thead><tr><th>Compte</th><th>Sauvegarde</th><th>Effet</th><th>Quoi</th></tr></thead>
+          <tbody id="corpsResultat"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Comment les comptes ont structuré leurs vues, et ce qu'ils partagent. -->
+  <div class="carte cache" id="cartePanorama">
+    <h2>Comment ils ont structuré leurs vues</h2>
+    <button type="button" class="bouton" id="btnPanorama">Relever la sélection</button>
+    <div class="cache" id="blocPanorama">
+      <div class="defilant">
+        <table class="donnees serree">
+          <thead>
+            <tr>
+              <th>Compte</th><th>Arbres</th><th>Fiches</th><th>Liens</th><th>Date</th>
+              <th>Doc.</th><th>Maisons</th><th>Catégories</th><th>Types</th><th>Filtres</th>
+            </tr>
+          </thead>
+          <tbody id="corpsPanorama"></tbody>
+        </table>
+      </div>
+      <div id="communDivergent"></div>
     </div>
   </div>
 

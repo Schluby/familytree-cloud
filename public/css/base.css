@@ -265,3 +265,82 @@ body.tres-large main { max-width: 68rem; }
 .lien.danger { color: var(--erreur); }
 
 .note { font-size: .8rem; color: var(--encre-douce); margin: .6rem 0 0; }
+
+/* ----------------------------------------------- les lots (10.A) */
+
+/* `input` est large par défaut sur les pages de formulaire ; une case à cocher
+   qui prend toute la colonne rendrait le tableau illisible. */
+.donnees .coche { width: 2rem; }
+input[type='checkbox'] { width: auto; margin: 0; vertical-align: middle; }
+
+/* `select` n'existait pas avant cette page : il s'aligne sur `input`. */
+select {
+  width: 100%;
+  margin-top: .25rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--bord);
+  border-radius: .4rem;
+  background: #100d0b;
+  color: var(--encre);
+  font: inherit;
+}
+select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+textarea {
+  width: 100%;
+  margin-top: .25rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--bord);
+  border-radius: .4rem;
+  background: #100d0b;
+  color: var(--encre);
+  font: inherit;
+  resize: vertical;
+}
+
+/* Les champs d'un lot : deux colonnes tant que la place le permet. */
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0 1rem;
+  margin-top: .4rem;
+}
+.grille label { margin-top: .7rem; }
+
+/* Les sept caractéristiques d'une maison : plus étroites, elles tiennent en
+   une bande plutôt qu'en colonne. */
+.grille.serree { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
+
+.sous-titre {
+  margin: 1.1rem 0 0;
+  font-size: .82rem;
+  color: var(--encre-douce);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* Une case à cocher suivie de son libellé, sur la même ligne. */
+.bascule { display: flex; align-items: center; gap: .5rem; margin-top: .9rem; font-size: .9rem; }
+.bascule input { flex: none; }
+label .bascule { margin-top: .35rem; }
+label .note { display: block; margin-top: .25rem; }
+input:disabled, select:disabled, textarea:disabled { opacity: .45; }
+
+.actions { margin-top: 1rem; }
+
+/* L'issue de chaque sauvegarde dans un lot, lisible d'un coup d'œil. */
+.etat-cree { color: var(--reussite); }
+.etat-mis_a_jour { color: var(--accent); }
+.etat-inchange { color: var(--encre-douce); }
+.etat-refuse { color: var(--erreur); }
+
+/* Ce que les comptes partagent, et ce qui n'est qu'à certains. */
+.etiquettes { display: flex; flex-wrap: wrap; gap: .35rem; margin: .3rem 0 0; padding: 0; list-style: none; }
+.etiquettes li {
+  border: 1px solid var(--bord);
+  border-radius: .8rem;
+  padding: .1rem .55rem;
+  font-size: .78rem;
+  color: var(--encre-douce);
+}
+.etiquettes li.partage { border-color: var(--reussite); color: var(--reussite); }
