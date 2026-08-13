@@ -920,6 +920,10 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .sauvegarde:hover { background: var(--fond-3); }
 .sauvegarde.actif { background: var(--accent-doux); border-color: var(--accent); cursor: default; }
+/* Un arbre qu'on nous a ouvert (11.B) : bordure en pointillé, pour qu'on ne le
+   prenne pas d'un coup d'œil pour l'une des siennes. */
+.sauvegarde.partage { border-style: dashed; }
+.sauvegarde.partage .sv-pastille { background: #7fa8c9; }
 .sv-pastille {
   width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px;
   border: 1.5px solid var(--bord-clair);
@@ -1255,6 +1259,32 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 body.sombre .bandeau-procuration { background: #352c12; color: #e8c96a; border-bottom-color: #6b5620; }
 body.en-procuration #btn-telecharger,
 body.en-procuration #btn-instantane { display: none; }
+
+/* ------------------------------------------------ arbre partagé (11.B)
+ *
+ * Le contraire de la procuration : on regarde sans pouvoir écrire. Le serveur
+ * refuse déjà tout verbe autre que GET sur `/api/partages/<id>/lecture` — ces
+ * règles ne sont donc pas la sécurité, elles sont l'honnêteté. **Une interface
+ * qui propose ce que l'API refuse ment**, et laisse croire qu'on a cassé
+ * quelque chose alors qu'on a simplement tenté ce qui n'existe pas.
+ */
+.bandeau-procuration .bouton { margin-left: auto; }
+body.en-partage .bandeau-procuration {
+  background: #e7f0f7; color: #2d4f6b; border-bottom-color: #a8c4d8;
+}
+body.sombre.en-partage .bandeau-procuration {
+  background: #16242e; color: #93c1de; border-bottom-color: #2c4657;
+}
+body.en-partage #btn-telecharger,
+body.en-partage #btn-instantane,
+body.en-partage #btn-nouveau-profil,
+body.en-partage #btn-annee,
+body.en-partage .rail-actions,
+body.en-partage #btn-nouveau-filtre,
+body.en-partage .etat-ecriture { display: none; }
+/* La liste des personnes reste ouvrable — c'est de la lecture — mais la fiche
+   n'y est plus modifiable : `pointer-events` couperait aussi le défilement. */
+body.en-partage .sauvegarde { cursor: default; }
 
 /* ------------------------------------------------------ essai sans compte
  *

@@ -98,13 +98,26 @@
 
         <section class="rail-bloc">
           <h2>Sauvegardes</h2>
-          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit ou appui long : renommer, dupliquer, télécharger.</p>
+          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit ou appui long : renommer, dupliquer, télécharger, <b>partager en lecture</b>.</p>
           <ul class="liste-sauvegardes" id="liste-sauvegardes"></ul>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-nouvelle-sauvegarde" title="Créer une sauvegarde">＋ Nouvelle</button>
             <button class="bouton bouton-plat" id="btn-importer-sauvegarde" title="Charger un .json exporté, ou un .zip de « Tout télécharger »">⤒ Importer</button>
           </div>
           <p class="rail-aide" id="aide-plafonds"></p>
+        </section>
+
+        <!-- Lot 11.B. Bloc à part, et non mêlé aux siennes : ces arbres ne
+             sont pas à vous, ne comptent pas dans votre plafond, et ne
+             s'écrivent pas. Les confondre mentirait sur ce qu'on peut en
+             faire. Masqué tant que personne ne vous a rien ouvert. -->
+        <section class="rail-bloc" id="bloc-partages" hidden>
+          <h2>Partagés avec moi</h2>
+          <p class="rail-aide">
+            Des arbres que d’autres comptes vous ont ouverts. Vous les voyez
+            tels qu’ils les modifient, en lecture seule.
+          </p>
+          <ul class="liste-sauvegardes" id="liste-partages"></ul>
         </section>
 
         <section class="rail-bloc">

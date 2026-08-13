@@ -16,6 +16,7 @@ import { routesAuth } from './auth/routes';
 import { routesSauvegardes } from './sauvegardes/routes';
 import { routesAdmin } from './admin/routes';
 import { routesDomaine, santeDuMonde } from './domaine/routes';
+import { routesPartages } from './partages/routes';
 import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import type { Variables } from './intergiciels';
 
@@ -143,6 +144,15 @@ app.route('/api/sauvegardes', routesSauvegardes);
  * -------------------------------------------------------------------------- */
 
 app.route('/api/admin', routesAdmin);
+
+/* --------------------------------------------------------------------------
+ * Les partages (lot 11.B) : un arbre montré à d'autres comptes, en lecture
+ * seule. Surface séparée elle aussi, et montée avant `/api` pour la même
+ * raison. Les routes de membres n'apprennent pas qu'un partage existe : elles
+ * répondent toujours 404 sur ce qui n'est pas à elles.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api/partages', routesPartages);
 
 /* --------------------------------------------------------------------------
  * Le domaine : l'arbre lui-même, sur le contrat d'adresses de la version

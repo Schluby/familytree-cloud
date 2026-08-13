@@ -6,9 +6,10 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8, 9 et 10.A** — des tranches qui
-n'étaient pas au plan d'origine, demandées les 10 et 11/08/2026. En ligne sur
-https://familytree.schlub-perso.workers.dev.
+**Les sept lots du plan sont livrés, puis les lots 8, 9, 10 et 11** — des
+tranches qui n'étaient pas au plan d'origine, demandées entre le 10 et le
+13/08/2026. En ligne sur https://familytree.schlub-perso.workers.dev et sur
+https://myschlub.com (**le même Worker**, pas un second déploiement).
 
 Le lot 9 change quelque chose de plus profond que les précédents : **le service
 n'exige plus de compte pour être essayé.** Un visiteur arrive dans un monde déjà
@@ -99,6 +100,25 @@ barre ne garde que de quoi naviguer et le reste **descend dans le rail** —
   de départ (26 px pour « ＋ Nouvelle maison », 24 px pour une entrée de
   légende) étaient dessinées pour une souris.
 
+Le lot 11.B, du même jour, répond à la question « le lien de campagne, est-ce
+que ça crée une vue partagée ? » — **non** : `meta.document` est une adresse
+http(s) vers un document hébergé ailleurs, rien d'autre. Le partage, lui, ouvre
+**une sauvegarde vivante à plusieurs lecteurs**, sur sa propre surface
+`/api/partages/*`. Trois choses à ne pas défaire :
+
+- **Il n'y a pas de partage en écriture, et il ne faut pas en ajouter un.** La
+  table n'a pas de colonne « droit ». Deux personnes qui écrivent dans le même
+  document sans arbitre, c'est le verrou de révision qui en rejette une au
+  hasard. La procuration (8.F) reste la seule écriture chez autrui.
+- **L'ordre des deux intergiciels du chemin de lecture est un invariant** :
+  `verbeDeLecture` **puis** `parPartage`. Le verbe est refusé avant que le
+  compte du propriétaire ne soit posé sur le contexte ; inverser les deux ferait
+  d'un défaut d'ordre une écriture au nom de quelqu'un d'autre.
+- **Les routes de membres restent aveugles.** `GET /api/sauvegardes/<arbre
+  partagé>` répond **404** même à celui à qui on l'a ouvert, et il ne peut pas
+  l'activer. Ne jamais « corriger » cela : c'est ce qui empêche le partage
+  d'ouvrir une brèche dans le cloisonnement.
+
 Le panorama (`POST /api/admin/lots/panorama`) répond à la question qui précède
 tout lot de groupe : **qu'est-ce que ces comptes ont en commun ?** Ce qui est
 partagé par tous supporte un lot ; ce qui n'est qu'à certains serait écrasé sans
@@ -158,6 +178,13 @@ Le lot 8, en une phrase par morceau :
   autre. **C'est un revirement assumé du lot 7**, pas un oubli.
 - **8.G — mot de passe oublié.** Jeton par courriel, à usage unique, une heure.
   Sans clé d'envoi, l'option ne s'affiche pas et le code de secours reste.
+
+### Ce qu'il faut poser en ligne avant que le lot 11 ne serve
+
+**Deux migrations à appliquer** — `npm run deploy` les passe seul, mais il faut
+qu'il tourne : `0006_tutelles.sql` (les intendants) et `0007_partages.sql` (les
+arbres partagés). Sans elles, les routes de ces deux lots échouent sur une
+table absente.
 
 ### Ce qui vous revient
 
@@ -228,7 +255,7 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
 - `Dataset` garde un index en cache : appeler `oublierIndex()` après toute
   mutation de `personnes`.
 - **Ne jamais modifier une migration déjà appliquée** ; en ajouter une. La
-  dernière est `0006_tutelles.sql`.
+  dernière est `0007_partages.sql`.
 - **Toute route neuve sous `/api/admin/*` qui reçoit un identifiant de compte
   doit passer par `dansLePerimetre`** (`src/admin/intergiciel.ts`). Sans ce
   passage, elle est ouverte à tout intendant sur tout compte : le périmètre est
@@ -379,11 +406,23 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **416 vérifications** en
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **453 vérifications** en
   local : deux sections branchent sur la configuration de l'instance (courriel,
   Google) et vérifient le comportement attendu de chaque côté, donc le total en
   ligne diffère de quelques unités. Un écart entre les deux nombres est normal ;
   un écart *ailleurs* ne l'est pas.
+- **Ne pas modifier `essai.sh` pendant qu'il tourne.** Bash relit le fichier au
+  fil de l'exécution, depuis la position où il en est : une insertion décale
+  tout et il reprend au milieu d'un mot. Le symptôme — « syntax error near
+  unexpected token » sur une ligne parfaitement valable — se lit comme un bogue
+  qu'on vient d'écrire. `bash -n` sur le fichier au repos le dément.
+- **En local, `essai.sh` peut faire tomber `wrangler dev`.** Son aide `sql()`
+  lance `wrangler d1 execute --local` pendant que `wrangler dev` tient le même
+  fichier SQLite ; la contention est intermittente et tue le serveur en pleine
+  course. Le symptôme ne trompe pas : des codes **`000`** en cascade à partir
+  d'un point, puis un `ENOENT … corps.json` (curl n'a rien reçu, donc rien
+  écrit). Ce n'est pas une régression du code — relancer le serveur et
+  reprendre.
 - **Une vérification de page doit viser l'adresse que le site sert vraiment.**
   `GET /admin.html` répond **307** (Cloudflare enlève l'extension) : le corps
   est vide, et deux vérifications écrites contre lui sont passées sans rien

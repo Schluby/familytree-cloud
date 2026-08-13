@@ -26,7 +26,25 @@
  * édite l'arbre d'un autre reste lui-même.
  */
 const ARBRE_VISE = new URLSearchParams(location.search).get('arbre') || '';
-const DOMAINE = ARBRE_VISE ? `/api/admin/arbres/${encodeURIComponent(ARBRE_VISE)}` : '/api';
+
+/* ------------------------------------------------------- le partage (11.B)
+ *
+ * `?partage=<sauvegarde>` : on **regarde** l'arbre de quelqu'un d'autre, qui
+ * nous l'a ouvert. Même mécanisme que la procuration, sans le pouvoir — le
+ * serveur monte le domaine derrière `/api/partages/<id>/lecture` et refuse tout
+ * verbe autre que GET **avant** de choisir la route (`src/partages/routes.ts`).
+ *
+ * Les deux ne se cumulent pas, et la procuration l'emporte : elle est le geste
+ * d'un administrateur sur un arbre qu'il peut écrire, le partage celui d'un
+ * lecteur qui ne le peut pas.
+ */
+const PARTAGE_VISE = ARBRE_VISE ? '' : new URLSearchParams(location.search).get('partage') || '';
+
+const DOMAINE = ARBRE_VISE
+  ? `/api/admin/arbres/${encodeURIComponent(ARBRE_VISE)}`
+  : PARTAGE_VISE
+    ? `/api/partages/${encodeURIComponent(PARTAGE_VISE)}/lecture`
+    : '/api';
 
 /** Redirige vers la connexion en gardant l'adresse demandée. */
 function versConnexion() {
@@ -65,6 +83,11 @@ export function memoriserCompte(role) {
 
 function essaiPossible() {
   if (ARBRE_VISE) return false;
+  // Un partage est adressé à **un compte nommé** (lot 11.B). Ouvrir un essai
+  // tout neuf fabriquerait quelqu'un à qui l'arbre n'a jamais été partagé, et
+  // le renverrait sur un 404 incompréhensible. Sans session, c'est la page de
+  // connexion — comme pour les pages de compte.
+  if (PARTAGE_VISE) return false;
   if (localStorage.getItem(MEMOIRE_COMPTE)) return false;
   return !PAGES_SANS_ESSAI.some((page) => location.pathname.startsWith(page));
 }
@@ -157,6 +180,20 @@ async function listerSauvegardes() {
 export const Api = {
   /** L'arbre d'un autre qu'on édite, ou `''` : c'est le sien. */
   procuration: ARBRE_VISE,
+  /** L'arbre d'un autre qu'on **regarde**, ou `''`. Lecture seule (11.B). */
+  partage: PARTAGE_VISE,
+
+  // ------------------------------------------------------------ les partages
+  /** Les arbres qu'on m'a ouverts. */
+  partages: () => requete('/api/partages'),
+  /** À qui l'un des miens est ouvert. */
+  lecteurs: (id) => requete(`/api/partages/${id}/lecteurs`),
+  /** La liste **entière** des lecteurs, par adresse. Elle remplace. */
+  poserLecteurs: (id, lecteurs) =>
+    requete(`/api/partages/${id}/lecteurs`, {
+      method: 'PUT',
+      body: JSON.stringify({ lecteurs }),
+    }),
   /**
    * Appelé après **toute** écriture réussie. `main.js` s'en sert pour savoir
    * qu'un visiteur sans compte a maintenant quelque chose à perdre.

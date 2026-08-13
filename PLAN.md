@@ -17,6 +17,11 @@ non coché. Les décisions techniques et leurs raisons sont dans
 
 ## Où on en est
 
+> **Cette section date des premiers jours et n'a pas été réécrite** — elle
+> raconte l'ordre dans lequel les lots 0 à 5 sont tombés. L'état courant est
+> dans [`REPRISE.md`](REPRISE.md) ; le détail de chaque lot, y compris les
+> lots 8 à 11 ajoutés après coup, est dans les sections ci-dessous.
+
 **Lot 0 fait, et en ligne (09/08/2026).**
 
 - Adresse : **https://familytree.schlub-perso.workers.dev**
@@ -1053,3 +1058,84 @@ fois.
 **416/416.** Les huit vérifications nouvelles constatent que les pièces sont
 servies (le bloc d'accueil, la sortie du tiroir, le module, les règles
 tactiles) ; les mesures, elles, sont dans le tableau ci-dessus.
+
+---
+
+# Lot 11.B — Un arbre montré aux autres, en lecture seule  ☑
+
+*Question posée le 13/08/2026 : « elle sert à quoi la partie adresse de lien ?
+Est-ce que ça permet de créer une nouvelle vue que l'administrateur va pouvoir
+configurer (mettre les gens en mode read only), sur laquelle il va pouvoir
+faire des modifs, et que les autres joueurs voient ? Je veux ça si c'est pas
+ça. »*
+
+**Ce n'était pas ça.** Le « lien de campagne » (`meta.document`, lot 9) est une
+adresse http(s) rangée dans une sauvegarde. Elle met un bouton 📜 dans la barre
+du haut, qui ouvre un document hébergé ailleurs — un Google Doc, une page de
+notes. Elle ne partage rien, ne donne accès à rien, et l'arbre reste
+strictement privé. Le champ du même nom dans les lots la pose chez plusieurs
+comptes d'un coup, rien de plus.
+
+**Voici ce qui a été demandé.** Le propriétaire désigne des comptes ; ils voient
+*sa* sauvegarde — la vivante, pas une copie qui vieillirait dès qu'il y touche —
+dans l'application entière, et ne peuvent rien y écrire.
+
+- ☑ Migration `0007_partages.sql` — `partages(sauvegarde_id, utilisateur_id)`.
+- ☑ Surface séparée `/api/partages/*` ([`src/partages/routes.ts`](src/partages/routes.ts)).
+- ☑ `GET /` (ce qu'on m'a ouvert), `GET /:arbre/lecteurs`,
+  `PUT /:arbre/lecteurs` (la liste entière, par **adresse**).
+- ☑ `/:arbre/lecture/*` monte **le domaine entier**, derrière deux gardes.
+- ☑ Interface : bloc « Partagés avec moi » dans le rail, « Partager en
+  lecture… » dans le menu d'une sauvegarde, bandeau 👁 et extinction de ce qui
+  écrit en mode lecture.
+
+## Les quatre décisions qui méritent d'être relues
+
+**Aucun partage en écriture, et il n'y en aura pas.** Deux personnes qui
+écrivent dans le même document sans rien pour arbitrer entre elles, c'est un
+verrou de révision qui rejette l'une des deux au hasard. La procuration
+(lot 8.F) reste la seule écriture chez autrui — et elle est journalisée. D'où
+une table sans colonne « droit » : elle ne dit qu'une chose, et ne peut pas en
+dire une autre par accident.
+
+**La garde du verbe est posée avant la substitution du compte.** Deux
+intergiciels sur le chemin, dans cet ordre : `verbeDeLecture` refuse tout ce qui
+n'est pas GET, *puis* `parPartage` substitue le propriétaire. Si l'ordre venait
+à être inversé par distraction, la conséquence serait un refus — jamais une
+écriture au nom du propriétaire. Et parce que la garde est sur le chemin et non
+sur les routes, une route d'écriture ajoutée demain au domaine y serait refusée
+sans que personne n'ait à y penser.
+
+**Les routes de membres restent aveugles.** `src/intergiciels.ts` ne connaît
+toujours pas les partages, `ficheDe` porte toujours `utilisateur_id` dans son
+`WHERE`. `GET /api/sauvegardes/<arbre partagé>` répond **404** à celui à qui on
+l'a pourtant ouvert, et il ne peut pas l'activer. Le partage vit sur sa propre
+surface, exactement comme l'administration sur la sienne. C'est vérifié
+séparément, et c'est ce qui empêche le lot d'ouvrir une brèche ailleurs.
+
+**Une adresse inconnue est nommée, pas tue.** C'est l'inverse des lots du
+11.A, où le silence protégeait l'existence des comptes. Ici c'est *mon* arbre,
+et si Jean n'a pas de compte je dois le savoir — sans quoi je crois l'avoir
+invité. Cela apprend à qui demande si une adresse a un compte ici ; c'est le
+prix d'un partage utilisable, et il se paie une adresse à la fois.
+
+## Ce qui a été écarté
+
+**Rendre une sauvegarde partagée « active ».** Elle n'est pas à nous : écrire
+son identifiant dans `utilisateurs.sauvegarde_active` reviendrait à ranger chez
+soi le nom d'un arbre qui appartient à quelqu'un d'autre — et à faire dépendre
+notre écran de ce que ce quelqu'un décide d'en faire. On l'ouvre dans une page
+à part, `?partage=<id>`, et on revient chez soi.
+
+**Empêcher un lecteur d'exporter.** `/export/*` est une lecture, elle passe
+donc, et c'est dit plutôt que passé sous silence : **partager un arbre, c'est
+accepter qu'on puisse en faire une copie.** Le refuser ne protégerait rien — qui voit toutes
+les fiches et tous les liens peut les recopier à la main — et coûterait à un
+joueur le droit de sortir en `.xlsx` la table qu'on vient de lui montrer.
+
+## Vérification
+
+**453/453**, contre 416 à la fin du lot 11.C. La section reprend chaque verbe (POST, PATCH, DELETE) sur la
+surface de lecture, vérifie qu'un arbre non partagé répond le **même** 404
+qu'un arbre inexistant, et — c'est celle qui compte le plus — que l'API
+ordinaire continue de répondre 404 sur un arbre pourtant partagé.

@@ -271,6 +271,32 @@ ne connaît que `membre` et `intendant`, et refuse même de toucher au rôle d'u
 administrateur. Une route qui sacre un pair ferait du premier compte compromis
 le trousseau de toute l'instance.
 
+## Montrer un arbre à d'autres, en lecture seule (lot 11.B)
+
+**Ce n'est pas le « lien de campagne ».** Celui-là (le champ « Document » de la
+barre du haut, `meta.document`) est une simple adresse http(s) vers un document
+hébergé ailleurs — un Google Doc, des notes. Il ne partage rien.
+
+Le partage, lui, ouvre **votre sauvegarde vivante** à d'autres comptes : ils la
+voient telle que vous la modifiez, et ne peuvent rien y écrire.
+
+1. Dans le rail, bloc **Sauvegardes**, clic droit (ou appui long) sur l'arbre.
+2. **« Partager en lecture… »**, puis « Ouvrir à des comptes… ».
+3. Saisir les **adresses**, séparées par des virgules.
+
+⚠️ **La liste remplace la précédente** : effacer une adresse retire l'accès.
+Une adresse sans compte sur cette instance est ignorée, et la page le dit.
+
+Ceux à qui vous l'avez ouvert le trouvent dans leur rail, sous **« Partagés
+avec moi »**, en pointillé. L'ouvrir affiche un bandeau bleu **« 👁 Lecture
+seule »** et retire tout ce qui écrit.
+
+**Il n'y a pas de partage en écriture, et il n'y en aura pas.** Deux personnes
+qui écrivent dans le même document sans rien pour arbitrer entre elles, c'est
+l'une des deux qui se fait rejeter au hasard par le verrou de révision. Pour
+écrire chez quelqu'un, c'est « ✎ Éditer » depuis la page d'administration — et
+c'est journalisé.
+
 ## Les lots : agir sur plusieurs comptes à la fois (lot 10.A)
 
 La page d'administration porte, sous la liste des comptes, une **case à cocher

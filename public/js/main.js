@@ -33,6 +33,8 @@ const elements = {
   filFocus: document.getElementById('fil-focus'),
   listeVues: document.getElementById('liste-vues'),
   listeSauvegardes: document.getElementById('liste-sauvegardes'),
+  blocPartages: document.getElementById('bloc-partages'),
+  listePartages: document.getElementById('liste-partages'),
   btnNouvelleSauvegarde: document.getElementById('btn-nouvelle-sauvegarde'),
   btnImporterSauvegarde: document.getElementById('btn-importer-sauvegarde'),
   blocLiens: document.getElementById('bloc-liens'),
@@ -103,6 +105,8 @@ const elements = {
  * celle du propriétaire, et un instantané irait dans le mauvais compte.
  */
 const PROCURATION = Api.procuration;
+/** Lot 11.B : on regarde l'arbre de quelqu'un, qui nous l'a ouvert. */
+const PARTAGE = Api.partage;
 
 // Même palette que le moteur de rendu pour les générations.
 const COULEURS_GENERATION = ['#a8559f', '#8265c0', '#5b7fc4', '#2f97a8', '#2f9e78'];
@@ -282,6 +286,25 @@ async function demarrer() {
   // Le compte d'abord : c'est lui qui dit si la session tient encore, et un
   // 401 renvoie à la connexion avant qu'on ait affiché un arbre vide.
   await dessinerCompte();
+  // Un arbre qu'on nous a ouvert (11.B) : mêmes écrans, mêmes vues, aucune
+  // écriture. Le chemin est celui de la procuration, sans le pouvoir.
+  if (PARTAGE) {
+    try {
+      await preparerPartage();
+    } catch (erreur) {
+      message(`Arbre inaccessible : ${erreur.message}`);
+      return;
+    }
+    try {
+      etat.vues = (await Api.vues()).vues;
+      dessinerListeVues();
+      await chargerUnivers();
+      await choisirVue(etat.vues[0]?.id);
+    } catch (erreur) {
+      message(`Impossible de contacter l'API : ${erreur.message}`);
+    }
+    return;
+  }
   if (PROCURATION) {
     try {
       await preparerProcuration();
@@ -365,6 +388,48 @@ async function preparerProcuration() {
   // propriétaire : l'afficher inviterait à changer d'arbre sans le savoir.
   elements.listeSauvegardes.closest('.rail-bloc').hidden = true;
   elements.univers.textContent = sauvegarde.nom || '';
+}
+
+/**
+ * L'arbre qu'on nous a ouvert : de qui il est, et ce qu'on peut en faire.
+ *
+ * Le nom et le propriétaire viennent de la liste des partages — la seule
+ * information qui manque, l'arbre lui-même arrivant par le domaine monté
+ * derrière `/api/partages/<id>/lecture`. Si l'arbre n'y figure pas, c'est que
+ * le partage a été retiré : on le dit, plutôt que d'afficher un écran vide.
+ */
+async function preparerPartage() {
+  const { partages = [] } = await Api.partages();
+  const fiche = partages.find((p) => p.id === PARTAGE);
+  if (!fiche) {
+    throw new Error("cet arbre ne vous est plus partagé, ou ne l'a jamais été");
+  }
+
+  document.body.classList.add('en-partage');
+  elements.bandeauProcuration.hidden = false;
+  elements.bandeauProcuration.replaceChildren(
+    ...[
+      ['b', '👁 Lecture seule'],
+      [
+        'span',
+        ` — « ${fiche.nom} » appartient à ${fiche.proprietaire_email || 'un autre compte'}, qui vous l’a ouvert. Vous voyez ses modifications ; vous ne pouvez rien y écrire.`,
+      ],
+    ].map(([balise, texte]) => {
+      const element = document.createElement(balise);
+      element.textContent = texte;
+      return element;
+    })
+  );
+  const retour = document.createElement('a');
+  retour.className = 'bouton bouton-icone';
+  retour.href = '/';
+  retour.textContent = '↩ Mes arbres';
+  elements.bandeauProcuration.append(retour);
+
+  // Comme sous procuration : cette liste serait la nôtre, pas celle de l'arbre
+  // ouvert. La montrer inviterait à changer de monde sans s'en apercevoir.
+  elements.listeSauvegardes.closest('.rail-bloc').hidden = true;
+  elements.univers.textContent = fiche.nom || '';
 }
 
 /** Tout ce qui dépend de la sauvegarde active : maisons, types, joueurs… */
@@ -475,6 +540,54 @@ async function dessinerSauvegardes() {
       return li;
     })
   );
+
+  await dessinerPartages();
+}
+
+/**
+ * Les arbres qu'on nous a ouverts (11.B).
+ *
+ * Un clic ouvre une page à part, `?partage=<id>` : ce n'est pas « activer une
+ * sauvegarde » — elle n'est pas à nous, et la rendre active reviendrait à
+ * écrire dans notre compte le nom d'un arbre qui appartient à quelqu'un
+ * d'autre. On la regarde, puis on revient chez soi.
+ */
+async function dessinerPartages() {
+  let partages = [];
+  try {
+    partages = (await Api.partages()).partages || [];
+  } catch (erreur) {
+    // Un partage qui ne répond pas ne doit pas emporter la liste des siennes.
+    partages = [];
+  }
+
+  elements.blocPartages.hidden = partages.length === 0;
+  elements.listePartages.replaceChildren(
+    ...partages.map((fiche) => {
+      const li = document.createElement('li');
+      li.className = 'sauvegarde partage';
+      li.title = `Appartient à ${fiche.proprietaire_email} — lecture seule`;
+
+      const pastille = document.createElement('span');
+      pastille.className = 'sv-pastille';
+
+      const corps = document.createElement('div');
+      corps.className = 'sv-corps';
+      const nom = document.createElement('div');
+      nom.className = 'sv-nom';
+      nom.textContent = fiche.nom;
+      const meta = document.createElement('div');
+      meta.className = 'sv-meta';
+      meta.textContent = `${fiche.proprietaire_email} · ${resumeContenu(fiche)}`;
+      corps.append(nom, meta);
+
+      li.append(pastille, corps);
+      li.addEventListener('click', () => {
+        location.href = `/?partage=${encodeURIComponent(fiche.id)}`;
+      });
+      return li;
+    })
+  );
 }
 
 /** Changer de sauvegarde = changer de monde : on repart de la vue générale. */
@@ -528,6 +641,12 @@ function menuSauvegarde(fiche, evenement) {
           nomSource: fiche.nom,
         }),
     },
+    {
+      label: 'Partager en lecture…',
+      icone: '👁',
+      detail: 'montrer cet arbre à d’autres comptes',
+      onclick: () => menuPartage(fiche, evenement),
+    },
     { separateur: true },
     {
       label: 'Exporter en classeur Excel',
@@ -551,6 +670,84 @@ function menuSauvegarde(fiche, evenement) {
       onclick: () => confirmerSuppressionSauvegarde(fiche, evenement),
     },
   ]);
+}
+
+/**
+ * À qui cet arbre est ouvert, et comment changer la liste.
+ *
+ * On désigne les lecteurs **par leur adresse**, jamais par un identifiant : on
+ * partage à « jean@exemple.fr ». La liste envoyée **remplace** la précédente —
+ * une route d'ajout et une route de retrait feraient deux façons de se tromper,
+ * et c'est la même règle que les tutelles du lot 11.A.
+ */
+async function menuPartage(fiche, evenement) {
+  let lecteurs = [];
+  try {
+    lecteurs = (await Api.lecteurs(fiche.id)).lecteurs || [];
+  } catch (erreur) {
+    message(`Impossible de lire les partages : ${erreur.message}`);
+    return;
+  }
+
+  const adresses = lecteurs.map((lecteur) => lecteur.email);
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: `Partager « ${fiche.nom} »` },
+    {
+      texte: adresses.length
+        ? `Ouvert à ${pluriel(adresses.length, 'compte')} : ${adresses.join(', ')}`
+        : 'Cet arbre n’est ouvert à personne.',
+    },
+    {
+      texte:
+        'Ceux à qui vous l’ouvrez le voient tel que vous le modifiez, et ne peuvent rien y écrire.',
+    },
+    { separateur: true },
+    {
+      label: adresses.length ? 'Modifier la liste…' : 'Ouvrir à des comptes…',
+      icone: '👁',
+      onclick: () => changerLecteurs(fiche, adresses),
+    },
+    adresses.length && {
+      label: 'Ne plus le partager',
+      icone: '🚫',
+      danger: true,
+      onclick: () => enregistrerLecteurs(fiche, []),
+    },
+  ]);
+}
+
+function changerLecteurs(fiche, adresses) {
+  const saisie = prompt(
+    `Les adresses des comptes à qui « ${fiche.nom} » est ouvert, séparées par des virgules.\n` +
+      'Cette liste remplace la précédente : effacer une adresse retire l’accès.',
+    adresses.join(', ')
+  );
+  if (saisie === null) return;
+  enregistrerLecteurs(
+    fiche,
+    saisie
+      .split(/[,;\s]+/)
+      .map((mot) => mot.trim())
+      .filter(Boolean)
+  );
+}
+
+async function enregistrerLecteurs(fiche, adresses) {
+  try {
+    const reponse = await Api.poserLecteurs(fiche.id, adresses);
+    // Les adresses sans compte sont nommées : les taire ferait croire que Jean
+    // voit l'arbre alors qu'il ne le verra jamais.
+    const perdues = reponse.inconnus?.length
+      ? ` Sans compte ici, donc ignorée(s) : ${reponse.inconnus.join(', ')}.`
+      : '';
+    message(
+      reponse.lecteurs.length
+        ? `« ${fiche.nom} » est ouvert à ${pluriel(reponse.lecteurs.length, 'compte')}.${perdues}`
+        : `« ${fiche.nom} » n’est plus partagé.${perdues}`
+    );
+  } catch (erreur) {
+    message(`Partage impossible : ${erreur.message}`);
+  }
 }
 
 function confirmerSuppressionSauvegarde(fiche, evenement) {

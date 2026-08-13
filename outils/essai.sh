@@ -949,6 +949,80 @@ sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
 # navigateur — elles sont dans PLAN.md.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Lot 11.B : un arbre montre aux autres, en lecture seule
+#
+# Demande le 13/08/2026, apres la question « le lien de campagne, est-ce que ca
+# cree une vue que l'administrateur configure et que les autres joueurs
+# voient ? ». Non — `meta.document` n'est qu'une adresse http(s). Voici la
+# vraie : une seule sauvegarde, plusieurs lecteurs, aucune ecriture.
+#
+# Ce qui se verifie ici, et qui compte plus que le reste : que la lecture seule
+# tient sur TOUS les verbes, et qu'un arbre non partage repond 404 comme s'il
+# n'existait pas. Et surtout que l'API ORDINAIRE reste aveugle : partage ou
+# non, `/api/sauvegardes/<id>` d'un autre repond toujours 404.
+# ---------------------------------------------------------------------------
+
+echo "-- 11.B partager un arbre en lecture"
+code "$BOCAL_A" GET /api/sauvegardes > /dev/null
+ARBRE_PARTAGE="$(lire sauvegardes.0.id)"
+
+verifier "sans session, rien" 401 "$(code - GET /api/partages)"
+verifier "A n'a rien recu de personne" 0 "$(code "$BOCAL_A" GET /api/partages > /dev/null; lire partages.length)"
+verifier "les lecteurs d'un arbre qui n'est pas a nous" 404 "$(code "$BOCAL_B" GET /api/partages/$ARBRE_PARTAGE/lecteurs)"
+verifier "  et on ne peut pas s'y inviter" 404 "$(code "$BOCAL_B" PUT /api/partages/$ARBRE_PARTAGE/lecteurs "{\"lecteurs\":[\"$EMAIL_B\"]}")"
+verifier "A ouvre son arbre a B" 200 "$(code "$BOCAL_A" PUT /api/partages/$ARBRE_PARTAGE/lecteurs "{\"lecteurs\":[\"$EMAIL_B\",\"personne-$MARQUE@exemple.test\"]}")"
+verifier "  B est retenu" 1 "$(lire lecteurs.length)"
+verifier "  et l'adresse sans compte est nommee" 1 "$(lire inconnus.length)"
+verifier "  se partager a soi-meme ne sert a rien" 0 "$(code "$BOCAL_A" PUT /api/partages/$ARBRE_PARTAGE/lecteurs "{\"lecteurs\":[\"$EMAIL_A\"]}" > /dev/null; lire lecteurs.length)"
+verifier "A repose le partage" 1 "$(code "$BOCAL_A" PUT /api/partages/$ARBRE_PARTAGE/lecteurs "{\"lecteurs\":[\"$EMAIL_B\"]}" > /dev/null; lire lecteurs.length)"
+verifier "A relit ses lecteurs" 200 "$(code "$BOCAL_A" GET /api/partages/$ARBRE_PARTAGE/lecteurs)"
+verifier "  et y trouve B" oui "$(contient "$EMAIL_B")"
+
+echo "-- B le voit, et ne peut rien y ecrire"
+verifier "il figure dans ses partages" 1 "$(code "$BOCAL_B" GET /api/partages > /dev/null; lire partages.length)"
+verifier "  avec le nom de son proprietaire" oui "$(contient "$EMAIL_A")"
+verifier "il lit les referentiels" 200 "$(code "$BOCAL_B" GET /api/partages/$ARBRE_PARTAGE/lecture/referentiels)"
+verifier "  et les fiches" 200 "$(code "$BOCAL_B" GET /api/partages/$ARBRE_PARTAGE/lecture/personnes)"
+verifier "  et la vue se construit" 200 "$(code "$BOCAL_B" GET /api/partages/$ARBRE_PARTAGE/lecture/vue/sociogramme)"
+# Le coeur du lot. La garde du verbe est posee sur le CHEMIN, avant meme la
+# substitution du compte : un defaut d'ordre se traduirait par un refus, jamais
+# par une ecriture au nom du proprietaire.
+verifier "il ne cree pas de fiche" 403 "$(code "$BOCAL_B" POST /api/partages/$ARBRE_PARTAGE/lecture/personnes '{"prenom":"Intrus"}')"
+verifier "  ni n'en modifie une" 403 "$(code "$BOCAL_B" PATCH /api/partages/$ARBRE_PARTAGE/lecture/meta '{"annee_courante":"1 AC"}')"
+verifier "  ni ne pose une maison" 403 "$(code "$BOCAL_B" POST /api/partages/$ARBRE_PARTAGE/lecture/maisons '{"label":"Intruse"}')"
+verifier "  ni ne supprime" 403 "$(code "$BOCAL_B" DELETE /api/partages/$ARBRE_PARTAGE/lecture/personnes/qui-que-ce-soit)"
+verifier "  et le refus dit pourquoi" oui "$(contient 'lecture seule')"
+
+echo "-- l'API ordinaire reste aveugle au partage"
+verifier "la fiche de l'arbre partage : 404" 404 "$(code "$BOCAL_B" GET /api/sauvegardes/$ARBRE_PARTAGE)"
+verifier "  son contenu aussi" 404 "$(code "$BOCAL_B" GET /api/sauvegardes/$ARBRE_PARTAGE/contenu)"
+verifier "  et B ne peut pas l'activer" 404 "$(code "$BOCAL_B" POST /api/sauvegardes/$ARBRE_PARTAGE/activer)"
+verifier "  sa liste n'a pas grossi" non "$(code "$BOCAL_B" GET /api/sauvegardes > /dev/null; contient "$ARBRE_PARTAGE")"
+
+echo "-- un arbre qu'on ne nous a pas partage n'existe pas"
+code "$BOCAL_I" GET /api/sauvegardes > /dev/null
+verifier "l'invite n'y a pas droit" 404 "$(code "$BOCAL_I" GET /api/partages/$ARBRE_PARTAGE/lecture/referentiels)"
+verifier "  au mot pres" oui "$(contient 'introuvable')"
+verifier "  et il n'a rien dans ses partages" 0 "$(code "$BOCAL_I" GET /api/partages > /dev/null; lire partages.length)"
+verifier "une sauvegarde inventee" 404 "$(code "$BOCAL_B" GET /api/partages/inexistante/lecture/referentiels)"
+
+echo "-- retirer le partage referme la porte"
+verifier "A retire tout le monde" 200 "$(code "$BOCAL_A" PUT /api/partages/$ARBRE_PARTAGE/lecteurs '{"lecteurs":[]}')"
+verifier "  plus aucun lecteur" 0 "$(lire lecteurs.length)"
+verifier "  B ne le voit plus" 0 "$(code "$BOCAL_B" GET /api/partages > /dev/null; lire partages.length)"
+verifier "  et ne le lit plus" 404 "$(code "$BOCAL_B" GET /api/partages/$ARBRE_PARTAGE/lecture/referentiels)"
+
+echo "-- l'interface dit la meme chose que l'API"
+code - GET / > /dev/null
+verifier "le rail a son bloc « partages avec moi »" oui "$(contient 'bloc-partages')"
+verifier "  et le mode lecture a sa marque" oui "$(code - GET /js/main.js > /dev/null; contient 'en-partage')"
+verifier "  qui eteint ce qui ecrit" oui "$(code - GET /css/app.css > /dev/null; contient 'body.en-partage .rail-actions')"
+# Un partage est adresse a un compte nomme : ouvrir un essai tout neuf
+# fabriquerait quelqu'un a qui rien n'a ete partage, et le renverrait sur un 404
+# incomprehensible. Trouve en relisant, pas par une requete.
+verifier "  sans session, pas d'essai mais la connexion" oui "$(code - GET /js/api.js > /dev/null; contient 'if (PARTAGE_VISE) return false;')"
+
 echo "-- 11.C l'arbre au telephone"
 code - GET / > /dev/null
 verifier "le tiroir de gauche a une sortie" oui "$(contient 'btn-fermer-rail')"
