@@ -1390,8 +1390,6 @@ body.en-essai #btn-instantane { display: none; }
      tourné — sauf pour ☰ et 👤, qui doivent tenir dans tous les cas. */
   .barre-haut .champ-couleur,
   .barre-haut #lien-document,
-  .barre-haut #btn-telecharger,
-  .barre-haut #btn-instantane,
   .barre-haut #btn-vue-generale,
   .barre-haut #btn-annee,
   .barre-haut #btn-theme,
@@ -1400,6 +1398,35 @@ body.en-essai #btn-instantane { display: none; }
   .barre-haut #btn-deconnexion,
   .barre-haut .etat-ecriture,
   .barre-haut .compte { display: none; }
+
+  /* Éteints tout court, pas déplacés. Un `.zip` de toutes ses sauvegardes sur
+     un téléphone ne mène nulle part, et un instantané se prend quand on
+     travaille. « Vos données » (🛡) reste, et c'est le vrai endroit pour sortir
+     ses données. */
+  #btn-telecharger,
+  #btn-instantane { display: none; }
+
+  /* L'ordre du tiroir, refait pour un pouce.
+   *
+   * On l'ouvre pour filtrer — les maisons et les types de liens passent donc en
+   * tête, et les réglages de compte à la fin. L'ordre du HTML, lui, ne bouge
+   * pas : c'est celui d'un écran large, où tout est visible d'un coup.
+   *
+   * Trois blocs n'ont pas d'identifiant et se désignent par ce qu'ils
+   * contiennent. Là où `:has()` manquerait, eux seuls resteraient à leur place
+   * du HTML : l'ordre serait moins bon, rien ne casserait. */
+  .rail { display: flex; flex-direction: column; }
+  #rail-entete { order: 0; }
+  #bloc-maisons { order: 1; }
+  #bloc-liens { order: 2; }
+  .rail > section:has(#liste-vues) { order: 3; }
+  .rail > section:has(#options-vue) { order: 4; }
+  #bloc-joueurs { order: 5; }
+  .rail > section:has(#liste-sauvegardes) { order: 6; }
+  #bloc-partages { order: 7; }
+  #bloc-edition { order: 8; }
+  .rail > section:has(#stats) { order: 9; }
+  #bloc-telephone { order: 10; }
 
   /* L'en-tête du tiroir de gauche, et ce qu'il accueille. */
   #rail-entete {
@@ -1458,6 +1485,27 @@ body.en-essai #btn-instantane { display: none; }
   .panneau #recherche { min-height: 42px; font-size: 16px; }
   .panneau #selecteur-groupe { min-height: 42px; }
   #btn-fermer-panneau { min-width: 40px; min-height: 40px; font-size: 16px; }
+
+  /* La fiche, éditable au doigt.
+   *
+   * Mesuré le 13/08/2026, fiche ouverte sur 375 px : les champs de saisie
+   * faisaient **21 à 29 px**, les puces de rang 26, le ✕ de la fiche 30. Le
+   * `font-size: 16px` sur tout ce qui se saisit est là pour iOS, qui zoome sur
+   * un champ plus petit et laisse la page décadrée — impossible à récupérer
+   * d'une main. */
+  .panneau .champ-edit input,
+  .panneau .champ-edit select,
+  .panneau .champ-edit textarea,
+  .panneau .champ-suggere input,
+  .panneau .joueur-commentaire input { min-height: 40px; font-size: 16px; }
+  .panneau .puce-rang { min-height: 36px; }
+  .panneau .pn-fermer { min-width: 40px; min-height: 40px; }
+  /* Les sept points d'humeur tiennent sur une ligne : 28 px chacun, c'est le
+     plus grand qui les garde côte à côte sur un écran de 375. */
+  .panneau .humeur-point { width: 28px; height: 28px; }
+  .panneau .humeur-points { gap: 8px; }
+  /* La liste des personnes : une ligne se touche sans viser. */
+  .panneau .item-personne { min-height: 48px; }
 
   /* Tiroirs : hors écran par défaut, amenés par-dessus la scène au clic. */
   .rail, .panneau {

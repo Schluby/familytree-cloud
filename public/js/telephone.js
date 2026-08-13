@@ -26,12 +26,23 @@
 
 const POINT_DE_RUPTURE = '(max-width: 760px)';
 
+/** Sommes-nous sur un écran de téléphone, maintenant ? */
+export function surTelephone() {
+  return window.matchMedia(POINT_DE_RUPTURE).matches;
+}
+
 /**
  * Ce qui descend dans le rail, dans cet ordre.
  *
  * Ne descendent pas : `#groupe-essai` (« Créer un compte » est l'appel à
  * l'action d'un visiteur — l'enterrer sous ☰ le perdrait), `#btn-rail` et
  * `#btn-panneau`, qui sont justement ce qui ouvre les tiroirs.
+ *
+ * **Ni « ⤓ Tout télécharger » ni « 📸 Instantané ».** Signalé le 13/08/2026 :
+ * « retirer les choses inutiles type téléchargement sur téléphone ». Un `.zip`
+ * de toutes ses sauvegardes sur un téléphone ne mène nulle part — et « Vos
+ * données » (🛡), qui reste, est le vrai endroit pour sortir ses données. Ils ne
+ * descendent donc pas : ils sont éteints par le CSS.
  */
 const A_DESCENDRE = [
   '#btn-vue-generale',
@@ -39,8 +50,6 @@ const A_DESCENDRE = [
   '#lien-document',
   '#btn-annee',
   '#btn-theme',
-  '#btn-telecharger',
-  '#btn-instantane',
   '#compte',
   '#lien-admin',
   '#lien-donnees',
@@ -95,12 +104,50 @@ function remonter() {
  * un tiroir qui couvre tout l'écran, ne pas pouvoir sortir revient à ne pas
  * pouvoir entrer.
  */
+/** Les deux tiroirs, retenus pour que les ouvertures d'ailleurs y accèdent. */
+let volets = null;
+
+/**
+ * Amène le volet de droite, celui de la fiche.
+ *
+ * **Le défaut qu'on répare.** Signalé le 13/08/2026 : « la fiche s'affiche en
+ * dehors de l'écran, on ne la voit pas ». Ouvrir une fiche ne faisait que
+ * basculer l'onglet *à l'intérieur* du volet — ce qui suffit sur écran large,
+ * où le volet est une colonne toujours visible. Sur téléphone, il est un tiroir
+ * posé à `translateX(100%)` : la fiche s'y dessinait, fidèlement, à côté de
+ * l'écran.
+ */
+export function amenerLaFiche() {
+  if (!surTelephone() || !volets) return;
+  volets.panneauVolet.classList.add('ouvert');
+  volets.rail.classList.remove('ouvert');
+}
+
+/**
+ * Ouvre le rail **déroulé sur les filtres**.
+ *
+ * Les maisons et les types de liens sont ce qu'on vient régler le plus souvent,
+ * et ils vivaient à six blocs du haut du tiroir. Le bouton « ⛨ Filtres » de la
+ * barre du bas y mène directement.
+ */
+export function ouvrirLesFiltres() {
+  if (!volets) return;
+  volets.rail.classList.add('ouvert');
+  volets.rail.classList.remove('replie');
+  volets.panneauVolet.classList.remove('ouvert');
+  // Après le rendu : tant que le tiroir glisse, ses positions ne valent rien.
+  requestAnimationFrame(() => {
+    document.getElementById('bloc-maisons')?.scrollIntoView({ block: 'start' });
+  });
+}
+
 export function installerTelephone(elements) {
-  const surTelephone = window.matchMedia(POINT_DE_RUPTURE);
+  volets = elements;
+  const requete = window.matchMedia(POINT_DE_RUPTURE);
   let etat = null;
 
   const appliquer = () => {
-    const voulu = surTelephone.matches ? 'telephone' : 'large';
+    const voulu = requete.matches ? 'telephone' : 'large';
     if (voulu === etat) return;
     etat = voulu;
     if (voulu === 'telephone') descendre();
@@ -113,7 +160,7 @@ export function installerTelephone(elements) {
   // règles CSS, sans que `change` ne se déclenche — les commandes descendaient
   // dans le rail et n'en remontaient jamais. `resize` rattrape ; le garde sur
   // `etat` fait que la double écoute ne travaille jamais deux fois.
-  surTelephone.addEventListener('change', appliquer);
+  requete.addEventListener('change', appliquer);
   window.addEventListener('resize', appliquer);
 
   const fermerLesTiroirs = () => {
@@ -122,6 +169,7 @@ export function installerTelephone(elements) {
   };
 
   document.getElementById('btn-fermer-rail').addEventListener('click', fermerLesTiroirs);
+  document.getElementById('btn-filtres').addEventListener('click', ouvrirLesFiltres);
 
   // Toucher la scène referme : c'est le geste qu'on tente d'instinct devant un
   // panneau qui recouvre ce qu'on voulait regarder. `capture` parce que la vue
@@ -130,7 +178,7 @@ export function installerTelephone(elements) {
   elements.scene.addEventListener(
     'pointerdown',
     () => {
-      if (!surTelephone.matches) return;
+      if (!requete.matches) return;
       if (elements.rail.classList.contains('ouvert') || elements.panneauVolet.classList.contains('ouvert')) {
         fermerLesTiroirs();
       }

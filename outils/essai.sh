@@ -1042,6 +1042,43 @@ verifier "les cibles tactiles du rail sont posees" oui "$(contient '.rail .rail-
 verifier "  la barre du haut ne garde que de quoi naviguer" oui "$(contient '.barre-haut #btn-theme')"
 
 # ---------------------------------------------------------------------------
+# Lot 11.D : le telephone repris en main
+#
+# Signale le 13/08/2026, apres le 11.C : « la fiche s'affiche en dehors de
+# l'ecran, on ne la voit pas », « retirer les choses inutiles type
+# telechargement », « pouvoir visualiser directement les maisons et les liens
+# pour les filtrer ».
+#
+# Le defaut central : ouvrir une fiche ne faisait que basculer l'onglet DANS le
+# volet. Sur ecran large le volet est une colonne toujours visible, ca suffit ;
+# sur telephone c'est un tiroir a translateX(100%), et la fiche se dessinait
+# fidelement a cote de l'ecran.
+# ---------------------------------------------------------------------------
+
+echo "-- 11.D le telephone repris en main"
+code - GET /js/telephone.js > /dev/null
+verifier "le volet de la fiche peut etre amene" oui "$(contient 'export function amenerLaFiche')"
+verifier "  et le rail s'ouvre deroule sur les filtres" oui "$(contient 'export function ouvrirLesFiltres')"
+verifier "  le telechargement ne descend plus dans le rail" non "$(contient \"'#btn-telecharger'\")"
+code - GET /js/main.js > /dev/null
+verifier "l'ouverture d'une fiche amene le volet" oui "$(contient 'amenerLaFiche()')"
+code - GET / > /dev/null
+verifier "la barre du bas porte le bouton des filtres" oui "$(contient 'btn-filtres')"
+code - GET /css/app.css > /dev/null
+verifier "le telechargement est eteint au telephone" oui "$(contient '#btn-instantane { display: none; }')"
+verifier "  la fiche s'edite au doigt" oui "$(contient '.panneau .champ-edit input')"
+verifier "  et les filtres passent en tete du tiroir" oui "$(contient '#bloc-maisons { order: 1; }')"
+
+# Signale le meme jour : « je ne vois pas comment faire passer une personne
+# intendant, ni comment acceder aux arbres des differents comptes ». Les deux
+# boutons etaient dans la colonne d'actions, qui tombait a droite de l'ecran.
+code - GET /css/base.css > /dev/null
+verifier "la colonne d'actions reste au bord droit" oui "$(contient '.donnees.serree td.actions,')"
+code - GET /admin > /dev/null
+verifier "  et la page dit ou sont les gestes" oui "$(contient 'aideComptes')"
+verifier "  y compris comment nommer un intendant" oui "$(contient 'Pour en nommer un')"
+
+# ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google
 #
 # Le flux « Authorization Code », entierement cote serveur : pas de script

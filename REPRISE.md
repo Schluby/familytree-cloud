@@ -100,6 +100,22 @@ barre ne garde que de quoi naviguer et le reste **descend dans le rail** —
   de départ (26 px pour « ＋ Nouvelle maison », 24 px pour une entrée de
   légende) étaient dessinées pour une souris.
 
+Le lot 11.D, du même jour, reprend le téléphone une seconde fois — et corrige
+le défaut que le 11.C n'avait pas vu :
+
+- **Un volet qui s'ouvre doit être amené à l'écran.** `surOuverture` ne faisait
+  que basculer l'onglet *dans* le volet ; sur téléphone la fiche se dessinait
+  hors champ. `amenerLaFiche()` (`telephone.js`) répare, et **toute nouvelle
+  ouverture de volet doit l'appeler** — sinon le défaut revient à l'identique.
+- **Tout ce qui se saisit prend `font-size: 16px` sous 760 px.** En dessous, iOS
+  zoome sur le champ au premier appui et laisse la page décadrée.
+- **« Tout télécharger » et « Instantané » sont éteints au téléphone**, pas
+  déplacés : ils ne sont pas dans `A_DESCENDRE`. 🛡 « Vos données » reste.
+- **La colonne d'actions des tableaux d'administration est collée au bord
+  droit** (`position: sticky`) : elle tombait hors de l'écran, et emportait avec
+  elle « Arbres » et « Nommer intendant ». Au téléphone elle redevient
+  ordinaire — elle fait 386 px, elle y recouvrirait tout.
+
 Le lot 11.B, du même jour, répond à la question « le lien de campagne, est-ce
 que ça crée une vue partagée ? » — **non** : `meta.document` est une adresse
 http(s) vers un document hébergé ailleurs, rien d'autre. Le partage, lui, ouvre
@@ -406,8 +422,8 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **453 vérifications en
-  local, 442 en ligne** (13/08/2026, contre `myschlub.com`). Deux sections
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **464 vérifications en
+  local** (13/08/2026) ; le total en ligne est plus bas de quelques unités. Deux sections
   branchent sur la configuration de l'instance (courriel, Google) et vérifient
   le comportement attendu de chaque côté : l'écart entre les deux nombres est
   normal. Un écart *ailleurs* ne l'est pas.

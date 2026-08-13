@@ -1139,3 +1139,71 @@ joueur le droit de sortir en `.xlsx` la table qu'on vient de lui montrer.
 surface de lecture, vérifie qu'un arbre non partagé répond le **même** 404
 qu'un arbre inexistant, et — c'est celle qui compte le plus — que l'API
 ordinaire continue de répondre 404 sur un arbre pourtant partagé.
+
+---
+
+# Lot 11.D — Le téléphone repris en main  ☑
+
+*Signalé le 13/08/2026, après le 11.C : « la fiche s'affiche en dehors de
+l'écran, on ne la voit pas », « retirer les choses inutiles type téléchargement
+sur téléphone », « pouvoir visualiser directement les maisons et les liens pour
+les filtrer, et ouvrir la fiche, le tout en format téléphone vertical ». Et,
+sur la page d'administration : « je ne vois pas comment faire passer une
+personne intendant, ni comment accéder aux arbres des différents comptes ».*
+
+## Le défaut central : la fiche se dessinait à côté de l'écran
+
+Ouvrir une fiche appelait `surOuverture`, qui ne faisait qu'une chose —
+`basculerOnglet('fiche')`, c'est-à-dire basculer l'onglet **à l'intérieur** du
+volet. Sur écran large ça suffit : le volet est une colonne toujours visible.
+Sur téléphone il est un tiroir posé à `translateX(100%)`, et la fiche s'y
+dessinait, fidèlement, **hors champ**. Rien ne manquait au rendu ; il manquait
+un geste.
+
+- ☑ `amenerLaFiche()` — le volet vient à l'écran dès qu'une fiche s'ouvre, par
+  la liste comme par le plan.
+- ☑ Cibles tactiles de la fiche : les champs de saisie faisaient **21 à 29 px**,
+  les puces de rang 26, le ✕ 30. Tout est passé à 36–40, et tout ce qui se
+  saisit à `font-size: 16px` — en dessous, iOS zoome sur le champ et laisse la
+  page décadrée, impossible à récupérer d'une main.
+
+## Voir les maisons et les liens sans les chercher
+
+- ☑ Bouton **« ⛨ Filtres »** dans la barre du bas : il ouvre le rail **déjà
+  déroulé sur les maisons**.
+- ☑ L'ordre du tiroir est refait pour un pouce : maisons, liens, vues, options,
+  joueurs, sauvegardes, partages, édition, sélection, réglages. On l'ouvre pour
+  filtrer — ce qu'on filtre passe en tête. L'ordre du HTML ne bouge pas : c'est
+  celui d'un écran large, où tout est visible d'un coup.
+
+## Ce qui a été retiré, et pourquoi
+
+**« ⤓ Tout télécharger » et « 📸 Instantané » ne descendent plus dans le
+rail : ils sont éteints.** Un `.zip` de toutes ses sauvegardes sur un téléphone
+ne mène nulle part. « Vos données » (🛡) reste, et c'est le vrai endroit pour
+sortir ses données.
+
+## La colonne d'actions de l'administration tombait hors de l'écran
+
+Mesuré : sur 1280 px, le tableau des comptes fait **1087 px dans une boîte de
+1042**. La colonne d'actions — celle qui porte **« Arbres »** *et* **« Nommer
+intendant »** — finissait à droite du bord visible, derrière un défilement
+horizontal que rien n'annonçait. Les deux gestes que l'on cherchait étaient
+dans la même colonne invisible.
+
+- ☑ Elle est **collée au bord droit** (`position: sticky`) et ne bouge plus,
+  quel que soit le défilement. Un voile porté à sa gauche dit qu'il y a du
+  contenu dessous.
+- ☑ Au téléphone, elle **redevient une colonne ordinaire** : elle fait 386 px,
+  soit plus que l'écran — la coller y recouvrirait tout le tableau.
+- ☑ La page le dit désormais : ce que fait la colonne de droite, et où trouver
+  « Nommer intendant » (avec le rappel que le rôle d'**administrateur**, lui, ne
+  s'accorde qu'en SQL).
+
+## Vérification
+
+**464/464.** Les mesures, elles, ne sont pas dans le harnais : fiche ouverte sur
+375 px, plus aucune cible sous 28 px, aucun élément qui déborde à
+l'horizontale ; barre du bas à sept commandes de 40 px dans 332 px de large ;
+« ⛨ Filtres » amène le bloc des maisons à 226 px du haut d'un écran de 812, et
+toucher une maison en éteint 18 sur 19.

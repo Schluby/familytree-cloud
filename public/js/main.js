@@ -24,7 +24,7 @@ import {
   creerEditeurType,
   creerFormulairePersonne,
 } from './editeurs.js';
-import { installerTelephone } from './telephone.js';
+import { amenerLaFiche, installerTelephone } from './telephone.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -155,7 +155,13 @@ const panneau = creerPanneau(elements.panneauFiche, {
   surCentrage: (id) => etat.moteur?.focus(id),
   surVueGenerale: () => vueGenerale(),
   surFermeture: () => vueGenerale(),
-  surOuverture: () => basculerOnglet('fiche'),
+  // Basculer l'onglet suffit sur écran large, où le volet est une colonne
+  // toujours visible. Sur téléphone c'est un tiroir hors champ : sans
+  // `amenerLaFiche`, la fiche se dessinait fidèlement **à côté de l'écran**.
+  surOuverture: () => {
+    basculerOnglet('fiche');
+    amenerLaFiche();
+  },
   surEnregistrement: () => rechargerVue({ conserverFocus: true }),
 });
 

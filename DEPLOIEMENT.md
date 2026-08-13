@@ -250,12 +250,18 @@ les autres comptes **n'existent pas** — les routes répondent 404, pas 403.
 
 La marche à suivre, entièrement depuis la page `/admin` :
 
-1. Dans le tableau **Comptes**, sur la ligne de la personne, cliquer
-   **« Nommer intendant »**. Il lui faut un vrai compte : un essai sans adresse
-   (rôle `invite`) est refusé.
+1. Dans le tableau **Comptes**, **colonne tout à droite** (elle reste visible
+   quand le tableau défile de côté), cliquer **« Nommer intendant »** sur la
+   ligne de la personne. Il lui faut un vrai compte : un essai sans adresse
+   (rôle `invite`) est refusé, et le bouton n'y apparaît pas.
 2. **Cocher** dans ce même tableau les comptes à lui confier.
 3. Dans le bloc **Intendants**, sur sa ligne, cliquer **« Lui confier la
    sélection »**.
+
+**Pour ouvrir l'arbre de quelqu'un**, c'est la même colonne de droite :
+**« Arbres »** liste ses sauvegardes juste en dessous. De là, « Consulter » les
+lit à plat, et **« ✎ Éditer » ouvre son arbre dans l'application** avec droit
+d'écriture — chaque modification étant inscrite au journal.
 
 ⚠️ **La sélection remplace ce qu'il avait.** Pour retirer un compte,
 décochez-le et confiez à nouveau ; pour tout reprendre, « Tout lui retirer ».

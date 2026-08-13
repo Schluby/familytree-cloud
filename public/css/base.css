@@ -264,6 +264,39 @@ body.tres-large main { max-width: 68rem; }
 .donnees.serree th { width: auto; color: var(--encre-douce); }
 .donnees.serree td { color: var(--encre); }
 
+/* La colonne d'actions reste collée au bord droit.
+ *
+ * Signalé le 13/08/2026 : « je ne vois pas comment faire passer une personne
+ * intendant, ni comment accéder aux arbres des différents comptes ». Les deux
+ * boutons existaient — « Nommer intendant » et « Arbres » — mais le tableau
+ * mesurait 1087 px dans une boîte de 1042 : **la colonne entière tombait à
+ * droite de l'écran**, derrière un défilement horizontal que rien n'annonçait.
+ * Elle ne bouge plus.
+ *
+ * `box-shadow: inset` plutôt que `border-bottom` : sur une table en
+ * `border-collapse: collapse`, les bordures d'une cellule collante ne se
+ * dessinent pas. Le second voile, à gauche, dit qu'il y a du contenu dessous. */
+.donnees.serree td.actions,
+.donnees.serree thead th:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--fond-carte);
+  box-shadow:
+    inset 0 -1px 0 var(--bord),
+    -8px 0 8px -8px rgba(0, 0, 0, .55);
+}
+
+/* Au téléphone, la coller serait pire que le mal : cette colonne fait 386 px,
+   soit plus large que l'écran — elle recouvrirait tout le tableau. Elle
+   redevient une colonne ordinaire, et ses boutons s'empilent. */
+@media (max-width: 760px) {
+  .donnees.serree td.actions,
+  .donnees.serree thead th:last-child { position: static; box-shadow: none; }
+  .donnees.serree td.actions { white-space: normal; }
+  .donnees.serree td.actions .lien,
+  .donnees.serree td.actions a { min-height: 34px; display: inline-flex; align-items: center; }
+}
+
 .actions { display: flex; gap: .6rem; align-items: center; }
 .actions .lien,
 .actions a { margin: 0; font-size: .8rem; white-space: nowrap; }
