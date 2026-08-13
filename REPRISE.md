@@ -406,11 +406,11 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **453 vérifications** en
-  local : deux sections branchent sur la configuration de l'instance (courriel,
-  Google) et vérifient le comportement attendu de chaque côté, donc le total en
-  ligne diffère de quelques unités. Un écart entre les deux nombres est normal ;
-  un écart *ailleurs* ne l'est pas.
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **453 vérifications en
+  local, 442 en ligne** (13/08/2026, contre `myschlub.com`). Deux sections
+  branchent sur la configuration de l'instance (courriel, Google) et vérifient
+  le comportement attendu de chaque côté : l'écart entre les deux nombres est
+  normal. Un écart *ailleurs* ne l'est pas.
 - **Ne pas modifier `essai.sh` pendant qu'il tourne.** Bash relit le fichier au
   fil de l'exécution, depuis la position où il en est : une insertion décale
   tout et il reprend au milieu d'un mot. Le symptôme — « syntax error near
