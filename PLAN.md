@@ -896,3 +896,85 @@ l'identifiant manquait. TypeScript compile sans rien dire — D1 aurait refusé 
 requête à la première connexion Google réelle, c'est-à-dire au seul moment où
 personne n'aurait été là pour la voir. Trouvé en relisant le SQL à voix haute,
 pas par un outil.
+
+---
+
+# Lot 11.A — Deux étages d'administration  ☑
+
+*Demandé le 13/08/2026 : « je voudrais être l'administrateur suprême qui va
+pouvoir donner des permissions d'administrateur à d'autres profils (mais qui
+n'auront pas cette vue que j'ai) et aussi attitrer des profils qui seront sous
+la gestion de l'administrateur intermédiaire ».*
+
+Il n'y avait qu'un rôle au-dessus de `membre`, et il pouvait tout, sur tout le
+monde. Une table de jeu n'a pas besoin de ça : le maître de jeu doit pouvoir
+suivre **ses** joueurs sans hériter du pouvoir d'effacer un compte ou d'en
+remplacer le mot de passe.
+
+- ☑ Migration `0006_tutelles.sql` — table `tutelles(intendant_id,
+  utilisateur_id, cree_le, pose_par)`. Le rôle continue de vivre dans
+  `utilisateurs.role`, colonne TEXT sans contrainte : rien à migrer pour lui.
+- ☑ Rôle **`intendant`** — administrateur délégué. Périmètre = les comptes
+  qu'on lui a confiés, **plus le sien**.
+- ☑ `exigerGestion` pose le périmètre sur le contexte ; `exigerSouverain` le
+  double sur les routes qui n'appartiennent qu'à l'`admin`.
+- ☑ Toute route qui reçoit un identifiant de compte passe par
+  `dansLePerimetre` : `/utilisateurs`, `…/:id/sauvegardes`,
+  `/sauvegardes/:id`, `…/export`, la procuration `/arbres/:arbre/*`, les lots,
+  le panorama, le journal.
+- ☑ `POST /api/admin/utilisateurs/:id/role`, `GET /api/admin/intendants`,
+  `PUT /api/admin/intendants/:id/charges`.
+- ☑ `GET /api/admin/contexte` — la page sait qui elle sert avant de se
+  dessiner.
+- ☑ Journal : deux actions de plus, `role` et `tutelle`.
+- ☑ Interface : bloc « Intendants » visible du seul souverain, actions du
+  compte masquées pour un intendant, bandeau qui dit le périmètre.
+
+## Les quatre décisions qui méritent d'être relues
+
+**`admin` ne s'accorde pas par l'API, et ne s'accordera pas.** La route des
+rôles ne connaît que `membre` et `intendant`. Une route qui sacre un pair
+transformerait le premier compte compromis en trousseau de toute l'instance ;
+il n'y a aucun confort qui vaille ça. Le premier administrateur s'est donné en
+SQL, ses successeurs feront de même. La route refuse aussi de **toucher** au
+rôle d'un `admin` — sinon on contournerait la règle par l'autre bout.
+
+**Hors périmètre, c'est 404, jamais 403.** La même règle que le cloisonnement
+des membres. Dire « interdit » à un intendant lui apprendrait que le compte
+existe, et le nombre de comptes d'une instance n'est pas une information qu'on
+lui doit. La procuration répond le **même mot** (« sauvegarde introuvable »)
+qu'un arbre qui n'existe pas.
+
+**Une sélection de lot hors périmètre est retranchée en silence.** Refuser
+nommément apprendrait l'existence des comptes écartés. Rien ne se perd : le
+rapport du lot nomme chaque sauvegarde touchée, et la page ne propose que les
+comptes en charge. Une sélection entièrement hors périmètre tombe sur le 404
+« aucune sauvegarde à toucher », le même que pour des comptes qui n'en ont
+aucune.
+
+**Un intendant voit, dans le registre, ce qui a été fait à ses joueurs — même
+par le souverain.** C'est justement ce que le registre lui doit. Ce qu'il ne
+voit pas, ce sont les lignes qui **portent sur** un compte hors de son
+périmètre. La distinction est dans la colonne (`cible_utilisateur`), pas dans
+la présence d'un identifiant quelque part dans la réponse — et c'est ce que le
+harnais vérifie, avec `journal_vise` plutôt qu'un `contient`.
+
+**Démettre reprend les tutelles dans le même geste.** Les laisser derrière
+ferait d'une remise en fonction plus tard une restitution silencieuse de
+pouvoirs qu'on croyait repris. Vérifié : renommé, un ancien intendant repart
+sans personne.
+
+## Vérification
+
+**408/408**, contre 351 à la fin du correctif du 13/08. La section reprend
+**deux fois** chaque route qui reçoit un identifiant de compte : dans le
+périmètre, hors du périmètre. Elle vérifie aussi qu'un lot posé par l'intendant
+sur une sélection débordante ne touche **qu'**une sauvegarde, et que le compte
+hors périmètre n'a rien reçu.
+
+Deux échecs pendant l'écriture, tous deux dans le harnais et non dans le code :
+un `contient 'confies'` qui cherchait un mot accentué, et une assertion qui
+affirmait que le registre du souverain portait des lignes **visant** le compte
+A — alors qu'il en est l'auteur, jamais la cible. La seconde a été remplacée
+par ce qui prouve vraiment le filtre : le souverain voit **plus** de lignes que
+l'intendant.

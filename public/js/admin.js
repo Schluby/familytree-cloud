@@ -58,11 +58,26 @@ const selection = new Set();
 
 const ROLES = {
   admin: 'administrateur',
+  // Lot 11.A : l'administrateur délégué. Il ne voit que les comptes qu'on lui a
+  // confiés, et ne peut rien contre le compte lui-même.
+  intendant: 'intendant',
   membre: 'membre',
   // Lot 9.C : un visiteur qui n'a pas encore créé de compte. Il en a pourtant
   // un vrai, avec ses sauvegardes — le dire autrement serait mentir.
   invite: 'essai',
 };
+
+/**
+ * Qui regarde cette page, et jusqu'où — répondu par `/api/admin/contexte`.
+ *
+ * Tout ce que la page montre en dépend. Elle ne fabrique aucun droit : le
+ * serveur refuserait de toute façon. Mais **elle ne doit pas proposer ce qu'il
+ * refusera** — un bouton qui répond « interdit » est un bouton qui ment.
+ *
+ * Le défaut est le rôle le plus faible : si l'appel échoue, on n'affiche pas
+ * les commandes du souverain en attendant de savoir.
+ */
+let contexte = { souverain: false, compte: null, comptes_en_charge: 0 };
 
 async function chargerComptes() {
   const { ok, code, donnees } = await appeler('/api/admin/utilisateurs');
@@ -71,7 +86,11 @@ async function chargerComptes() {
     if (code === 403) {
       document.querySelector('main').replaceChildren(
         el('h1', 'Réservé aux administrateurs'),
-        el('p', "Ce compte n'a pas ce rôle. Il se donne en SQL, jamais depuis l'interface.")
+        el(
+          'p',
+          "Ce compte n'a ni le rôle d'administrateur ni celui d'intendant. " +
+            "Le second se donne depuis cette page ; le premier, en SQL, jamais depuis l'interface."
+        )
       );
       return;
     }
@@ -80,8 +99,11 @@ async function chargerComptes() {
   }
 
   comptes = donnees.utilisateurs;
-  $('sousTitre').textContent =
-    `${comptes.length} compte${comptes.length > 1 ? 's' : ''} sur cette instance.`;
+  $('sousTitre').textContent = contexte.souverain
+    ? `${comptes.length} compte${comptes.length > 1 ? 's' : ''} sur cette instance.`
+    : `${comptes.length} compte${comptes.length > 1 ? 's' : ''} vous ${
+        comptes.length > 1 ? 'sont confiés' : 'est confié'
+      }, le vôtre compris.`;
 
   // Un compte disparu de la liste ne doit pas rester dans la sélection : il
   // serait invisible et pourtant compté dans le lot.
@@ -90,6 +112,7 @@ async function chargerComptes() {
   }
 
   dessinerComptes();
+  await chargerIntendants();
   await chargerJournal();
 }
 
@@ -122,12 +145,21 @@ function dessinerComptes() {
       );
 
       const actions = el('td', null, 'actions');
-      actions.append(
-        bouton('Arbres', () => chargerSauvegardes(compte)),
-        bouton('Plafond…', () => changerPlafond(compte)),
-        bouton('Mot de passe…', () => reinitialiser(compte)),
-        bouton('Supprimer', () => supprimerCompte(compte), 'lien danger')
-      );
+      actions.append(bouton('Arbres', () => chargerSauvegardes(compte)));
+      // Les gestes qui touchent au compte lui-même n'appartiennent qu'au
+      // souverain. Un intendant consulte et édite ; il ne dispose de personne.
+      if (contexte.souverain) {
+        actions.append(
+          bouton('Plafond…', () => changerPlafond(compte)),
+          bouton('Mot de passe…', () => reinitialiser(compte))
+        );
+        if (compte.role === 'intendant') {
+          actions.append(bouton('Démettre', () => changerRole(compte, 'membre')));
+        } else if (compte.role === 'membre') {
+          actions.append(bouton('Nommer intendant', () => changerRole(compte, 'intendant')));
+        }
+        actions.append(bouton('Supprimer', () => supprimerCompte(compte), 'lien danger'));
+      }
       ligne.append(actions);
       return ligne;
     })
@@ -201,6 +233,109 @@ async function supprimerCompte(compte) {
     return;
   }
   message(donnees?.erreur || `Erreur ${code}`, 'erreur');
+}
+
+/* ------------------------------------------------------------ intendants */
+
+let intendants = [];
+
+/** Nommer un intendant, ou le démettre. Souverain seulement. */
+async function changerRole(compte, role) {
+  const question =
+    role === 'intendant'
+      ? `Faire de ${compte.email} un intendant ?\n\n` +
+        'Il pourra consulter, ouvrir et modifier les arbres des comptes que vous\n' +
+        'lui confierez — et eux seuls. Il ne pourra ni changer un mot de passe,\n' +
+        'ni un plafond, ni supprimer un compte, ni nommer qui que ce soit.'
+      : `Démettre ${compte.email} ?\n\n` +
+        "Il perd l'accès à cette page, et les comptes qui lui étaient confiés\n" +
+        'lui sont retirés dans le même geste.';
+  if (!confirm(question)) return;
+
+  const { ok, donnees } = await appeler(`/api/admin/utilisateurs/${compte.id}/role`, {
+    method: 'POST',
+    body: JSON.stringify({ role }),
+  });
+  message(
+    ok
+      ? role === 'intendant'
+        ? `${compte.email} est intendant. Cochez ses comptes et confiez-les-lui.`
+        : `${compte.email} n'est plus intendant.`
+      : donnees?.erreur || 'Erreur',
+    ok ? 'reussite' : 'erreur'
+  );
+  if (ok) await chargerComptes();
+}
+
+async function chargerIntendants() {
+  if (!contexte.souverain) return;
+  const { ok, donnees } = await appeler('/api/admin/intendants');
+  if (!ok) return;
+
+  intendants = donnees.intendants;
+  $('corpsIntendants').replaceChildren(
+    ...(intendants.length
+      ? intendants.map((fiche) => {
+          const ligne = el('tr');
+          ligne.append(
+            el('td', fiche.email),
+            el('td', fiche.charges),
+            el('td', fiche.comptes.map((compte) => compte.email).join(', ') || '—'),
+            el('td', dateLisible(fiche.dernier_acces))
+          );
+          const actions = el('td', null, 'actions');
+          actions.append(bouton('Lui confier la sélection', () => confier(fiche)));
+          if (fiche.charges) {
+            actions.append(bouton('Tout lui retirer', () => confier(fiche, []), 'lien danger'));
+          }
+          ligne.append(actions);
+          return ligne;
+        })
+      : [
+          ligneVide(
+            'Aucun intendant. Nommez-en un depuis la colonne d’actions du tableau des comptes.',
+            5
+          ),
+        ])
+  );
+}
+
+/**
+ * Confier des comptes — la liste **remplace** la précédente.
+ *
+ * C'est la même sélection que celle des lots, à dessein : on coche les joueurs
+ * d'une table, puis on les confie, puis on leur pose une maison. Un second
+ * mécanisme de sélection pour le même geste n'apprendrait rien à personne.
+ */
+async function confier(fiche, comptes = [...selection]) {
+  const avant = fiche.comptes.map((compte) => compte.email);
+  const question = comptes.length
+    ? `Confier ${comptes.length} compte(s) à ${fiche.email} ?\n\n` +
+      (avant.length
+        ? `Cette liste REMPLACE la précédente :\n  ${avant.join('\n  ')}\n\n`
+        : '') +
+      'Il verra ces comptes, et eux seuls.'
+    : `Retirer à ${fiche.email} les ${avant.length} compte(s) qu'il avait ?\n\n` +
+      `  ${avant.join('\n  ')}`;
+  if (!confirm(question)) return;
+
+  const { ok, donnees } = await appeler(`/api/admin/intendants/${fiche.id}/charges`, {
+    method: 'PUT',
+    body: JSON.stringify({ comptes }),
+  });
+  if (!ok) {
+    message(donnees?.erreur || 'Erreur', 'erreur');
+    return;
+  }
+
+  // Les comptes écartés le sont pour une raison qui se dit : on ne confie ni un
+  // administrateur ni un autre intendant. Le taire ferait croire à un bogue.
+  const ecartes = donnees.ecartes?.length
+    ? ` ${donnees.ecartes.length} écarté(s) : on ne confie ni un administrateur ni un autre intendant.`
+    : '';
+  message(`${fiche.email} a maintenant ${donnees.comptes.length} compte(s).${ecartes}`, 'reussite');
+  await chargerIntendants();
+  await chargerJournal();
 }
 
 /* ----------------------------------------------------------- sauvegardes */
@@ -331,6 +466,9 @@ const LIBELLES = {
   // Le geste qui laisse une trace *dans* les données de quelqu'un d'autre :
   // une édition par procuration (8.F) ou une sauvegarde touchée par un lot.
   edition: 'a modifié un arbre',
+  // Lot 11.A : les deux gestes qui décident qui pourra regarder quoi.
+  role: 'a changé un rôle',
+  tutelle: 'a changé les comptes confiés',
 };
 
 async function chargerJournal() {
@@ -873,12 +1011,54 @@ $('retour').addEventListener('click', () => {
   location.href = '/';
 });
 
-/** Les catalogues d'abord : le formulaire des types en dépend. */
+/**
+ * Ce que la page doit savoir avant de se dessiner.
+ *
+ * Le contexte d'abord — souverain ou intendant décide de ce qui s'affiche.
+ * Puis les catalogues, dont le formulaire des types de liens dépend.
+ */
 async function demarrer() {
+  const { ok: connu, donnees: qui } = await appeler('/api/admin/contexte');
+  if (connu) contexte = qui;
+  reglerSurLeRole();
+
   const { ok, donnees } = await appeler('/api/admin/catalogues');
   if (ok) catalogues = donnees;
   construireFormulaire();
   await chargerComptes();
+}
+
+/** Ce que la page montre, et ce qu'elle annonce, selon qui la regarde. */
+function reglerSurLeRole() {
+  $('carteIntendants').classList.toggle('cache', !contexte.souverain);
+
+  $('bandeau').replaceChildren();
+  const dire = (...morceaux) => {
+    for (const morceau of morceaux) {
+      $('bandeau').append(typeof morceau === 'string' ? document.createTextNode(morceau) : morceau);
+    }
+  };
+
+  if (contexte.souverain) {
+    dire(
+      el('strong', 'Vous écrivez chez les autres.'),
+      ' Vous pouvez consulter, exporter et ',
+      el('strong', 'modifier'),
+      ' les arbres de tous les comptes — un par un avec « ✎ Éditer », ou plusieurs d’un coup avec les lots. Vous seul nommez les intendants, changez les mots de passe, les plafonds, et supprimez. ',
+      el('strong', 'Chaque lecture et chaque écriture laissent une trace'),
+      ' dans le journal, en bas de page, et ce journal ne s’efface pas.'
+    );
+    return;
+  }
+
+  dire(
+    el('strong', 'Vous êtes intendant.'),
+    ' Vous voyez ',
+    el('strong', 'les comptes qui vous ont été confiés'),
+    ', et eux seuls : le reste de l’instance ne vous est pas visible. Vous pouvez consulter, exporter et modifier leurs arbres — un par un avec « ✎ Éditer », ou plusieurs d’un coup avec les lots. Vous ne pouvez ni changer un mot de passe, ni un plafond, ni supprimer un compte, ni nommer qui que ce soit. ',
+    el('strong', 'Chaque lecture et chaque écriture laissent une trace'),
+    ' dans le journal, en bas de page.'
+  );
 }
 
 demarrer();

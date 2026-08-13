@@ -26,10 +26,8 @@
 
 import type { MiddlewareHandler } from 'hono';
 import type { Compte } from '../auth/sessions';
-import type { Variables } from '../intergiciels';
+import { dansLePerimetre, type ContexteAdmin } from './intergiciel';
 import { journaliser } from './journal';
-
-type Contexte = { Bindings: Env; Variables: Variables };
 
 interface LigneProprietaire {
   utilisateur_id: string;
@@ -50,8 +48,8 @@ interface LigneProprietaire {
  * regarde. C'est le seul endroit où cette valeur est décidée ailleurs que par
  * son propriétaire, et elle ne touche pas la base — uniquement ce contexte-ci.
  */
-export const parProcuration: MiddlewareHandler<Contexte> = async (c, next) => {
-  const admin = c.get('compte'); // posé par `exigerAdmin`, en amont
+export const parProcuration: MiddlewareHandler<ContexteAdmin> = async (c, next) => {
+  const admin = c.get('compte'); // posé par `exigerGestion`, en amont
   // `:arbre`, pas `:id` : le domaine a ses propres `:id` et deux paramètres du
   // même nom se recouvrent dans une adresse imbriquée. Voir `routes.ts`.
   const sauvegardeId = c.req.param('arbre');
@@ -67,7 +65,12 @@ export const parProcuration: MiddlewareHandler<Contexte> = async (c, next) => {
     .bind(sauvegardeId)
     .first<LigneProprietaire>();
 
-  if (!ligne) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
+  // Hors du périmètre de l'intendant, l'arbre n'existe pas — le **même** 404,
+  // au mot près, que s'il n'existait vraiment pas. Un refus distinct ferait de
+  // cette route un moyen de savoir quels arbres vivent sur l'instance.
+  if (!ligne || !dansLePerimetre(c.get('perimetre'), ligne.utilisateur_id)) {
+    return c.json({ erreur: 'sauvegarde introuvable' }, 404);
+  }
 
   const proprietaire: Compte = {
     id: ligne.utilisateur_id,

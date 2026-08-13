@@ -226,7 +226,50 @@ d'administration porte un bouton **« ✎ Éditer »** à côté de « Consulter
 ouvre l'application entière sur l'arbre visé. Chaque écriture est inscrite au
 journal, et un bandeau rappelle en permanence chez qui l'on écrit.
 
-Fait le **11/08/2026** pour `maxschlub@gmail.com`.
+Fait le **11/08/2026** pour `maxschlub@gmail.com`, le **13/08/2026** pour
+`maxime.schlubach.25@neoma-bs.com`.
+
+## Nommer un intendant, et lui confier des joueurs (lot 11.A)
+
+Depuis le 13/08/2026 il y a **deux étages**. L'administrateur — celui du
+paragraphe ci-dessus, donné en SQL — peut tout, sur tous les comptes. Il peut
+en outre nommer des **intendants**, qui n'ont de pouvoir que sur les comptes
+qu'il leur confie.
+
+Un intendant peut, **sur ses comptes et sur eux seuls** :
+
+- les voir dans la liste, avec leurs arbres et la place qu'ils occupent ;
+- ouvrir un arbre en consultation, l'exporter (JSON, Excel) ;
+- l'ouvrir en édition avec « ✎ Éditer » — donc y poser une maison, corriger une
+  fiche, attribuer un nom de joueur ;
+- leur appliquer des lots, et relever leur panorama.
+
+Il ne peut **pas** : changer un mot de passe, un plafond, supprimer un compte,
+nommer ou démettre qui que ce soit, ni voir le reste de l'instance. Pour lui,
+les autres comptes **n'existent pas** — les routes répondent 404, pas 403.
+
+La marche à suivre, entièrement depuis la page `/admin` :
+
+1. Dans le tableau **Comptes**, sur la ligne de la personne, cliquer
+   **« Nommer intendant »**. Il lui faut un vrai compte : un essai sans adresse
+   (rôle `invite`) est refusé.
+2. **Cocher** dans ce même tableau les comptes à lui confier.
+3. Dans le bloc **Intendants**, sur sa ligne, cliquer **« Lui confier la
+   sélection »**.
+
+⚠️ **La sélection remplace ce qu'il avait.** Pour retirer un compte,
+décochez-le et confiez à nouveau ; pour tout reprendre, « Tout lui retirer ».
+Un administrateur ou un autre intendant présent dans la sélection est écarté, et
+la page le dit : la tutelle descend, elle ne traverse pas.
+
+**Démettre reprend les tutelles dans le même geste.** Le renommer plus tard le
+fait repartir sans personne — un pouvoir repris qui reviendrait tout seul
+n'aurait jamais été repris.
+
+Le rôle `admin`, lui, **ne s'accorde toujours qu'en SQL**. La route des rôles
+ne connaît que `membre` et `intendant`, et refuse même de toucher au rôle d'un
+administrateur. Une route qui sacre un pair ferait du premier compte compromis
+le trousseau de toute l'instance.
 
 ## Les lots : agir sur plusieurs comptes à la fois (lot 10.A)
 

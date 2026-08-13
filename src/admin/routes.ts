@@ -21,6 +21,14 @@
  *   bougé. Deux chemins distincts pour deux pouvoirs distincts, plutôt qu'un
  *   seul chemin dont le sens dépendrait d'un verbe.
  * - **Le journal** — consultable, jamais effaçable.
+ *
+ * **Deux étages depuis le lot 11.A.** `exigerGestion` laisse entrer l'`admin`
+ * et l'`intendant`, et pose sur le contexte le **périmètre** — les comptes sur
+ * lesquels celui qui regarde a pouvoir. Chaque route qui reçoit un identifiant
+ * de compte le passe par `dansLePerimetre` ; hors périmètre, elle répond le
+ * même 404 que pour un compte inexistant. Les gestes qui touchent au compte
+ * lui-même — plafond, mot de passe, suppression, rôle, tutelle — sont doublés
+ * d'`exigerSouverain` et n'appartiennent qu'à l'`admin`.
  */
 
 import { Hono, type Context } from 'hono';
@@ -31,8 +39,14 @@ import { tables as tablesDe, versXlsx, MIME_XLSX } from '../domaine/exports';
 import { Dataset, slugifier, type Objet } from '../domaine/models';
 import * as referentiels from '../domaine/referentiels';
 import { routesDomaine } from '../domaine/routes';
-import type { Variables } from '../intergiciels';
-import { exigerAdmin, lectureSeule } from './intergiciel';
+import {
+  dansLePerimetre,
+  exigerGestion,
+  exigerSouverain,
+  lectureSeule,
+  type Perimetre,
+  type VariablesAdmin,
+} from './intergiciel';
 import { dernieres, journaliser } from './journal';
 import {
   MAX_COMPTES,
@@ -46,9 +60,9 @@ import {
 } from './lots';
 import { parProcuration } from './procuration';
 
-export const routesAdmin = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const routesAdmin = new Hono<{ Bindings: Env; Variables: VariablesAdmin }>();
 
-routesAdmin.use('*', exigerAdmin);
+routesAdmin.use('*', exigerGestion);
 // La garde du verbe est posée sur le chemin, pas sur chaque route : c'est ce
 // qui la rend vraie pour les routes qui n'existent pas encore. Elle ne couvre
 // que `/sauvegardes/*` — la lecture à plat. L'édition a son propre chemin.
@@ -70,6 +84,11 @@ routesAdmin.use('/sauvegardes/*', lectureSeule);
 // maison nommée d'après l'identifiant de la sauvegarde.
 routesAdmin.use('/arbres/:arbre/*', parProcuration);
 routesAdmin.route('/arbres/:arbre', routesDomaine);
+
+/** `?, ?, ?` — un `IN (…)` de N valeurs, toujours lié, jamais interpolé. */
+function trous(combien: number): string {
+  return combien ? Array.from({ length: combien }, () => '?').join(',') : "''";
+}
 
 function fichier(nom: string, mime: string, octets: Uint8Array | string): Response {
   const corps = typeof octets === 'string' ? new TextEncoder().encode(octets) : octets;
@@ -94,11 +113,33 @@ function fichier(nom: string, mime: string, octets: Uint8Array | string): Respon
  */
 routesAdmin.get('/catalogues', (c) => c.json(referentiels.decrireCatalogues()));
 
+/**
+ * Qui regarde, et jusqu'où.
+ *
+ * La page d'administration doit se dessiner **avant** de savoir ce qu'elle a le
+ * droit de montrer : sans cette route, elle afficherait les boutons du
+ * souverain à un intendant, qui les verrait refusés un par un. Une interface
+ * qui propose ce que l'API refuse ment.
+ */
+routesAdmin.get('/contexte', (c) => {
+  const perimetre = c.get('perimetre');
+  const moi = c.get('compte');
+  return c.json({
+    compte: { id: moi.id, email: moi.email, role: moi.role },
+    souverain: perimetre === null,
+    comptes_en_charge: perimetre === null ? null : perimetre.size,
+  });
+});
+
 /* --------------------------------------------------------------------------
  * Les comptes
  * -------------------------------------------------------------------------- */
 
 routesAdmin.get('/utilisateurs', async (c) => {
+  const perimetre = c.get('perimetre');
+  // Le filtre est dans la requête, pas après : une liste complète chargée puis
+  // élaguée en mémoire, c'est une liste complète qui a existé.
+  const borne = perimetre === null ? '' : `WHERE u.id IN (${trous(perimetre.size)})`;
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.nom_affiche, u.role, u.cree_le, u.dernier_acces,
             u.plafond_octets, u.plafond_sauvegardes,
@@ -108,9 +149,12 @@ routesAdmin.get('/utilisateurs', async (c) => {
             COALESCE(SUM(s.relations), 0)   AS relations
        FROM utilisateurs u
        LEFT JOIN sauvegardes s ON s.utilisateur_id = u.id
+      ${borne}
       GROUP BY u.id
       ORDER BY u.cree_le DESC`
-  ).all<Objet>();
+  )
+    .bind(...(perimetre === null ? [] : [...perimetre]))
+    .all<Objet>();
 
   return c.json({ utilisateurs: results });
 });
@@ -122,7 +166,9 @@ routesAdmin.get('/utilisateurs/:id/sauvegardes', async (c) => {
   )
     .bind(id)
     .first<Objet>();
-  if (!proprietaire) return c.json({ erreur: 'compte inconnu' }, 404);
+  if (!proprietaire || !dansLePerimetre(c.get('perimetre'), id)) {
+    return c.json({ erreur: 'compte inconnu' }, 404);
+  }
 
   const { results } = await c.env.DB.prepare(
     `SELECT id, nom, personnes, relations, taille, revision, cree_le, modifie_le
@@ -134,11 +180,21 @@ routesAdmin.get('/utilisateurs/:id/sauvegardes', async (c) => {
   return c.json({ proprietaire, sauvegardes: results });
 });
 
+/* --------------------------------------------------------------------------
+ * Ce qui n'appartient qu'au souverain
+ *
+ * `exigerSouverain` est écrit sur chaque route plutôt que posé sur un préfixe :
+ * ces adresses-là sont mêlées à celles que l'intendant peut prendre — même
+ * `/utilisateurs/:id`, selon le verbe. Un préfixe commun n'existerait qu'au
+ * prix d'un renommage qui séparerait mal, et une garde qu'on ne voit pas en
+ * lisant la route est une garde qu'on oublie de reconduire.
+ * -------------------------------------------------------------------------- */
+
 /**
  * Relever (ou abaisser) un plafond. Le seul geste d'administration qui touche
  * au compte sans toucher au mot de passe.
  */
-routesAdmin.post('/utilisateurs/:id/plafond', async (c) => {
+routesAdmin.post('/utilisateurs/:id/plafond', exigerSouverain, async (c) => {
   const id = c.req.param('id');
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
 
@@ -176,7 +232,7 @@ routesAdmin.post('/utilisateurs/:id/plafond', async (c) => {
  * et le remplacer sans pouvoir le montrer à son propriétaire ne ferait que lui
  * retirer son dernier recours.
  */
-routesAdmin.post('/utilisateurs/:id/mot-de-passe', async (c) => {
+routesAdmin.post('/utilisateurs/:id/mot-de-passe', exigerSouverain, async (c) => {
   const id = c.req.param('id');
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
   const cle = cleValide(corps.cle);
@@ -197,7 +253,7 @@ routesAdmin.post('/utilisateurs/:id/mot-de-passe', async (c) => {
 });
 
 /** Supprimer un compte, et tout ce qui pend après lui (cascade du schéma). */
-routesAdmin.delete('/utilisateurs/:id', async (c) => {
+routesAdmin.delete('/utilisateurs/:id', exigerSouverain, async (c) => {
   const id = c.req.param('id');
   const moi = c.get('compte');
 
@@ -215,6 +271,174 @@ routesAdmin.delete('/utilisateurs/:id', async (c) => {
 
   await journaliser(c.env.DB, moi.id, 'suppression', id);
   return c.body(null, 204);
+});
+
+/* --------------------------------------------------------------------------
+ * Les intendants (lot 11.A)
+ *
+ * Le souverain délègue, et il délègue **borné** : un intendant reçoit des
+ * comptes, pas l'instance. Deux gestes seulement — nommer, et confier — parce
+ * que ce sont les deux seules choses qui décident qui verra quoi.
+ * -------------------------------------------------------------------------- */
+
+/** Les rôles qu'une route peut poser. `admin` n'en fait pas partie, exprès. */
+const ROLES_ACCORDABLES = ['membre', 'intendant'];
+
+/**
+ * Nommer ou démettre un intendant.
+ *
+ * **`admin` ne s'accorde pas ici, et ne s'accordera pas.** Le premier
+ * administrateur s'est donné en SQL et ses successeurs feront de même. Une
+ * route qui sacre un pair transforme le premier compte compromis en trousseau
+ * de toute l'instance ; il n'y a aucun confort qui vaille ça.
+ *
+ * Démettre un intendant lui retire ses tutelles dans le même geste. Les
+ * laisser derrière ferait d'une remise en fonction plus tard une restitution
+ * silencieuse de pouvoirs qu'on croyait repris.
+ */
+routesAdmin.post('/utilisateurs/:id/role', exigerSouverain, async (c) => {
+  const id = c.req.param('id');
+  const moi = c.get('compte');
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+  const role = String(corps.role ?? '');
+
+  if (!ROLES_ACCORDABLES.includes(role)) {
+    return c.json(
+      {
+        erreur: `rôle inconnu : « ${role} » (${ROLES_ACCORDABLES.join(', ')})`,
+        indice: "le rôle « admin » se donne en SQL, jamais depuis l'interface",
+      },
+      400
+    );
+  }
+
+  const cible = await c.env.DB.prepare('SELECT id, email, role FROM utilisateurs WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; email: string; role: string }>();
+  if (!cible) return c.json({ erreur: 'compte inconnu' }, 404);
+
+  // Se démettre soi-même fermerait la porte derrière soi, sans personne pour la
+  // rouvrir autrement qu'en SQL. Et démettre un pair reviendrait à contourner
+  // la règle du dessus par l'autre bout.
+  if (cible.role === 'admin') {
+    return c.json(
+      {
+        erreur: "le rôle d'un administrateur ne se change pas depuis l'interface",
+        indice: 'en SQL, comme il a été donné',
+      },
+      400
+    );
+  }
+  // Un essai (lot 9.C) n'a pas d'adresse : lui confier des comptes reviendrait
+  // à donner un pouvoir à un témoin de navigateur.
+  if (cible.role === 'invite') {
+    return c.json({ erreur: "un compte d'essai ne peut pas devenir intendant" }, 400);
+  }
+
+  await c.env.DB.prepare('UPDATE utilisateurs SET role = ? WHERE id = ?').bind(role, id).run();
+  if (role !== 'intendant') {
+    await c.env.DB.prepare('DELETE FROM tutelles WHERE intendant_id = ?').bind(id).run();
+  }
+
+  await journaliser(c.env.DB, moi.id, 'role', id);
+  return c.json({ ok: true, compte: { id, email: cible.email, role } });
+});
+
+/** Les intendants de l'instance, et les comptes qu'ils ont en charge. */
+routesAdmin.get('/intendants', exigerSouverain, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.email, u.nom_affiche, u.dernier_acces,
+            COUNT(t.utilisateur_id) AS charges
+       FROM utilisateurs u
+       LEFT JOIN tutelles t ON t.intendant_id = u.id
+      WHERE u.role = 'intendant'
+      GROUP BY u.id
+      ORDER BY u.email`
+  ).all<Objet>();
+
+  const { results: liens } = await c.env.DB.prepare(
+    `SELECT t.intendant_id, t.utilisateur_id, u.email
+       FROM tutelles t
+       JOIN utilisateurs u ON u.id = t.utilisateur_id
+      ORDER BY u.email`
+  ).all<{ intendant_id: string; utilisateur_id: string; email: string }>();
+
+  const parIntendant: Record<string, { id: string; email: string }[]> = {};
+  for (const lien of liens) {
+    const deja = parIntendant[lien.intendant_id] ?? [];
+    deja.push({ id: lien.utilisateur_id, email: lien.email });
+    parIntendant[lien.intendant_id] = deja;
+  }
+
+  return c.json({
+    intendants: results.map((fiche) => ({
+      ...fiche,
+      comptes: parIntendant[String(fiche.id)] ?? [],
+    })),
+  });
+});
+
+/**
+ * Confier des comptes à un intendant — la liste **entière**, pas un ajout.
+ *
+ * Remplacer plutôt qu'empiler rend le geste rejouable et lisible : ce qu'on
+ * envoie est ce qu'il aura, et retirer un compte se fait en le décochant plutôt
+ * qu'en trouvant une route de suppression. C'est aussi ce que la page montre.
+ */
+routesAdmin.put('/intendants/:id/charges', exigerSouverain, async (c) => {
+  const id = c.req.param('id');
+  const moi = c.get('compte');
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+
+  const intendant = await c.env.DB.prepare('SELECT id, role FROM utilisateurs WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; role: string }>();
+  if (!intendant) return c.json({ erreur: 'compte inconnu' }, 404);
+  if (intendant.role !== 'intendant') {
+    return c.json({ erreur: "ce compte n'est pas intendant", indice: 'nommez-le d’abord' }, 400);
+  }
+
+  const bruts = Array.isArray(corps.comptes) ? corps.comptes : [];
+  const demandes = [...new Set(bruts.map((v: unknown) => String(v ?? '').trim()).filter(Boolean))];
+  if (demandes.length > MAX_COMPTES) {
+    return c.json({ erreur: `au plus ${MAX_COMPTES} comptes par intendant` }, 400);
+  }
+
+  // On ne confie que des comptes qui existent, et jamais un administrateur ni
+  // un autre intendant : la tutelle descend, elle ne traverse pas.
+  const retenus = demandes.length
+    ? (
+        await c.env.DB.prepare(
+          `SELECT id FROM utilisateurs
+            WHERE id IN (${trous(demandes.length)}) AND role NOT IN ('admin', 'intendant')`
+        )
+          .bind(...demandes)
+          .all<{ id: string }>()
+      ).results.map((ligne) => ligne.id)
+    : [];
+
+  const maintenant = Math.floor(Date.now() / 1000);
+  const gestes: D1PreparedStatement[] = [
+    c.env.DB.prepare('DELETE FROM tutelles WHERE intendant_id = ?').bind(id),
+    ...retenus.map((utilisateur) =>
+      c.env.DB
+        .prepare(
+          `INSERT INTO tutelles (intendant_id, utilisateur_id, cree_le, pose_par)
+           VALUES (?, ?, ?, ?)`
+        )
+        .bind(id, utilisateur, maintenant, moi.id)
+    ),
+  ];
+  // En lot : une tutelle à demi remplacée laisserait l'intendant sans personne,
+  // ou avec les anciens et les nouveaux.
+  await c.env.DB.batch(gestes);
+
+  await journaliser(c.env.DB, moi.id, 'tutelle', id);
+  return c.json({
+    ok: true,
+    comptes: retenus,
+    ecartes: demandes.filter((demande) => !retenus.includes(demande)),
+  });
 });
 
 /* --------------------------------------------------------------------------
@@ -248,7 +472,9 @@ async function charger(base: D1Database, id: string) {
  */
 routesAdmin.get('/sauvegardes/:id', async (c) => {
   const ligne = await charger(c.env.DB, c.req.param('id'));
-  if (!ligne || !ligne.donnees) return c.json({ erreur: 'sauvegarde inconnue' }, 404);
+  if (!ligne || !ligne.donnees || !dansLePerimetre(c.get('perimetre'), ligne.utilisateur_id)) {
+    return c.json({ erreur: 'sauvegarde inconnue' }, 404);
+  }
 
   const dataset = Dataset.depuisDict(JSON.parse(ligne.donnees) as Objet);
   const { donnees: _ignore, ...fiche } = ligne;
@@ -276,7 +502,9 @@ routesAdmin.get('/sauvegardes/:id', async (c) => {
 
 routesAdmin.get('/sauvegardes/:id/export', async (c) => {
   const ligne = await charger(c.env.DB, c.req.param('id'));
-  if (!ligne || !ligne.donnees) return c.json({ erreur: 'sauvegarde inconnue' }, 404);
+  if (!ligne || !ligne.donnees || !dansLePerimetre(c.get('perimetre'), ligne.utilisateur_id)) {
+    return c.json({ erreur: 'sauvegarde inconnue' }, 404);
+  }
 
   const base = slugifier(String(ligne.nom), 'sauvegarde');
   const format = new URL(c.req.url).searchParams.get('format') ?? 'json';
@@ -305,7 +533,27 @@ routesAdmin.get('/sauvegardes/:id/export', async (c) => {
  * regarder ; un client qui se trompe de chemin lit.
  * -------------------------------------------------------------------------- */
 
-type Contexte = Context<{ Bindings: Env; Variables: Variables }>;
+type Contexte = Context<{ Bindings: Env; Variables: VariablesAdmin }>;
+
+/** Les identifiants reçus, nettoyés et dédoublonnés. */
+function nommes(brut: unknown): string[] {
+  const bruts = Array.isArray(brut) ? brut : [];
+  return [...new Set(bruts.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))];
+}
+
+/**
+ * La sélection, ramenée au périmètre de celui qui la pose.
+ *
+ * Les comptes hors périmètre sont **retirés en silence**, et c'est voulu : dire
+ * « ce compte ne vous appartient pas » apprendrait à un intendant qu'il existe.
+ * Rien ne se perd pour autant — le rapport du lot nomme chaque sauvegarde
+ * touchée, et la page ne propose que les comptes qu'il a en charge. Une
+ * sélection entièrement hors périmètre tombe sur le 404 « aucune sauvegarde à
+ * toucher », le même que pour des comptes qui n'en ont aucune.
+ */
+function auPerimetre(ids: string[], perimetre: Perimetre): string[] {
+  return perimetre === null ? ids : ids.filter((id) => perimetre.has(id));
+}
 
 /** La sélection, validée, résolue en sauvegardes. */
 async function preparerLot(
@@ -313,12 +561,12 @@ async function preparerLot(
 ): Promise<{ cibles: Cible[]; operation: Objet } | Response> {
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
 
-  const bruts = Array.isArray(corps.comptes) ? corps.comptes : [];
-  const comptes = [...new Set(bruts.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))];
-  if (!comptes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
-  if (comptes.length > MAX_COMPTES) {
+  const demandes = nommes(corps.comptes);
+  if (!demandes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  if (demandes.length > MAX_COMPTES) {
     return c.json({ erreur: `sélection trop large : ${MAX_COMPTES} comptes au plus` }, 400);
   }
+  const comptes = auPerimetre(demandes, c.get('perimetre'));
 
   const portee: Portee = corps.portee === 'active' ? 'active' : 'toutes';
 
@@ -361,12 +609,12 @@ async function preparerLot(
  */
 routesAdmin.post('/lots/panorama', async (c) => {
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
-  const bruts = Array.isArray(corps.comptes) ? corps.comptes : [];
-  const comptes = [...new Set(bruts.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))];
-  if (!comptes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
-  if (comptes.length > MAX_COMPTES) {
+  const demandes = nommes(corps.comptes);
+  if (!demandes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  if (demandes.length > MAX_COMPTES) {
     return c.json({ erreur: `sélection trop large : ${MAX_COMPTES} comptes au plus` }, 400);
   }
+  const comptes = auPerimetre(demandes, c.get('perimetre'));
 
   const portee: Portee = corps.portee === 'active' ? 'active' : 'toutes';
   return c.json(panorama(await resoudreCibles(c.env.DB, comptes, portee)));
@@ -394,5 +642,16 @@ routesAdmin.post('/lots/appliquer', async (c) => {
 
 routesAdmin.get('/journal', async (c) => {
   const combien = Number(new URL(c.req.url).searchParams.get('combien') ?? '200');
-  return c.json({ journal: await dernieres(c.env.DB, Number.isFinite(combien) ? combien : 200) });
+  const moi = c.get('compte');
+  // Un intendant voit ses propres gestes et ce qui a été fait aux comptes qu'on
+  // lui a confiés — y compris par le souverain, car c'est justement ce que le
+  // registre lui doit. Le reste de l'instance ne le regarde pas.
+  return c.json({
+    journal: await dernieres(
+      c.env.DB,
+      Number.isFinite(combien) ? combien : 200,
+      c.get('perimetre'),
+      moi.id
+    ),
+  });
 });

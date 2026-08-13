@@ -27,7 +27,15 @@ export type Action =
    * qui compte le plus dans ce registre — le seul qui laisse une trace *dans*
    * les données de quelqu'un d'autre.
    */
-  | 'edition';
+  | 'edition'
+  /**
+   * Lot 11.A : le souverain distribue le pouvoir. `role` quand il nomme ou
+   * démet un intendant, `tutelle` quand il lui confie ou lui retire des
+   * comptes. Ce sont les deux gestes qui décident **qui peut regarder quoi** ;
+   * les laisser hors du registre les rendrait invisibles.
+   */
+  | 'role'
+  | 'tutelle';
 
 export async function journaliser(
   base: D1Database,
@@ -60,20 +68,48 @@ export interface LigneJournal {
   le: number;
 }
 
-/** Les dernières lignes, avec les adresses plutôt que des identifiants nus. */
-export async function dernieres(base: D1Database, combien = 200): Promise<LigneJournal[]> {
+/**
+ * Les dernières lignes, avec les adresses plutôt que des identifiants nus.
+ *
+ * `perimetre` borne la lecture pour un intendant (lot 11.A) : il voit **ses
+ * propres gestes** et **ce qui a été fait aux comptes qu'on lui a confiés** —
+ * y compris par le souverain, car c'est justement ce que le registre lui doit.
+ * Le reste de l'instance ne le regarde pas, et les adresses des autres comptes
+ * n'ont pas à transiter par sa page. Un périmètre `null` ne filtre rien.
+ */
+export async function dernieres(
+  base: D1Database,
+  combien = 200,
+  perimetre: ReadonlySet<string> | null = null,
+  lecteurId: string | null = null
+): Promise<LigneJournal[]> {
+  const limite = Math.min(1000, Math.max(1, combien));
+
+  const colonnes = `j.id, j.admin_id, j.action, j.cible_utilisateur, j.cible_sauvegarde, j.le,
+                    a.email AS admin_email,
+                    c.email AS cible_email`;
+  const jointures = `FROM journal_admin j
+                     LEFT JOIN utilisateurs a ON a.id = j.admin_id
+                     LEFT JOIN utilisateurs c ON c.id = j.cible_utilisateur`;
+  const fin = 'ORDER BY j.le DESC, j.id DESC LIMIT ?';
+
+  if (perimetre === null) {
+    const { results } = await base
+      .prepare(`SELECT ${colonnes} ${jointures} ${fin}`)
+      .bind(limite)
+      .all<LigneJournal>();
+    return results;
+  }
+
+  const charges = [...perimetre];
+  const trous = charges.length ? charges.map(() => '?').join(',') : "''";
   const { results } = await base
     .prepare(
-      `SELECT j.id, j.admin_id, j.action, j.cible_utilisateur, j.cible_sauvegarde, j.le,
-              a.email AS admin_email,
-              c.email AS cible_email
-         FROM journal_admin j
-         LEFT JOIN utilisateurs a ON a.id = j.admin_id
-         LEFT JOIN utilisateurs c ON c.id = j.cible_utilisateur
-        ORDER BY j.le DESC, j.id DESC
-        LIMIT ?`
+      `SELECT ${colonnes} ${jointures}
+        WHERE j.admin_id = ? OR j.cible_utilisateur IN (${trous})
+        ${fin}`
     )
-    .bind(Math.min(1000, Math.max(1, combien)))
+    .bind(lecteurId ?? '', ...charges, limite)
     .all<LigneJournal>();
   return results;
 }

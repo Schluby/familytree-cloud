@@ -93,6 +93,19 @@ contient() { # contient <texte> : le texte apparait-il dans la derniere reponse 
   if grep -qF -- "$1" "$DOSSIER/corps.json" 2>/dev/null; then echo oui; else echo non; fi
 }
 
+journal_vise() { # journal_vise <id> : combien de lignes du journal VISENT ce compte
+  # `contient` ne suffit pas ici : l'identifiant d'un administrateur apparait
+  # aussi comme AUTEUR d'une ligne, et voir « le souverain a ouvert l'arbre de
+  # mon joueur » est justement ce que le registre doit a un intendant. Ce qu'on
+  # verifie, c'est qu'aucune ligne ne PORTE SUR un compte hors perimetre.
+  node -e "
+    const fs=require('fs');
+    let d={};
+    try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    process.stdout.write(String((d.journal||[]).filter(l=>l.cible_utilisateur==='$1').length));
+  " 2>/dev/null
+}
+
 echo "Base : $BASE"
 echo
 
@@ -819,6 +832,108 @@ verifier "  et dit pourquoi il est eteint" oui "$(contient 'raisonLot')"
 code - GET /css/base.css > /dev/null
 verifier "un bouton eteint n'affiche plus l'attente" oui "$(contient 'cursor: not-allowed')"
 verifier "  le curseur d'attente est reserve a « occupe »" oui "$(contient '.bouton.occupe')"
+
+# ---------------------------------------------------------------------------
+# Lot 11.A : deux etages d'administration
+#
+# Le souverain (`admin`) peut tout, sur tout le monde. L'intendant ne peut que
+# consulter et editer les comptes qu'on lui a CONFIES — et pour tout le reste
+# de l'instance, ces comptes-la n'existent pas : 404, jamais 403.
+#
+# C'est la section la plus importante du fichier apres le cloisonnement des
+# membres. Chaque route qui recoit un identifiant de compte y est reprise deux
+# fois : dans le perimetre, hors du perimetre.
+# ---------------------------------------------------------------------------
+
+echo "-- 11.A le souverain nomme un intendant"
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+code "$BOCAL_VIDE" GET /api/auth/moi > /dev/null
+ID_ESSAI="$(lire compte.id)"
+
+verifier "un membre n'est pas encore intendant" 403 "$(code "$BOCAL_B" GET /api/admin/contexte)"
+verifier "A se sait souverain" 200 "$(code "$BOCAL_A" GET /api/admin/contexte)"
+verifier "  et sans perimetre" true "$(lire souverain)"
+verifier "le role « admin » ne s'accorde pas par l'API" 400 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"admin"}')"
+verifier "  et il dit ou il se donne" oui "$(contient 'SQL')"
+verifier "un essai ne peut pas devenir intendant" 400 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_ESSAI/role '{"role":"intendant"}')"
+verifier "le role d'un admin ne se touche pas" 400 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_A/role '{"role":"membre"}')"
+verifier "compte inconnu" 404 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/fantome/role '{"role":"intendant"}')"
+verifier "B est nomme intendant" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"intendant"}')"
+
+echo "-- un intendant sans tutelle ne voit que lui-meme"
+verifier "il entre" 200 "$(code "$BOCAL_B" GET /api/admin/contexte)"
+verifier "  mais il n'est pas souverain" false "$(lire souverain)"
+verifier "  et son perimetre se compte" 1 "$(lire comptes_en_charge)"
+verifier "la liste des comptes lui repond" 200 "$(code "$BOCAL_B" GET /api/admin/utilisateurs)"
+verifier "  et A n'y est pas" non "$(contient "$EMAIL_A")"
+verifier "  lui, si" oui "$(contient "$EMAIL_B")"
+
+echo "-- ce qu'un intendant ne peut PAS faire"
+verifier "changer un plafond" 403 "$(code "$BOCAL_B" POST /api/admin/utilisateurs/$ID_INVITE/plafond '{"octets":131072,"sauvegardes":5}')"
+verifier "  remplacer un mot de passe" 403 "$(code "$BOCAL_B" POST /api/admin/utilisateurs/$ID_INVITE/mot-de-passe '{"cle":"x"}')"
+verifier "  supprimer un compte" 403 "$(code "$BOCAL_B" DELETE /api/admin/utilisateurs/$ID_INVITE)"
+verifier "  nommer un intendant" 403 "$(code "$BOCAL_B" POST /api/admin/utilisateurs/$ID_INVITE/role '{"role":"intendant"}')"
+verifier "  lire la liste des intendants" 403 "$(code "$BOCAL_B" GET /api/admin/intendants)"
+verifier "  se confier des comptes" 403 "$(code "$BOCAL_B" PUT /api/admin/intendants/$ID_COMPTE_B/charges "{\"comptes\":[\"$ID_COMPTE_A\"]}")"
+verifier "  et le refus dit ce qu'il peut" oui "$(contient 'intendant consulte')"
+
+echo "-- hors perimetre, les comptes n'existent pas"
+verifier "l'arbre de A est introuvable" 404 "$(code "$BOCAL_B" GET /api/admin/sauvegardes/$ID_REF)"
+verifier "  son export aussi" 404 "$(code "$BOCAL_B" GET /api/admin/sauvegardes/$ID_REF/export)"
+verifier "  ses sauvegardes aussi" 404 "$(code "$BOCAL_B" GET /api/admin/utilisateurs/$ID_COMPTE_A/sauvegardes)"
+verifier "  et la porte d'edition dit le meme mot" 404 "$(code "$BOCAL_B" GET /api/admin/arbres/$ID_REF/referentiels)"
+verifier "  au mot pres" oui "$(contient 'introuvable')"
+verifier "un lot vise A : aucune sauvegarde a toucher" 404 "$(code "$BOCAL_B" POST /api/admin/lots/apercu "{\"comptes\":[\"$ID_COMPTE_A\"],\"operation\":{\"type\":\"meta\",\"annee_courante\":\"9 AC\"}}")"
+verifier "le panorama de A ne rend rien" 0 "$(code "$BOCAL_B" POST /api/admin/lots/panorama "{\"comptes\":[\"$ID_COMPTE_A\"]}" > /dev/null; lire comptes.length)"
+
+echo "-- le souverain lui confie un compte"
+verifier "on ne confie pas a un simple membre" 400 "$(code "$BOCAL_A" PUT /api/admin/intendants/$ID_INVITE/charges "{\"comptes\":[\"$ID_COMPTE_A\"]}")"
+verifier "la tutelle se pose" 200 "$(code "$BOCAL_A" PUT /api/admin/intendants/$ID_COMPTE_B/charges "{\"comptes\":[\"$ID_INVITE\",\"$ID_COMPTE_A\"]}")"
+verifier "  l'invite est retenu" 1 "$(lire comptes.length)"
+verifier "  et le souverain ecarte : la tutelle ne remonte pas" 1 "$(lire ecartes.length)"
+verifier "la liste des intendants le montre" 200 "$(code "$BOCAL_A" GET /api/admin/intendants)"
+verifier "  avec son compte en charge" 1 "$(lire intendants.0.charges)"
+
+echo "-- dans son perimetre, l'intendant travaille"
+verifier "son perimetre a grandi" 2 "$(code "$BOCAL_B" GET /api/admin/contexte > /dev/null; lire comptes_en_charge)"
+verifier "il voit le compte confie" oui "$(code "$BOCAL_B" GET /api/admin/utilisateurs > /dev/null; contient "$ID_INVITE")"
+verifier "  toujours pas A" non "$(contient "$EMAIL_A")"
+verifier "il liste ses sauvegardes" 200 "$(code "$BOCAL_B" GET /api/admin/utilisateurs/$ID_INVITE/sauvegardes)"
+verifier "il consulte son arbre" 200 "$(code "$BOCAL_B" GET /api/admin/sauvegardes/$SAUVEGARDE_INVITE)"
+verifier "il l'edite par procuration" 200 "$(code "$BOCAL_B" PATCH /api/admin/arbres/$SAUVEGARDE_INVITE/meta '{"annee_courante":"305 AC"}')"
+verifier "  et l'invite le retrouve chez lui" oui "$(code "$BOCAL_I" GET /api/referentiels > /dev/null; contient '305 AC')"
+verifier "un lot passe sur son perimetre" 200 "$(code "$BOCAL_B" POST /api/admin/lots/appliquer "{\"comptes\":[\"$ID_INVITE\",\"$ID_COMPTE_A\"],\"portee\":\"active\",\"operation\":{\"type\":\"maison\",\"label\":\"Maison de l intendant\"}}")"
+verifier "  une seule sauvegarde touchee" 1 "$(lire resume.sauvegardes)"
+verifier "  celle de l'invite" oui "$(contient "$ID_INVITE")"
+verifier "  et A n'a rien recu" non "$(code "$BOCAL_A" GET /api/referentiels > /dev/null; contient 'Maison de l intendant')"
+
+echo "-- le registre suit, et ne deborde pas"
+verifier "l'intendant lit un journal" 200 "$(code "$BOCAL_B" GET /api/admin/journal)"
+LIGNES_INTENDANT="$(lire journal.length)"
+verifier "  ses ecritures sur son joueur y sont" oui "$([ "$(journal_vise "$ID_INVITE")" -gt 0 ] && echo oui || echo non)"
+# La borne du registre. Une ligne qui PORTE SUR un compte hors perimetre n'a
+# rien a faire la ; une ligne qu'un administrateur a POSEE sur l'un de ses
+# joueurs, si — c'est ce que le registre lui doit. Les deux se distinguent par
+# la colonne, pas par la presence de l'identifiant dans le corps.
+verifier "  aucune ligne ne porte sur A" 0 "$(journal_vise "$ID_COMPTE_A")"
+verifier "le souverain, lui, voit la nomination" oui "$(code "$BOCAL_A" GET /api/admin/journal > /dev/null; contient '"role"')"
+verifier "  et la tutelle" oui "$(contient '"tutelle"')"
+# La preuve que le filtre retranche vraiment : le souverain voit tout le
+# registre, l'intendant n'en voit qu'une part.
+verifier "  et il en voit plus que l'intendant" oui "$([ "$(lire journal.length)" -gt "$LIGNES_INTENDANT" ] && echo oui || echo non)"
+
+echo "-- demettre reprend tout, tutelles comprises"
+verifier "B redevient membre" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"membre"}')"
+verifier "  la porte se referme" 403 "$(code "$BOCAL_B" GET /api/admin/contexte)"
+# Sur son adresse a lui, pas sur le total : le harnais tourne aussi en ligne,
+# ou d'autres intendants peuvent tres bien exister sans le regarder.
+verifier "  et il quitte la liste des intendants" non "$(code "$BOCAL_A" GET /api/admin/intendants > /dev/null; contient "$EMAIL_B")"
+# Le remettre en fonction ne doit pas lui rendre ses anciennes tutelles : un
+# pouvoir repris qui revient tout seul n'a jamais ete repris.
+verifier "on le renomme" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"intendant"}')"
+verifier "  il repart sans personne" 1 "$(code "$BOCAL_B" GET /api/admin/contexte > /dev/null; lire comptes_en_charge)"
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
 
 # ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google

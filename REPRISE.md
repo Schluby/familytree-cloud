@@ -58,6 +58,32 @@ arbre à la fois. Quatre choses à retenir :
 - **Une ligne de journal par sauvegarde écrite.** Un lot de trente arbres laisse
   trente traces, pas une.
 
+Le lot 11.A, ajouté le 13/08/2026, **coupe l'administration en deux étages**.
+Il n'y avait qu'un rôle au-dessus de `membre`, et il pouvait tout, sur tout le
+monde ; il y en a deux :
+
+- **`admin`, le souverain.** Périmètre `null` — tous les comptes. Lui seul nomme
+  les intendants, leur confie des comptes, touche aux plafonds, aux mots de
+  passe et à la suppression. Le rôle **continue de se donner en SQL** : aucune
+  route ne l'accorde, et la route des rôles refuse même de toucher à celui d'un
+  administrateur.
+- **`intendant`, l'administrateur délégué.** Périmètre = les comptes qu'on lui a
+  confiés (table `tutelles`), **plus le sien**. Il consulte, exporte, édite par
+  procuration et applique des lots — sur eux seuls.
+
+Trois choses à ne pas perdre de vue :
+
+- **Le périmètre est posé sur le contexte, il ne s'applique pas tout seul.**
+  Toute route neuve sous `/api/admin/*` qui reçoit un identifiant de compte doit
+  appeler `dansLePerimetre`. Sans ça, elle est ouverte à tout intendant sur tout
+  compte.
+- **Hors périmètre, c'est 404, jamais 403** — la même règle que le cloisonnement
+  des membres. La procuration répond le **même mot** qu'un arbre inexistant.
+- **Une sélection de lot déborde en silence** : les comptes hors périmètre sont
+  retranchés sans le dire. Le rapport nomme ensuite chaque sauvegarde touchée,
+  donc rien ne se perd — mais un lot posé sur dix comptes peut n'en toucher que
+  trois, et c'est normal.
+
 Le panorama (`POST /api/admin/lots/panorama`) répond à la question qui précède
 tout lot de groupe : **qu'est-ce que ces comptes ont en commun ?** Ce qui est
 partagé par tous supporte un lot ; ce qui n'est qu'à certains serait écrasé sans
@@ -187,7 +213,17 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
 - `Dataset` garde un index en cache : appeler `oublierIndex()` après toute
   mutation de `personnes`.
 - **Ne jamais modifier une migration déjà appliquée** ; en ajouter une. La
-  dernière est `0005_google.sql`.
+  dernière est `0006_tutelles.sql`.
+- **Toute route neuve sous `/api/admin/*` qui reçoit un identifiant de compte
+  doit passer par `dansLePerimetre`** (`src/admin/intergiciel.ts`). Sans ce
+  passage, elle est ouverte à tout intendant sur tout compte : le périmètre est
+  posé sur le contexte, il ne s'applique pas de lui-même. Et le refus est un
+  **404**, jamais un 403 — la même règle que le cloisonnement des membres.
+- **Un geste qui touche au compte lui-même** — plafond, mot de passe,
+  suppression, rôle, tutelle — **prend `exigerSouverain` en plus.** La garde est
+  écrite sur chaque route parce que ces adresses sont mêlées à celles que
+  l'intendant peut prendre ; un préfixe commun n'existerait qu'au prix d'un
+  renommage qui séparerait mal.
 - **Un `INSERT` mal compté ne se voit pas au typage.** L'insertion du compte
   Google est partie avec sept marqueurs et six valeurs liées ; `tsc` compile
   sans rien dire, et D1 n'aurait refusé qu'à la première connexion réelle.

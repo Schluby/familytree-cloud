@@ -11,8 +11,10 @@
   <h1>Administration</h1>
   <p id="sousTitre">Les comptes de cette instance, et leurs arbres.</p>
 
-  <!-- Dit à l'administrateur ce qu'il engage, avant qu'il ne clique. -->
-  <div class="bandeau">
+  <!-- Dit à l'administrateur ce qu'il engage, avant qu'il ne clique. Le texte
+       dépend du rôle : un intendant n'a pas les mêmes pouvoirs, et lui servir
+       la phrase du souverain lui promettrait ce que l'API lui refusera. -->
+  <div class="bandeau" id="bandeau">
     <strong>Vous écrivez chez les autres.</strong> Vous pouvez consulter,
     exporter, et <strong>modifier</strong> les arbres des autres comptes — un par
     un avec « ✎ Éditer », ou plusieurs d’un coup avec les lots ci-dessous.
@@ -35,6 +37,33 @@
         <tbody id="corpsComptes"><tr><td colspan="8">Chargement…</td></tr></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Les intendants (11.A). Visible du seul souverain : c'est lui qui
+       distribue le pouvoir, et l'API refuse ces routes à tout autre. -->
+  <div class="carte cache" id="carteIntendants">
+    <h2>Intendants</h2>
+    <p class="note">
+      Un intendant administre <strong>les comptes que vous lui confiez</strong>,
+      et eux seuls : il les consulte, ouvre leurs arbres, les édite et leur
+      applique des lots. Il ne touche ni aux mots de passe, ni aux plafonds, ni
+      à la suppression, ni aux rôles — et <strong>le reste de l’instance lui est
+      invisible</strong>. Son propre compte fait partie de son périmètre.
+    </p>
+    <div class="defilant">
+      <table class="donnees serree">
+        <thead>
+          <tr><th>Adresse</th><th>Comptes</th><th>Lesquels</th><th>Dernier accès</th><th></th></tr>
+        </thead>
+        <tbody id="corpsIntendants"></tbody>
+      </table>
+    </div>
+    <p class="note" id="aideTutelle">
+      Cochez des comptes dans le tableau ci-dessus, puis « Lui confier la
+      sélection ». <strong>La sélection remplace</strong> ce qu’il avait :
+      décocher un compte, c’est le lui retirer.
+    </p>
   </div>
 
   <!-- ------------------------------------------------------------------ -->
