@@ -71,8 +71,11 @@
     </p>
 
     <div class="actions" id="actionsLot">
-      <button type="button" class="bouton" id="btnApercu">Aperçu</button>
-      <button type="button" class="bouton accent" id="btnAppliquer" disabled>Appliquer…</button>
+      <button type="button" class="bouton accent" id="btnApercu">Aperçu</button>
+      <button type="button" class="bouton" id="btnAppliquer" disabled>Appliquer</button>
+      <!-- Pourquoi « Appliquer » est éteint, dit à côté du bouton. Un bouton gris
+           sans un mot se lit comme un bouton qui charge. -->
+      <span class="note raison" id="raisonLot"></span>
     </div>
 
     <div class="cache" id="blocResultat">

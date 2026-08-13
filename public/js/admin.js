@@ -372,6 +372,23 @@ let catalogues = null;
 let champsCourants = [];
 /** La signature du lot tel qu'il était au moment de l'aperçu. */
 let apercuValide = null;
+/** Où en est le lot : ce qu'il reste à faire avant de pouvoir écrire. */
+let etape = 'a-faire';
+/** La requête en cours, s'il y en a une : `'apercu'`, `'appliquer'`, ou `''`. */
+let occupe = '';
+
+/**
+ * Pourquoi « Appliquer » est éteint — à dire *toujours*.
+ *
+ * Un bouton gris et muet se lit comme un bouton qui charge, surtout quand son
+ * libellé se termine par des points de suspension. C'est ce qui s'est passé :
+ * on attendait la fin d'un calcul qui n'avait jamais commencé.
+ */
+const RAISONS = {
+  'a-faire': 'Faites d’abord un aperçu — « Appliquer » s’allumera ensuite.',
+  pret: 'Aperçu relu : vous pouvez appliquer.',
+  'sans-effet': 'Cet aperçu ne change rien — le lot est déjà en place partout.',
+};
 
 const STATUTS = ['vivant', 'mort', 'inconnu'];
 
@@ -604,7 +621,34 @@ function cequiManque() {
 /** Un aperçu ne vaut que pour le lot exact qu'on a lu. */
 function perimerApercu() {
   apercuValide = null;
-  $('btnAppliquer').disabled = true;
+  etape = 'a-faire';
+  majBoutons();
+}
+
+/**
+ * L'état des deux boutons, dit d'un seul endroit.
+ *
+ * L'accent marque le geste suivant : « Aperçu » tant qu'on n'a rien relu, puis
+ * « Appliquer ». Et le libellé change pendant la requête, pour qu'une vraie
+ * attente ne ressemble pas à un bouton simplement éteint.
+ */
+function majBoutons() {
+  const manque = cequiManque();
+  const btnApercu = $('btnApercu');
+  const btnAppliquer = $('btnAppliquer');
+
+  btnApercu.disabled = Boolean(occupe) || Boolean(manque);
+  btnAppliquer.disabled = Boolean(occupe) || etape !== 'pret';
+
+  btnApercu.textContent = occupe === 'apercu' ? 'Aperçu en cours…' : 'Aperçu';
+  btnAppliquer.textContent = occupe === 'appliquer' ? 'Écriture en cours…' : 'Appliquer';
+  btnApercu.classList.toggle('occupe', occupe === 'apercu');
+  btnAppliquer.classList.toggle('occupe', occupe === 'appliquer');
+
+  btnApercu.classList.toggle('accent', etape !== 'pret');
+  btnAppliquer.classList.toggle('accent', etape === 'pret');
+
+  $('raisonLot').textContent = occupe ? '' : manque || RAISONS[etape];
 }
 
 function majSelection() {
@@ -631,34 +675,48 @@ function majSelection() {
   perimerApercu();
 }
 
-async function lancerLot(chemin) {
+async function lancerLot(chemin, quoi) {
   const manque = cequiManque();
   if (manque) {
     message(manque, 'erreur');
     return null;
   }
 
-  message('Calcul en cours…');
-  const { ok, donnees } = await appeler(chemin, {
-    method: 'POST',
-    body: JSON.stringify(corpsDuLot()),
-  });
-  if (!ok) {
-    message(donnees?.erreur || 'Erreur', 'erreur');
+  occupe = quoi;
+  majBoutons();
+  message(quoi === 'apercu' ? 'Aperçu en cours…' : 'Écriture en cours…');
+  try {
+    const { ok, donnees } = await appeler(chemin, {
+      method: 'POST',
+      body: JSON.stringify(corpsDuLot()),
+    });
+    if (!ok) {
+      message(donnees?.erreur || 'Erreur', 'erreur');
+      return null;
+    }
+    dessinerResultat(donnees);
+    return donnees;
+  } catch (erreur) {
+    // Sans ce filet, une coupure du réseau laissait « en cours… » à l'écran
+    // pour toujours : la promesse était rejetée et personne ne le disait.
+    message(`Le serveur n’a pas répondu — ${erreur.message}`, 'erreur');
     return null;
+  } finally {
+    occupe = '';
+    majBoutons();
   }
-  dessinerResultat(donnees);
-  return donnees;
 }
 
 async function apercu() {
-  const resultat = await lancerLot('/api/admin/lots/apercu');
+  const resultat = await lancerLot('/api/admin/lots/apercu', 'apercu');
   if (!resultat) return;
 
-  apercuValide = JSON.stringify(corpsDuLot());
-  $('btnAppliquer').disabled = resultat.resume.creees + resultat.resume.mises_a_jour === 0;
+  const sansEffet = resultat.resume.creees + resultat.resume.mises_a_jour === 0;
+  apercuValide = sansEffet ? null : JSON.stringify(corpsDuLot());
+  etape = sansEffet ? 'sans-effet' : 'pret';
+  majBoutons();
   message(
-    $('btnAppliquer').disabled
+    sansEffet
       ? 'Rien ne changerait : ce lot est déjà en place.'
       : 'Aperçu — rien n’a été écrit. Relisez, puis appliquez.',
     'reussite'
@@ -685,7 +743,7 @@ async function appliquer() {
     return;
   }
 
-  const resultat = await lancerLot('/api/admin/lots/appliquer');
+  const resultat = await lancerLot('/api/admin/lots/appliquer', 'appliquer');
   if (!resultat) return;
 
   perimerApercu();

@@ -807,6 +807,19 @@ verifier "  sans le supprimer pour autant" oui "$(contient 'formulaireRecuperati
 verifier "  et propose de changer de compte" oui "$(contient 'changerDeCompte')"
 verifier "  en disant qui est connecte" oui "$(contient 'compteEnCours')"
 
+# Signale le 13/08 : « Appliquer… », gris et coiffe d'un curseur d'attente, se
+# lisait comme un bouton en train de charger. Un bouton eteint doit dire
+# pourquoi il l'est, et n'emprunter aucun signe a ceux qui travaillent.
+# `/admin.html` redirige (307) : le corps serait vide et les deux verifications
+# passeraient sans rien lire. On demande l'adresse que le site sert vraiment.
+code - GET /admin > /dev/null
+verifier "la page d'administration repond" oui "$(contient 'btnAppliquer')"
+verifier "« Appliquer » ne promet plus une suite" non "$(contient 'Appliquer…')"
+verifier "  et dit pourquoi il est eteint" oui "$(contient 'raisonLot')"
+code - GET /css/base.css > /dev/null
+verifier "un bouton eteint n'affiche plus l'attente" oui "$(contient 'cursor: not-allowed')"
+verifier "  le curseur d'attente est reserve a « occupe »" oui "$(contient '.bouton.occupe')"
+
 # ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google
 #
