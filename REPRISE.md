@@ -84,6 +84,21 @@ Trois choses à ne pas perdre de vue :
   donc rien ne se perd — mais un lot posé sur dix comptes peut n'en toucher que
   trois, et c'est normal.
 
+Le lot 11.C, du même jour, **rend l'arbre utilisable au téléphone**. Le rail
+n'était pas absent : la barre du haut réclamait 512 px de commandes dans 375 px
+d'écran, et le ☰ qui l'ouvre se retrouvait 75 px hors de l'écran. Depuis, la
+barre ne garde que de quoi naviguer et le reste **descend dans le rail** —
+`public/js/telephone.js` déplace les nœuds, il ne les duplique pas. Deux choses
+à savoir avant d'y toucher :
+
+- **Ajouter un bouton à la barre du haut oblige à décider où il va sur
+  téléphone.** Soit il entre dans `A_DESCENDRE` (`telephone.js`), soit il prend
+  un `display: none` dans le bloc `@media (max-width: 760px)` — sinon il repousse
+  ☰ et 👤 hors de l'écran, et le défaut recommence.
+- **Toute cible tactile fait au moins 36 px de haut sous 760 px.** Les valeurs
+  de départ (26 px pour « ＋ Nouvelle maison », 24 px pour une entrée de
+  légende) étaient dessinées pour une souris.
+
 Le panorama (`POST /api/admin/lots/panorama`) répond à la question qui précède
 tout lot de groupe : **qu'est-ce que ces comptes ont en commun ?** Ce qui est
 partagé par tous supporte un lot ; ce qui n'est qu'à certains serait écrasé sans
@@ -364,11 +379,33 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   dans l'heure depuis la même adresse déclenche la limite d'inscriptions. Purge :
   `wrangler d1 execute familytree --local --command "DELETE FROM tentatives"`
   (ou `--remote`).
-- `outils/essai.sh` s'**étend**, ne se réécrit pas. **346 vérifications** en
-  local, **335 en ligne** : deux sections branchent sur la configuration de
-  l'instance (courriel, Google) et vérifient le comportement attendu de chaque
-  côté. Un écart entre les deux nombres est normal ; un écart *ailleurs* ne
-  l'est pas.
+- `outils/essai.sh` s'**étend**, ne se réécrit pas. **416 vérifications** en
+  local : deux sections branchent sur la configuration de l'instance (courriel,
+  Google) et vérifient le comportement attendu de chaque côté, donc le total en
+  ligne diffère de quelques unités. Un écart entre les deux nombres est normal ;
+  un écart *ailleurs* ne l'est pas.
+- **Une vérification de page doit viser l'adresse que le site sert vraiment.**
+  `GET /admin.html` répond **307** (Cloudflare enlève l'extension) : le corps
+  est vide, et deux vérifications écrites contre lui sont passées sans rien
+  lire. C'est `/admin`, `/connexion`, `/donnees`. Une vérification à vide est
+  pire qu'une vérification en échec.
+- **Ne pas affirmer d'un journal filtré qu'il « ne contient pas » un
+  identifiant.** L'identifiant d'un administrateur y figure aussi comme
+  **auteur** d'une ligne, et voir « le souverain a ouvert l'arbre de mon
+  joueur » est justement ce que le registre doit à un intendant. Ce qui se
+  vérifie, c'est la colonne `cible_utilisateur` — d'où `journal_vise` dans le
+  harnais, plutôt qu'un `contient`.
+- **Le harnais ne possède pas l'instance.** Une assertion du type « il ne reste
+  plus aucun intendant » suppose qu'aucun autre compte n'existe : vraie en
+  local sur une base propre, fausse en ligne. Viser l'adresse d'essai, jamais le
+  total.
+- **Le navigateur de ces sessions n'affiche pas la page** (`document.hidden`).
+  Conséquences, toutes rencontrées : les captures d'écran échouent, les
+  transitions CSS sont **gelées** — un tiroir mesuré en plein glissement paraît
+  fermé —, et `resize` comme le `change` de `matchMedia` **ne se déclenchent
+  pas**. Pour mesurer une mise en page, neutraliser les transitions
+  (`* { transition: none !important }`) et **recharger** à chaque largeur plutôt
+  que de compter sur le redimensionnement.
 - **La section 10.B branche sur `/api/auth/moyens`.** En local `.dev.vars` porte
   une clé d'envoi factice, donc l'instance se dit configurée ; en ligne elle ne
   l'est pas. Le harnais vérifie le comportement **attendu dans chaque cas**

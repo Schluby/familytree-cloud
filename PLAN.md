@@ -978,3 +978,78 @@ affirmait que le registre du souverain portait des lignes **visant** le compte
 A — alors qu'il en est l'auteur, jamais la cible. La seconde a été remplacée
 par ce qui prouve vraiment le filtre : le souverain voit **plus** de lignes que
 l'intendant.
+
+---
+
+# Lot 11.C — L'arbre au téléphone  ☑
+
+*Signalé le 13/08/2026 : « toute la partie vue de l'arbre, au niveau surtout
+des options d'ajouts, des catégories, maisons et liens — on ne les voit pas sur
+téléphone ».*
+
+**Le rail n'était pas absent : il était inatteignable.** Mesuré sur 375 px, la
+barre du haut réclamait **512 px de commandes**. Les quatre derniers boutons
+débordaient à droite, et parmi eux le **☰ qui ouvre le rail**, à 75 px hors de
+l'écran ; le 👤 du volet de droite à 155 px. Le rail existait, complet —
+sauvegardes, vues, joueurs, liens, filtre/maisons, options, édition — et
+strictement aucun geste ne permettait de l'ouvrir.
+
+- ☑ Sur téléphone, la barre du haut ne garde que de quoi **naviguer** : la
+  marque, ☰, 👤, et « Créer un compte » pour un visiteur d'essai.
+- ☑ Tout le reste **descend dans le rail**, en tête, dans un bloc « Compte et
+  réglages » : année, thème, couleur & filtre, document, tout télécharger,
+  instantané, vue générale, compte, ⚙, 🛡, ⏻.
+  ([`public/js/telephone.js`](public/js/telephone.js))
+- ☑ Le tiroir de gauche a **une sortie** — il n'en avait pas, contrairement au
+  volet de droite. ✕ dans son en-tête, et un appui sur la scène referme.
+- ☑ Cibles tactiles : plus rien sous **36 px** dans le rail, le volet et les
+  deux barres.
+
+## La décision qui porte le lot
+
+**On déplace les nœuds, on ne les duplique pas.** Le CSS sait cacher, pas
+déménager — et cacher aurait désencombré la barre en rendant ces commandes
+introuvables, c'est-à-dire en reproduisant le défaut qu'on répare. Dupliquer
+les boutons dans le rail aurait donné deux éléments pour un même geste, deux
+identifiants, deux câblages à tenir d'accord. Les **mêmes** nœuds descendent et
+remontent : les écouteurs les suivent, et il n'y a jamais qu'une vérité par
+bouton. Les règles CSS `display: none` restent en ceinture, pour la fraction de
+seconde où le script n'a pas encore tourné.
+
+## Ce que les mesures ont trouvé, et que l'œil n'aurait pas vu
+
+En balayant les 76 cibles du tiroir ouvert, une par une :
+
+| élément | avant | après |
+|---|---|---|
+| ＋ Nouvelle maison / Nouveau type / Nouveau joueur | 26 px | 44 px |
+| entrée de légende (une maison, un type de lien) | 24 px | 40 px |
+| poignée ＋ des filtres | 28 × 19 | 40 × 40 |
+| puce d'axe de filtre | 52 × 21 | 65 × 36 |
+| case « masquer les liens révolus » | 13 × 13 | 20 × 20, cible de 40 |
+| ✎ d'un joueur | 24 px | 40 px |
+| curseur de zoom | 16 px | 34 px |
+
+Les « options d'ajouts » nommées dans le signalement étaient donc bien là — à
+26 px de haut, sous un bouton d'ouverture hors de l'écran.
+
+## Ce qui n'a pas pu être vérifié ici, et pourquoi
+
+**Le franchissement du point de rupture à chaud** — faire pivoter le téléphone
+de portrait à paysage. Dans le navigateur de cette session, l'onglet n'est pas
+rendu (`document.hidden`), et Chrome y supprime `resize` **et** l'événement
+`change` de `matchMedia` ; les transitions CSS y sont également gelées, ce qui
+a d'abord fait croire que le tiroir ne s'ouvrait pas. Ce qui est vérifié, c'est
+l'état après **chargement** à chaque largeur — le cas réel d'un téléphone.
+
+C'est en cherchant à vérifier ce franchissement qu'un vrai défaut est apparu :
+la première version n'écoutait que `change`, les commandes descendaient dans le
+rail et **n'en remontaient jamais** sur écran large. `resize` a été ajouté à
+côté, avec un garde d'état pour que la double écoute ne travaille pas deux
+fois.
+
+## Vérification
+
+**416/416.** Les huit vérifications nouvelles constatent que les pièces sont
+servies (le bloc d'accueil, la sortie du tiroir, le module, les règles
+tactiles) ; les mesures, elles, sont dans le tableau ci-dessus.

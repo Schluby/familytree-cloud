@@ -24,6 +24,7 @@ import {
   creerEditeurType,
   creerFormulairePersonne,
 } from './editeurs.js';
+import { installerTelephone } from './telephone.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -2195,6 +2196,10 @@ elements.btnPanneau.addEventListener('click', () => {
 elements.btnFermerPanneau.addEventListener('click', () =>
   elements.panneauVolet.classList.remove('ouvert')
 );
+// Sous 760 px, la barre du haut ne garde que de quoi naviguer et le reste
+// descend dans le rail. Voir `telephone.js` : sans ça, ☰ lui-même était hors
+// de l'écran, et le rail devenait inatteignable.
+installerTelephone(elements);
 // Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
 // pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
 elements.btnNouveauProfil.addEventListener('click', (evenement) => {

@@ -69,7 +69,7 @@
           </span>
           <span class="compte" id="compte" title="Compte connecté">…</span>
           <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden>⚙</a>
-          <a class="bouton bouton-icone" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer">🛡</a>
+          <a class="bouton bouton-icone" id="lien-donnees" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer">🛡</a>
           <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter">⏻</button>
         </span>
         <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer le panneau de gauche">☰</button>
@@ -81,6 +81,21 @@
 
       <!-- Rail gauche : vues, légendes, filtres -->
       <aside class="rail" id="rail">
+        <!-- Téléphone : le rail devient un tiroir plein écran. Il lui faut une
+             sortie — le volet de droite en avait une, pas lui — et il accueille
+             ce que la barre du haut ne peut plus porter. Voir
+             `public/js/telephone.js`, qui descend les commandes ici et les
+             remonte quand l'écran s'élargit. -->
+        <div class="rail-entete" id="rail-entete">
+          <h2>Menu</h2>
+          <button class="bouton bouton-icone btn-fermer-volet" id="btn-fermer-rail" title="Fermer">✕</button>
+        </div>
+
+        <section class="rail-bloc" id="bloc-telephone" hidden>
+          <h2>Compte et réglages</h2>
+          <div class="rail-actions" id="accueil-telephone"></div>
+        </section>
+
         <section class="rail-bloc">
           <h2>Sauvegardes</h2>
           <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit ou appui long : renommer, dupliquer, télécharger.</p>

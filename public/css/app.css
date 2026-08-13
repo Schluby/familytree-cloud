@@ -1313,6 +1313,10 @@ body.en-essai #btn-instantane { display: none; }
 .astuce-telephone { display: none; }
 .btn-fermer-volet { margin-left: auto; align-self: center; margin-right: 6px; }
 
+/* L'en-tête du tiroir de gauche : sa sortie. Sur écran large le rail est une
+   colonne, pas un tiroir — il n'y a rien à fermer. */
+#rail-entete { display: none; }
+
 /* ------------------------------------------------------------ téléphone
  *
  * L'arbre s'édite au doigt depuis le lot 8 : l'appui long ouvre le même menu
@@ -1320,9 +1324,18 @@ body.en-essai #btn-instantane { display: none; }
  * viser, et un lien armé se termine d'une simple touche. Restent à la souris
  * le glisser d'une fiche et la poignée ＋.
  *
- * Les deux volets deviennent des tiroirs plein écran, ouverts par ☰ et 👤 ;
- * la barre du haut ne garde que ce qui sert sans souris — dont le thème, qui
- * y a été remonté depuis la barre basse.
+ * Les deux volets deviennent des tiroirs plein écran, ouverts par ☰ et 👤.
+ *
+ * **Repris le 13/08/2026 (lot 11.C).** La barre du haut réclamait 512 px de
+ * commandes dans 375 px d'écran : les quatre derniers boutons débordaient à
+ * droite, dont le ☰ lui-même, à 75 px hors de l'écran. Le rail — sauvegardes,
+ * vues, joueurs, liens, maisons, options — était donc entier et strictement
+ * inatteignable, et c'est ce qu'on nous a signalé.
+ *
+ * Depuis, la barre ne garde que de quoi **naviguer** : la marque, ☰, 👤 (et
+ * « Créer un compte » pour un visiteur d'essai). Tout le reste descend dans le
+ * rail, en tête, par `public/js/telephone.js` — déplacé et non dupliqué, pour
+ * qu'il n'y ait jamais deux boutons pour un même geste.
  */
 @media (max-width: 760px) {
   .btn-telephone { display: inline-flex; }
@@ -1331,17 +1344,90 @@ body.en-essai #btn-instantane { display: none; }
   .barre-haut { gap: 8px; padding: 7px 10px; flex-wrap: nowrap; }
   .marque { min-width: 0; }
   .marque-titre { display: none; }
-  .marque-univers { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .barre-controles { margin-left: auto; gap: 5px; }
-  /* Ce qui demande une souris, ou trop de largeur, sort de la barre : la
-     couleur et les filtres restent accessibles dans le rail. */
+  .marque-univers { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* `flex: none` sur les deux boutons de tiroir : sans ça, un nom d'univers
+     long les comprimerait jusqu'à l'illisible plutôt que de se laisser rogner
+     lui-même — et c'est lui qui peut se permettre de perdre des lettres. */
+  .barre-controles { margin-left: auto; gap: 6px; flex: none; }
+  /* ☰ et 👤 sont la navigation entière de cet écran : ils méritent la même
+     cible que le reste. `flex: none` en plus, pour qu'un nom d'univers long
+     les comprime jamais — c'est lui qui peut se permettre de perdre des
+     lettres, pas eux. */
+  .barre-haut .bouton { min-height: 40px; }
+  #btn-rail, #btn-panneau { flex: none; min-width: 40px; }
+  /* Ce qui ne sert pas à naviguer quitte la barre. `telephone.js` le descend
+     dans le rail ; ces règles restent la ceinture, si le script n'a pas encore
+     tourné — sauf pour ☰ et 👤, qui doivent tenir dans tous les cas. */
   .barre-haut .champ-couleur,
   .barre-haut #lien-document,
   .barre-haut #btn-telecharger,
   .barre-haut #btn-instantane,
   .barre-haut #btn-vue-generale,
+  .barre-haut #btn-annee,
+  .barre-haut #btn-theme,
+  .barre-haut #lien-admin,
+  .barre-haut #lien-donnees,
+  .barre-haut #btn-deconnexion,
   .barre-haut .etat-ecriture,
-  .compte { display: none; }
+  .barre-haut .compte { display: none; }
+
+  /* L'en-tête du tiroir de gauche, et ce qu'il accueille. */
+  #rail-entete {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--bord);
+    position: sticky; top: 0; z-index: 1; background: var(--fond-2);
+  }
+  #rail-entete h2 { margin: 0; }
+  /* Les commandes descendues : en grille, avec des cibles qu'un doigt atteint
+     sans viser. 44 px est la hauteur en dessous de laquelle on tape à côté. */
+  #accueil-telephone {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 8px; align-items: stretch;
+  }
+  #accueil-telephone .bouton { min-height: 44px; justify-content: center; }
+  #accueil-telephone .champ { flex-direction: column; align-items: stretch; gap: 3px; }
+  #accueil-telephone .champ select { min-height: 44px; }
+  /* L'adresse du compte n'est pas un bouton : elle occupe sa propre ligne. */
+  #accueil-telephone .compte { grid-column: 1 / -1; max-width: none; font-size: 12px; }
+
+  /* Cibles tactiles dans le rail.
+   *
+   * Mesuré le 13/08/2026, tiroir ouvert sur 375 px : une entrée de légende
+   * faisait **24 px** de haut, la poignée ＋ des filtres 28×19, une puce d'axe
+   * 52×21, la case « masquer les liens révolus » 13×13. Ce sont exactement les
+   * commandes qu'on nous disait ne pas pouvoir utiliser — atteignables, mais
+   * pas touchables. En dessous de 40 px, un doigt tape à côté.
+   *
+   * On agrandit par le remplissage plutôt que par la police : la légende doit
+   * pouvoir montrer vingt maisons sans devenir un livre. */
+  /* « ＋ Nouvelle maison », « ＋ Nouveau type », « ＋ Nouveau joueur » : 26 px
+     de haut et 11 px de police. Ce sont les « options d'ajouts » qu'on nous
+     disait inutilisables — elles étaient là, simplement trop fines pour un
+     doigt. */
+  .rail .rail-actions { gap: 6px; }
+  .rail .rail-actions .bouton { min-height: 44px; padding: 8px 6px; font-size: 12.5px; }
+  .rail .legende li { min-height: 40px; padding: 8px 8px; }
+  .rail .liste-vues li,
+  .rail .liste-joueurs li,
+  .rail .liste-sauvegardes li { min-height: 44px; }
+  .rail .axe-puce { min-height: 36px; padding: 6px 12px; font-size: 12px; }
+  .rail .btn-entete,
+  .rail .joueur-rail-fiche,
+  #btn-fermer-rail { min-width: 40px; min-height: 40px; font-size: 16px; }
+  .rail .option { min-height: 40px; }
+  .rail .option input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 20px; }
+  /* Les options numériques d'une vue (taille des cartes, écartement…). */
+  .rail .option input[type='number'] { min-height: 38px; font-size: 16px; }
+  /* Les libellés d'aide occupaient un tiers du tiroir. On les garde — ils
+     enseignent l'appui long — mais lisibles plutôt que minuscules. */
+  .rail .rail-aide { font-size: 11.5px; }
+
+  /* Le volet de droite, aux mêmes mesures. `font-size: 16px` sur la recherche
+     n'est pas une coquetterie : en dessous, iOS zoome sur le champ au premier
+     appui et laisse la page décadrée. */
+  .panneau #recherche { min-height: 42px; font-size: 16px; }
+  .panneau #selecteur-groupe { min-height: 42px; }
+  #btn-fermer-panneau { min-width: 40px; min-height: 40px; font-size: 16px; }
 
   /* Tiroirs : hors écran par défaut, amenés par-dessus la scène au clic. */
   .rail, .panneau {
@@ -1363,11 +1449,14 @@ body.en-essai #btn-instantane { display: none; }
      l'écran : les commandes de cadrage passent en icônes, seul « ＋ Profil »
      — le seul bouton qui écrit — garde son libellé. */
   .barre-basse { flex-wrap: nowrap; gap: 2px; padding: 5px 7px; max-width: calc(100vw - 20px); }
-  .barre-basse .bouton { padding: 6px 7px; }
+  /* 40 px de haut, comme le reste : c'est ici que vit « ＋ Profil », le seul
+     bouton de cette barre qui écrit. Le curseur de zoom passe de 16 à 34 px —
+     en dessous, on attrape sa poignée une fois sur deux. */
+  .barre-basse .bouton { padding: 6px 7px; min-height: 40px; }
   .barre-basse #btn-ajuster .lib,
   .barre-basse #btn-focus .lib { display: none; }
   .barre-basse .bouton .ico { margin-right: 0; }
   #btn-nouveau-profil { flex: 0 0 auto; }
-  #zoom-curseur { width: 68px; }
+  #zoom-curseur { width: 68px; height: 34px; }
   .separateur-vertical { margin: 0 1px; }
 }

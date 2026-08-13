@@ -936,6 +936,38 @@ sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
 sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
 
 # ---------------------------------------------------------------------------
+# Lot 11.C : l'arbre au telephone
+#
+# Signale le 13/08/2026 : « les options d'ajouts, les categories, maisons et
+# liens, on ne les voit pas sur telephone ». Le rail etait pourtant complet et
+# devenait bien un tiroir sous 760 px — mais la barre du haut reclamait 512 px
+# de commandes dans 375 px d'ecran, et le ☰ qui ouvre ce tiroir se retrouvait
+# a 75 px HORS de l'ecran. Le rail etait la, entier, et inatteignable.
+#
+# Ce qui se verifie d'ici : que les pieces sont servies. Les mesures (aucune
+# cible sous 36 px, rien hors ecran, pas de debordement horizontal) se font au
+# navigateur — elles sont dans PLAN.md.
+# ---------------------------------------------------------------------------
+
+echo "-- 11.C l'arbre au telephone"
+code - GET / > /dev/null
+verifier "le tiroir de gauche a une sortie" oui "$(contient 'btn-fermer-rail')"
+verifier "  et un bloc qui accueille la barre du haut" oui "$(contient 'accueil-telephone')"
+verifier "  « Vos donnees » est nommable pour le demenagement" oui "$(contient 'lien-donnees')"
+code - GET /js/telephone.js > /dev/null
+verifier "le module de demenagement est servi" oui "$(contient 'installerTelephone')"
+# Deplace, jamais duplique : deux boutons pour un meme geste, ce serait deux
+# identifiants et deux cablages a tenir d'accord.
+verifier "  il deplace les noeuds" oui "$(contient 'places')"
+# Le motif passe par une variable : il porte une apostrophe, et l'echapper dans
+# l'argument aurait fait chercher un antislash (deja paye une fois).
+MOTIF_RESIZE="addEventListener('resize'"
+verifier "  et ecoute AUSSI resize" oui "$(contient "$MOTIF_RESIZE")"
+code - GET /css/app.css > /dev/null
+verifier "les cibles tactiles du rail sont posees" oui "$(contient '.rail .rail-actions .bouton')"
+verifier "  la barre du haut ne garde que de quoi naviguer" oui "$(contient '.barre-haut #btn-theme')"
+
+# ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google
 #
 # Le flux « Authorization Code », entierement cote serveur : pas de script
