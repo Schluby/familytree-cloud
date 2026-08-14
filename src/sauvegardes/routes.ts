@@ -37,10 +37,12 @@ import {
   ecrireDocument,
   ErreurPlafond,
   ficheDe,
+  lireTexte,
   maintenant,
   type Contenu,
   type Fiche,
 } from './depot';
+import { semerDemonstration } from '../depart';
 
 type Contexte = Context<{ Bindings: Env; Variables: Variables }>;
 
@@ -129,11 +131,17 @@ function verifierTaille(c: Contexte, prepare: DocumentPrepare): Response | null 
   );
 }
 
-/** Le plafond de nombre, vérifié avant toute création. */
+/**
+ * Le plafond de nombre, vérifié avant toute création.
+ *
+ * `demo = 0` : la démonstration n'est pas une des dix sauvegardes du compte.
+ * Sans ça, un compte plein ne pourrait plus rien créer **à cause du monde
+ * d'exemple qu'on lui a offert** — la plus mauvaise façon de faire un cadeau.
+ */
 async function verifierNombre(c: Contexte): Promise<Response | null> {
   const compte = c.get('compte');
   const ligne = await c.env.DB.prepare(
-    'SELECT COUNT(*) AS combien FROM sauvegardes WHERE utilisateur_id = ?'
+    'SELECT COUNT(*) AS combien FROM sauvegardes WHERE utilisateur_id = ? AND demo = 0'
   )
     .bind(compte.id)
     .first<{ combien: number }>();
@@ -189,6 +197,32 @@ routesSauvegardes.post('/:id/activer', async (c) => {
   const compte = c.get('compte');
   const fiche = await ficheDe(c.env.DB, compte.id, c.req.param('id'));
   if (!fiche) return introuvable(c);
+
+  await activer(c.env.DB, compte.id, fiche.id);
+  return c.json({ sauvegarde: fiche });
+});
+
+/* --------------------------------------------------------------------------
+ * La démonstration — avant `/:id`, pour que le mot ne soit jamais pris pour un
+ * identifiant.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Remettre la démonstration à zéro, et l'ouvrir.
+ *
+ * Une seule route pour deux gestes qui n'en font qu'un : « effacer ce que j'ai
+ * bricolé là-dedans » et « refaire le tutoriel proprement ». Elle reconstruit
+ * aussi la fiche quand on l'avait supprimée — d'où `forcer` : ailleurs, une
+ * démonstration absente est un choix qu'on respecte ; ici, c'est ce qu'on
+ * demande.
+ *
+ * Pas de plafond à vérifier : la démonstration n'en occupe aucun, et rendre le
+ * terrain d'essai à quelqu'un ne doit pas dépendre de la place qu'il lui reste.
+ */
+routesSauvegardes.post('/demonstration', async (c) => {
+  const compte = c.get('compte');
+  const fiche = await semerDemonstration(c.env.DB, compte.id, compte.sauvegarde_active, true);
+  if (!fiche) return c.json({ erreur: 'démonstration indisponible' }, 500);
 
   await activer(c.env.DB, compte.id, fiche.id);
   return c.json({ sauvegarde: fiche });
@@ -279,9 +313,10 @@ routesSauvegardes.post('/', async (c) => {
   const source = await ficheDe(c.env.DB, c.get('compte').id, depuis);
   if (!source) return introuvable(c);
 
-  const ligne = await c.env.DB.prepare('SELECT donnees FROM contenus WHERE sauvegarde_id = ?')
-    .bind(depuis)
-    .first<{ donnees: string }>();
+  // `lireTexte` et non un `SELECT donnees` : copier la démonstration est
+  // précisément le geste d'« en faire mon monde », et tant qu'on n'y a pas
+  // écrit elle n'a pas de ligne à copier.
+  const ligne = await lireTexte(c.env.DB, c.get('compte').id, depuis);
   if (!ligne) return introuvable(c);
 
   if (mode === 'copie') {
@@ -373,16 +408,12 @@ routesSauvegardes.delete('/:id', async (c) => {
  * Le document
  * -------------------------------------------------------------------------- */
 
+// Ces trois lectures passent par `lireTexte` plutôt que par leur propre
+// jointure : c'est lui qui sait qu'une démonstration jamais touchée n'a pas de
+// ligne de contenu et qu'il faut alors servir le document livré avec le Worker.
+// Trois requêtes en double, c'étaient trois endroits où l'oublier.
 routesSauvegardes.get('/:id/contenu', async (c) => {
-  const ligne = await c.env.DB.prepare(
-    `SELECT c.donnees, s.revision
-       FROM contenus c
-       JOIN sauvegardes s ON s.id = c.sauvegarde_id
-      WHERE c.sauvegarde_id = ? AND s.utilisateur_id = ?`
-  )
-    .bind(c.req.param('id'), c.get('compte').id)
-    .first<{ donnees: string; revision: number }>();
-
+  const ligne = await lireTexte(c.env.DB, c.get('compte').id, c.req.param('id'));
   if (!ligne) return introuvable(c);
 
   // Rendu tel quel : le texte stocké *est* la réponse. Ni parse, ni stringify.
@@ -458,15 +489,7 @@ routesSauvegardes.put('/:id/contenu', async (c) => {
  * -------------------------------------------------------------------------- */
 
 routesSauvegardes.get('/:id/export', async (c) => {
-  const ligne = await c.env.DB.prepare(
-    `SELECT c.donnees, s.nom
-       FROM contenus c
-       JOIN sauvegardes s ON s.id = c.sauvegarde_id
-      WHERE c.sauvegarde_id = ? AND s.utilisateur_id = ?`
-  )
-    .bind(c.req.param('id'), c.get('compte').id)
-    .first<{ donnees: string; nom: string }>();
-
+  const ligne = await lireTexte(c.env.DB, c.get('compte').id, c.req.param('id'));
   if (!ligne) return introuvable(c);
 
   return new Response(reindenter(ligne.donnees, ligne.nom), {

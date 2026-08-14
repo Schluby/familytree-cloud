@@ -1402,3 +1402,109 @@ pourtant, n'avait aucune porte pour y aller.** La condition suit maintenant
 « le tiroir de gauche a une sortie » cherchait `btn-fermer-rail`. Ce qu'elle
 protège n'a pas changé — sur un tiroir qui couvre tout l'écran, ne pas pouvoir
 sortir revient à ne pas pouvoir entrer — mais elle vise maintenant la bascule.
+
+---
+
+# Lot 14 — La démonstration, et la visite guidée  ☑
+
+**Le constat, mesuré le 14/08/2026 en production.**
+
+| | |
+|---|---|
+| comptes | 45, dont **37 essais sans compte** |
+| sauvegardes | 38 |
+| octets stockés | 3 133 838 |
+| dont Westeros vierge, en 32 exemplaires | **2 937 472 — soit 94 %** |
+
+Autrement dit : le service stockait presque exclusivement son propre cadeau.
+Chaque visiteur repartait avec sa copie personnelle de 90 Ko d'un document
+identique au voisin, et les chiffres d'administration — poids, fiches, liens,
+doublons — parlaient de Westeros plutôt que du travail des gens. Le
+rapprochement du lot 12.C annonçait sereinement que tout le monde avait les
+mêmes fiches : exact, et parfaitement inutile.
+
+Demande du 15/08 : « faire passer l'arbre de base comme non comptabilisé dans
+les stats, non sauvegardé aussi… ça sert juste comme tuto ; ce qui sera
+vraiment pertinent, ce sera de voir ce que les joueurs feront d'eux-mêmes ».
+
+## 14.A — Une fiche qui ne coûte rien et ne compte nulle part
+
+- ☑ Migration `0008` : une colonne `demo`, **additive et non destructive**. Le
+  drapeau se pose sur l'existant avec une garde qui ne se discute pas —
+  `revision = 1`, la révision n'avançant que dans `ecrireDocument`. Les deux
+  Westeros réellement travaillés (révisions 5 et 8) restent des mondes à leurs
+  propriétaires et ne sont pas touchés.
+- ☑ **Sa ligne de contenu n'existe pas tant que personne n'y a écrit.**
+  `lireTexte` sert alors le document livré avec le Worker ; la première
+  écriture matérialise la ligne par l'`ON CONFLICT` déjà présent. Un visiteur
+  coûte désormais **deux lignes de quelques octets**, contre 90 Ko.
+- ☑ Écartée des plafonds (`verifierNombre`), de « Vos données », de l'archive
+  « Tout télécharger », du panorama et des lots de l'administration
+  (`resoudreCibles`), et du compteur de `/api/sante`.
+- ☑ **Remise à zéro à chaque ouverture de session** — et seulement si elle a
+  bougé : le cas courant ne coûte qu'une lecture d'index. Le ménage nocturne
+  fait de même pour qui ne se déconnecte jamais, et c'est lui qui rendra les
+  2,9 Mo dormants.
+- ☑ `POST /api/sauvegardes/demonstration` : à la demande, et reconstruit la
+  fiche si on l'avait supprimée. **Elle ne revient pas d'elle-même** : effacer
+  la démonstration est un choix légitime, et la réinstaller à chaque connexion
+  serait le contraire d'un service.
+- ☑ Elle ne se partage pas (409, avec l'indice « dupliquez-la d'abord »).
+
+**La seule exception à « rien n'est conservé », et pourquoi elle existe.** Un
+visiteur qui a construit dans la démonstration puis s'inscrit **garde son
+travail** : la fiche perd son drapeau et prend le nom « Mon Westeros », rien
+n'est recopié. Remettre la démonstration à zéro au moment précis où quelqu'un
+crée un compte pour garder son travail aurait été le seul endroit du produit
+où l'avertissement se serait retourné en piège.
+
+## 14.B — Le dire, et sans qu'on puisse le faire taire
+
+- ☑ Un bandeau `#bandeau-demo` **sans bouton de fermeture**, présent tant que
+  la démonstration est le monde ouvert et disparaissant dans le sien.
+- ☑ Il change de ton à la première écriture — comme le bandeau d'essai, et pour
+  la même raison : c'est là qu'il y a quelque chose à perdre.
+- ☑ Le bouton dit quoi faire **selon qui regarde** : « Créer un compte » pour un
+  visiteur, « ⎘ En faire mon monde » pour un membre.
+- ☑ Un bloc « Démonstration » à part dans le rail, comme « Partagés avec moi » :
+  cet arbre n'est pas à vous, ne compte pas dans votre plafond, ne se conserve
+  pas. Pas de menu contextuel dessus — renommer ou exporter ce qui repart à
+  zéro sont deux façons de croire qu'on le garde.
+- ☑ **Un seul bandeau à la fois** : dans la démonstration, celui d'essai se
+  tait. Deux barres empilées, c'est 130 px des 812 d'un téléphone pour deux
+  fois le même conseil.
+
+## 14.C — La visite guidée
+
+Six écrans, sortable à tout moment, relançable par un « ? » discret — dans la
+barre du haut, et dans le tiroir au téléphone.
+
+1. Bienvenue — **rien n'est conservé ici**, dit d'emblée ;
+2. créer un profil ; 3. relier deux fiches ; 4. ranger par maison ;
+5. changer ce que la couleur raconte (et créer une catégorie) ;
+6. **votre monde à vous**, qui se garde, lui.
+
+Trois règles : elle **se propose** (« Plus tard » sur le premier écran), elle
+**montre sans faire faire** (aucune étape n'attend un geste, on n'y reste pas
+coincé), et elle **se rabat quand une cible manque** — carte centrée plutôt que
+halo autour de rien.
+
+## Mesures
+
+| | avant | après |
+|---|---|---|
+| coût d'un visiteur en base | 90 Ko | **~200 octets** |
+| octets stockés qui sont du Westeros vierge | 2 937 472 (94 %) | **0** après le premier ménage |
+| bandeau de démonstration, 375 px, au repos | — | **29 px** (85 px avant la passe téléphone) |
+| bandeau après une écriture | — | 49 px, avec l'appel à l'action |
+| premier pixel d'arbre, 375 px | 55 px | 83 px (l'avertissement coûte 28 px) |
+| étapes du tutoriel hors écran, 375 px | — | **0 sur 6** |
+
+## Vérification
+
+**545/545 en local.** Trois assertions plus anciennes ont dû être réécrites, et
+non supprimées : elles comptaient « ses sauvegardes » avec la démonstration
+dedans, ce qui remplissait une place de trop dans le test des plafonds et
+faisait passer la démonstration neuve en tête de liste après une inscription.
+D'où trois aides — `siennes`, `sienne`, `demo_id` — qui disent en un mot ce que
+« ses sauvegardes » veut maintenant dire.

@@ -475,14 +475,14 @@ Google » apparaît alors sur la page de connexion.
 ## Les visiteurs sans compte (lot 9)
 
 Depuis le lot 9, **ouvrir la page suffit** : sans session, le serveur crée un
-compte de rôle `invite`, sans adresse ni mot de passe, avec la sauvegarde de
-départ « Westeros ». S'inscrire ensuite reprend ce compte tel quel.
+compte de rôle `invite`, sans adresse ni mot de passe, avec la démonstration.
+S'inscrire ensuite reprend ce compte tel quel.
 
 Ce que ça coûte, et ce qui le borne :
 
 | | |
 | --- | --- |
-| Par visiteur | 1 ligne `utilisateurs` + 1 sauvegarde de ~90 Ko |
+| Par visiteur | 1 ligne `utilisateurs` + 1 fiche de sauvegarde **sans contenu** (~200 octets depuis le lot 14 ; c'était 90 Ko) |
 | Frein | 8 essais par heure et par adresse IP (`invite:ip:…` dans `tentatives`) |
 | Ménage | les invités sans visite depuis **14 jours** sont effacés par le cron nocturne, sauvegardes comprises |
 
@@ -503,6 +503,65 @@ npx wrangler d1 execute familytree --remote --command "DELETE FROM utilisateurs 
 faudrait fermer en premier — `POST /api/auth/invite` dans `src/auth/routes.ts` —
 et non l'inscription elle-même : un passant qui n'a rien tapé coûte autant qu'un
 compte, mais ne laisse aucune adresse pour vous écrire.
+
+## La démonstration, et ce qu'elle n'est pas (lot 14)
+
+Tout compte — visiteur comme membre — ouvre sur **« Westeros », une
+démonstration**. C'est le même monde pour tout le monde, et **rien de ce qu'on
+y fait n'est conservé** : elle repart à zéro à chaque connexion, au ménage de
+la nuit, ou sur demande.
+
+Pourquoi : au 14/08/2026, **2,94 Mo des 3,13 Mo stockés** étaient 32 copies
+identiques et jamais touchées du même document. Le service stockait son propre
+cadeau, et le panorama d'un intendant parlait de Westeros au lieu de parler du
+travail de ses joueurs.
+
+Ce qu'il faut en retenir à l'exploitation :
+
+| | |
+| --- | --- |
+| En base | une ligne `sauvegardes` avec `demo = 1`, **sans ligne `contenus`** tant que personne n'y a écrit |
+| Dans les plafonds | rien : ni dans les 10 sauvegardes, ni dans les octets |
+| Dans « Vos données » | rien non plus — ce n'est pas votre travail |
+| Dans l'administration | invisible : ni dans les compteurs, ni dans les arbres consultables, ni dans les lots, ni dans le rapprochement |
+| Partage | refusé (409) — dupliquez-la d'abord |
+
+**La seule chose qu'on y garde**, et c'est délibéré : un visiteur qui a
+construit dans la démonstration puis s'inscrit la voit devenir **« Mon
+Westeros »**, une vraie sauvegarde à lui. Rien n'est recopié — la même ligne
+perd son drapeau.
+
+Pour voir où en est le stockage :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "SELECT (SELECT COUNT(*) FROM sauvegardes WHERE demo=1) AS demos, (SELECT COUNT(*) FROM contenus c JOIN sauvegardes s ON s.id=c.sauvegarde_id WHERE s.demo=1) AS demos_avec_contenu, (SELECT COALESCE(SUM(taille),0) FROM sauvegardes WHERE demo=0) AS octets_reels"
+```
+
+`demos_avec_contenu` doit être **petit** : ce sont les gens en train de
+bricoler dedans en ce moment. Le cron nocturne (04 h 17 UTC) les remet à zéro.
+Pour le faire à la main :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "DELETE FROM contenus WHERE sauvegarde_id IN (SELECT id FROM sauvegardes WHERE demo=1)"
+```
+
+**Si un jour vous changez le monde de départ** (`outils/construire-depart.mjs`
+puis `src/depart/westeros.json`), le changement atteint **tout le monde à la
+prochaine remise à zéro** — c'est justement l'intérêt de ne plus le recopier —
+mais **pas** les mondes que les gens ont faits à eux, qui sont des documents à
+part entière. Note connue du jeu de départ : « Brandon Stark » y désigne deux
+personnages, `brandon-stark-aine` (le frère d'Eddard) et `bran-stark` (son
+fils). Le rapprochement du lot 12.C le signale à juste titre.
+
+## La visite guidée (lot 14.C)
+
+Proposée **une fois**, à la première ouverture, et seulement dans la
+démonstration. Six écrans, « Plus tard » dès le premier. Elle se relance par le
+**« ? »** de la barre du haut — dans le tiroir, sous 👤, au téléphone — ou par
+le bouton du bandeau de démonstration.
+
+Pour la revoir soi-même, il suffit d'effacer le marqueur du navigateur :
+`localStorage.removeItem('familytree-tutoriel-vu')`.
 
 ## Brancher l'envoi de courriel (« mot de passe oublié »)
 

@@ -263,6 +263,16 @@ export const Api = {
   activerSauvegarde: (id) => requete(`/api/sauvegardes/${id}/activer`, { method: 'POST' }),
 
   /**
+   * La démonstration (lot 14), rendue à son état d'origine et rouverte.
+   *
+   * Même route pour « effacer ce que j'ai bricolé là-dedans » et pour « la
+   * remettre » quand on l'avait supprimée : le serveur la recrée si elle
+   * manque. Elle n'occupe aucun plafond, donc rien à vérifier avant.
+   */
+  reinitialiserDemonstration: () =>
+    requete('/api/sauvegardes/demonstration', { method: 'POST' }),
+
+  /**
    * Lien de téléchargement — le serveur renvoie le fichier en pièce jointe.
    * Mêmes formats qu'en local (`json`, `xlsx`, `csv`), plus `zip` : tout le
    * compte d'un coup, ce qui n'a de sens que là où les sauvegardes ne sont

@@ -25,6 +25,7 @@ import {
   creerFormulairePersonne,
 } from './editeurs.js';
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
+import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -94,6 +95,14 @@ const elements = {
   bandeauEssai: document.getElementById('bandeau-essai'),
   bandeauEssaiTexte: document.getElementById('bandeau-essai-texte'),
   bandeauEssaiFermer: document.getElementById('bandeau-essai-fermer'),
+  bandeauDemo: document.getElementById('bandeau-demo'),
+  bandeauDemoTexte: document.getElementById('bandeau-demo-texte'),
+  btnDemoGarder: document.getElementById('btn-demo-garder'),
+  btnDemoTutoriel: document.getElementById('btn-demo-tutoriel'),
+  blocDemonstration: document.getElementById('bloc-demonstration'),
+  listeDemonstration: document.getElementById('liste-demonstration'),
+  btnDemoCopier: document.getElementById('btn-demo-copier'),
+  btnDemoReinitialiser: document.getElementById('btn-demo-reinitialiser'),
 };
 
 /**
@@ -143,6 +152,12 @@ const etat = {
   // perdre, donc le moment où l'invitation cesse d'être discrète.
   invite: false,
   essaiModifie: false,
+  // La démonstration (lot 14) : la fiche, si le compte en a une, et le fait
+  // qu'on y ait écrit depuis l'ouverture de la page. Le second sert au même
+  // usage qu'`essaiModifie` — dire les choses plus fort au moment où quelque
+  // chose serait perdu, et pas avant.
+  demo: null,
+  demoModifiee: false,
   // Joueur en cours d'édition rapide : la liste de droite devient une
   // grille d'humeurs envers lui.
   joueurActif: null,
@@ -346,9 +361,25 @@ async function demarrer() {
     }
     await chargerUnivers();
     await choisirVue(etat.vues[0]?.id);
+    proposerLeTutoriel();
   } catch (erreur) {
     message(`Impossible de contacter l'API : ${erreur.message}`);
   }
+}
+
+/**
+ * La visite guidée, à la toute première ouverture — et pas une fois de plus.
+ *
+ * **Après** que l'arbre est dessiné, jamais avant : les étapes désignent des
+ * boutons de la page, et une visite qui commence sur un écran vide montre des
+ * halos autour de rien. Elle se **propose** (le premier écran offre « Plus
+ * tard »), et n'apparaît que dans la démonstration : quelqu'un qui ouvre son
+ * propre monde n'est pas en train de découvrir l'outil.
+ */
+function proposerLeTutoriel() {
+  if (PROCURATION || PARTAGE) return;
+  if (!tutorielJamaisVu() || !demonstrationOuverte()) return;
+  lancerLeTutoriel();
 }
 
 /**
@@ -490,7 +521,13 @@ const resumeContenu = (fiche) =>
 
 const poids = (octets) => `${Math.max(1, Math.round((octets || 0) / 1024))} Ko`;
 
-/** Les plafonds sont ceux du compte : les afficher évite la mauvaise surprise. */
+/**
+ * Les plafonds sont ceux du compte : les afficher évite la mauvaise surprise.
+ *
+ * La démonstration en est exclue, comme elle l'est côté serveur : elle
+ * n'occupe aucune des dix sauvegardes et ne pèse rien tant qu'on n'y a pas
+ * écrit. L'annoncer ici en dirait le contraire de ce que fait `verifierNombre`.
+ */
 function dessinerPlafonds() {
   if (!elements.aidePlafonds) return;
   const plafonds = etat.plafonds;
@@ -498,10 +535,48 @@ function dessinerPlafonds() {
     elements.aidePlafonds.textContent = '';
     return;
   }
-  const total = etat.sauvegardes.reduce((somme, fiche) => somme + (fiche.taille || 0), 0);
+  const siennes = etat.sauvegardes.filter((fiche) => !fiche.demo);
+  const total = siennes.reduce((somme, fiche) => somme + (fiche.taille || 0), 0);
+  // `poids` arrondit à 1 Ko au minimum — juste pour une sauvegarde, qui n'est
+  // jamais vide, faux pour un total à zéro : quelqu'un qui n'a encore que la
+  // démonstration lisait « 1 Ko utilisés » sans rien avoir écrit.
+  const utilises = total ? poids(total) : '0 Ko';
   elements.aidePlafonds.textContent =
-    `${etat.sauvegardes.length} / ${plafonds.sauvegardes} sauvegardes · ` +
-    `${poids(total)} utilisés, ${poids(plafonds.octets)} par sauvegarde.`;
+    `${siennes.length} / ${plafonds.sauvegardes} sauvegardes · ` +
+    `${utilises} utilisés, ${poids(plafonds.octets)} par sauvegarde.`;
+}
+
+/** Une entrée de la liste du rail. Les deux blocs se la partagent. */
+function itemSauvegarde(fiche) {
+  const li = document.createElement('li');
+  li.className = `sauvegarde ${fiche.actif ? 'actif' : ''} ${fiche.demo ? 'demo' : ''}`;
+  li.dataset.id = fiche.id;
+  li.title = fiche.demo
+    ? 'Monde de démonstration — rien de ce que vous y faites n’est conservé'
+    : `${poids(fiche.taille)} — modifiée le ${(fiche.modifie || '').replace('T', ' à ')}`;
+
+  const pastille = document.createElement('span');
+  pastille.className = 'sv-pastille';
+
+  const corps = document.createElement('div');
+  corps.className = 'sv-corps';
+  const nom = document.createElement('div');
+  nom.className = 'sv-nom';
+  nom.textContent = fiche.nom;
+  const meta = document.createElement('div');
+  meta.className = 'sv-meta';
+  meta.textContent = fiche.demo ? `${resumeContenu(fiche)} · non conservé` : resumeContenu(fiche);
+  corps.append(nom, meta);
+
+  li.append(pastille, corps);
+  li.addEventListener('click', () => {
+    if (!fiche.actif) ouvrirSauvegarde(fiche.id);
+  });
+  // Pas de menu contextuel sur la démonstration : renommer ce qui repart à zéro
+  // à la prochaine connexion, ou l'exporter comme si c'était son travail, sont
+  // deux façons de croire qu'on la garde. Ses deux gestes ont leurs boutons.
+  if (!fiche.demo) surMenuContextuel(li, (evenement) => menuSauvegarde(fiche, evenement));
+  return li;
 }
 
 async function dessinerSauvegardes() {
@@ -517,35 +592,19 @@ async function dessinerSauvegardes() {
   }
   etat.sauvegardes = reponse.sauvegardes;
   etat.plafonds = reponse.plafonds || null;
+  etat.demo = etat.sauvegardes.find((fiche) => fiche.demo) || null;
   dessinerPlafonds();
+
   elements.listeSauvegardes.replaceChildren(
-    ...etat.sauvegardes.map((fiche) => {
-      const li = document.createElement('li');
-      li.className = `sauvegarde ${fiche.actif ? 'actif' : ''}`;
-      li.dataset.id = fiche.id;
-      li.title = `${poids(fiche.taille)} — modifiée le ${(fiche.modifie || '').replace('T', ' à ')}`;
-
-      const pastille = document.createElement('span');
-      pastille.className = 'sv-pastille';
-
-      const corps = document.createElement('div');
-      corps.className = 'sv-corps';
-      const nom = document.createElement('div');
-      nom.className = 'sv-nom';
-      nom.textContent = fiche.nom;
-      const meta = document.createElement('div');
-      meta.className = 'sv-meta';
-      meta.textContent = resumeContenu(fiche);
-      corps.append(nom, meta);
-
-      li.append(pastille, corps);
-      li.addEventListener('click', () => {
-        if (!fiche.actif) ouvrirSauvegarde(fiche.id);
-      });
-      surMenuContextuel(li, (evenement) => menuSauvegarde(fiche, evenement));
-      return li;
-    })
+    ...etat.sauvegardes.filter((fiche) => !fiche.demo).map(itemSauvegarde)
   );
+  if (elements.blocDemonstration) {
+    elements.blocDemonstration.hidden = !etat.demo;
+    elements.listeDemonstration.replaceChildren(
+      ...(etat.demo ? [itemSauvegarde(etat.demo)] : [])
+    );
+  }
+  dessinerBandeauDemo();
 
   await dessinerPartages();
 }
@@ -2503,6 +2562,14 @@ const ESSAI_MASQUE = 'familytree-essai-masque';
 
 function dessinerBandeauEssai() {
   if (!elements.bandeauEssai) return;
+  // Un seul bandeau à la fois. Dans la démonstration, celui de la démonstration
+  // dit déjà « créez un compte » — et deux barres empilées, c'est 130 px des
+  // 812 d'un téléphone pour deux fois le même conseil (voir le lot 13, où l'on
+  // s'est battu pour ces pixels-là).
+  if (demonstrationOuverte()) {
+    elements.bandeauEssai.hidden = true;
+    return;
+  }
   if (localStorage.getItem(ESSAI_MASQUE) && !etat.essaiModifie) {
     elements.bandeauEssai.hidden = true;
     return;
@@ -2541,7 +2608,128 @@ function marquerEssaiModifie() {
   dessinerBandeauEssai();
 }
 
-Api.surEcriture = () => marquerEssaiModifie();
+/* ---------------------------------------------------------- la démonstration
+ *
+ * Le seul monde de l'application où **ce qu'on fait ne sera pas gardé** : il
+ * repart à zéro à la prochaine connexion, et au ménage de la nuit. Tout le
+ * reste du client l'ignore — c'est une sauvegarde comme les autres, éditable
+ * comme les autres — et c'est voulu : le terrain d'essai doit se comporter
+ * exactement comme le vrai, sans quoi il n'apprend rien.
+ *
+ * Ce qui suit ne fait donc qu'une chose : **le dire**, au bon moment et sans
+ * qu'on puisse le faire taire.
+ */
+
+const demonstrationOuverte = () => !!etat.demo?.actif && !PROCURATION && !PARTAGE;
+
+function dessinerBandeauDemo() {
+  if (!elements.bandeauDemo) return;
+  if (!demonstrationOuverte()) {
+    elements.bandeauDemo.hidden = true;
+    if (etat.invite) dessinerBandeauEssai();
+    return;
+  }
+
+  elements.bandeauDemo.hidden = false;
+  elements.bandeauDemo.classList.toggle('presse', etat.demoModifiee);
+  // `dessinerCompte` a pu montrer le bandeau d'essai avant que la liste des
+  // sauvegardes ne dise qu'on est dans la démonstration : il faut le refaire
+  // ici, sinon les deux barres cohabitent. C'était le cas au premier essai.
+  if (etat.invite) dessinerBandeauEssai();
+  // Deux longueurs pour un même propos, comme au lot 12 : sur 375 px, la phrase
+  // longue prenait trois lignes. Ce n'est pas un texte au rabais, c'est le même
+  // dit dans la place dont on dispose — et le mot qui compte y est toujours.
+  const court = surTelephone();
+  elements.bandeauDemoTexte.textContent = etat.demoModifiee
+    ? court
+      ? '⚗ Démonstration : ceci ne sera pas conservé.'
+      : '⚗ Vous venez de modifier la démonstration. Rien n’y est conservé — elle repartira à zéro à votre prochaine connexion.'
+    : court
+      ? '⚗ Démonstration — rien n’y est conservé.'
+      : '⚗ Démonstration — un monde d’exemple, le même pour tout le monde. Essayez tout ; rien de ce que vous y ferez n’est conservé.';
+
+  // Le bouton dit ce qu'il faut faire **pour ne pas perdre ce qu'on vient de
+  // faire**, et cela dépend de qui regarde : un visiteur n'a pas encore de
+  // compte où le ranger, un membre en a un.
+  elements.btnDemoGarder.textContent = etat.invite
+    ? 'Créer un compte'
+    : '⎘ En faire mon monde';
+  elements.btnDemoGarder.title = etat.invite
+    ? 'Votre adresse et un mot de passe : ce que vous avez construit ici devient votre premier monde'
+    : 'Copier la démonstration dans une sauvegarde à vous — celle-là, vous la gardez';
+}
+
+// Comme le bandeau d'essai : le texte dépend de la largeur, donc il se refait
+// quand elle change. Sans ça, ouvrir en grand puis réduire laisse la phrase
+// longue sur 375 px.
+window.addEventListener('resize', () => {
+  if (demonstrationOuverte()) dessinerBandeauDemo();
+});
+
+/** Première écriture dans la démonstration : le ton change, rien ne bloque. */
+function marquerDemoModifiee() {
+  if (!demonstrationOuverte() || etat.demoModifiee) return;
+  etat.demoModifiee = true;
+  dessinerBandeauDemo();
+}
+
+/** « En faire mon monde » : une copie, avec son nom, qui se garde, elle. */
+function garderLaDemonstration(evenement) {
+  if (etat.invite) {
+    location.href = '/connexion.html?creer=1';
+    return;
+  }
+  if (!etat.demo) return;
+  const point = pointDuGeste(evenement);
+  editeurSauvegarde.ouvrirCreation(point.x, point.y, {
+    depuis: etat.demo.id,
+    nomSource: etat.demo.nom,
+    nom: 'Mon Westeros',
+  });
+}
+
+/** Le coin d'où ouvrir un éditeur ancré sur un bouton plutôt que sur un clic. */
+function pointDuGeste(evenement) {
+  const cible = evenement?.currentTarget;
+  if (cible && typeof cible.getBoundingClientRect === 'function') {
+    const cadre = cible.getBoundingClientRect();
+    return { x: cadre.left, y: cadre.bottom + 6 };
+  }
+  return { x: evenement?.clientX ?? 120, y: evenement?.clientY ?? 120 };
+}
+
+async function reinitialiserDemonstration() {
+  message('Remise à zéro de la démonstration…');
+  try {
+    await Api.reinitialiserDemonstration();
+  } catch (erreur) {
+    message(`Impossible de remettre à zéro : ${erreur.message}`);
+    return;
+  }
+  etat.demoModifiee = false;
+  // La route rend la démonstration active : on recharge le monde comme après
+  // n'importe quel changement de sauvegarde, sinon l'écran garderait à l'image
+  // les fiches qu'on vient d'effacer.
+  await chargerUnivers();
+  await choisirVue(etat.vueCourante?.id || etat.vues[0]?.id);
+  message('');
+}
+
+elements.btnDemoGarder?.addEventListener('click', garderLaDemonstration);
+elements.btnDemoCopier?.addEventListener('click', garderLaDemonstration);
+elements.btnDemoReinitialiser?.addEventListener('click', reinitialiserDemonstration);
+
+// Deux portes vers la visite guidée : le « ? » de la barre, discret et
+// toujours là, et le bandeau de la démonstration — c'est-à-dire exactement
+// l'écran où l'on se trouve quand on a besoin qu'on nous explique.
+const relancerLeTutoriel = () => lancerLeTutoriel();
+document.getElementById('btn-tutoriel')?.addEventListener('click', relancerLeTutoriel);
+elements.btnDemoTutoriel?.addEventListener('click', relancerLeTutoriel);
+
+Api.surEcriture = () => {
+  marquerEssaiModifie();
+  marquerDemoModifiee();
+};
 
 elements.bandeauEssaiFermer?.addEventListener('click', () => {
   localStorage.setItem(ESSAI_MASQUE, '1');

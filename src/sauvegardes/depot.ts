@@ -10,8 +10,16 @@
  *    (lot 2) et celles du domaine (lot 3) passent toutes par `ecrireDocument`,
  *    qui recalcule les compteurs, retire les portraits `data:`, vérifie le
  *    plafond et fait avancer la révision. Une règle ajoutée là vaut pour tout.
+ *
+ * Depuis le lot 14, une fiche peut porter `demo = 1` : c'est la démonstration,
+ * le même monde pour tout le monde. Elle suit les deux invariants ci-dessus
+ * sans exception, avec une seule particularité, tenue ici : **sa ligne de
+ * contenu n'existe pas tant que personne n'y a écrit**, et sa lecture retombe
+ * alors sur le document livré avec le Worker. Trente-deux copies identiques du
+ * même Westeros pesaient 94 % de la base ; il n'y en a plus aucune.
  */
 
+import { contenuDepart } from '../depart/contenu';
 import { preparerDocument, type Document } from './document';
 
 export interface Fiche {
@@ -24,10 +32,12 @@ export interface Fiche {
   revision: number;
   cree_le: number;
   modifie_le: number;
+  /** 1 : la démonstration. Elle ne compte nulle part et ne se conserve pas. */
+  demo: number;
 }
 
 export const CHAMPS_FICHE =
-  'id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le';
+  'id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le, demo';
 
 export function maintenant(): number {
   return Math.floor(Date.now() / 1000);
@@ -48,21 +58,34 @@ export async function ficheDe(
     .first<Fiche>();
 }
 
-/** Le document brut, tel qu'il est stocké : compact, prêt à renvoyer. */
+/**
+ * Le document brut, tel qu'il est stocké : compact, prêt à renvoyer.
+ *
+ * Le `LEFT JOIN` et non un `JOIN` : la démonstration n'a de ligne de contenu
+ * que si quelqu'un y a écrit, et sans lui elle répondrait « introuvable » alors
+ * qu'elle existe. C'est le seul cas où `donnees` est absent, et le seul où l'on
+ * a le droit de le remplacer — par le document livré avec le Worker, qui est
+ * précisément ce qu'elle vaut tant qu'on n'y a pas touché.
+ */
 export async function lireTexte(
   base: D1Database,
   utilisateurId: string,
   id: string
 ): Promise<{ donnees: string; revision: number; nom: string } | null> {
-  return base
+  const ligne = await base
     .prepare(
-      `SELECT c.donnees, s.revision, s.nom
-         FROM contenus c
-         JOIN sauvegardes s ON s.id = c.sauvegarde_id
-        WHERE c.sauvegarde_id = ? AND s.utilisateur_id = ?`
+      `SELECT c.donnees, s.revision, s.nom, s.demo
+         FROM sauvegardes s
+         LEFT JOIN contenus c ON c.sauvegarde_id = s.id
+        WHERE s.id = ? AND s.utilisateur_id = ?`
     )
     .bind(id, utilisateurId)
-    .first<{ donnees: string; revision: number; nom: string }>();
+    .first<{ donnees: string | null; revision: number; nom: string; demo: number }>();
+
+  if (!ligne) return null;
+  if (ligne.donnees !== null) return ligne as { donnees: string; revision: number; nom: string };
+  if (!ligne.demo) return null;
+  return { donnees: contenuDepart().texte, revision: ligne.revision, nom: ligne.nom };
 }
 
 export class ErreurPlafond extends Error {
@@ -159,23 +182,31 @@ export interface Contenu {
  * Les deux vivent ici pour la même raison : le jour où une règle s'ajoute (un
  * quota, une trace, un champ), il n'y a que deux endroits à toucher, et ils
  * sont l'un sous l'autre.
+ *
+ * `demo` ne crée **pas** la ligne de contenu, et c'est tout ce qu'il change.
+ * Les compteurs sont ceux du document livré — la fiche dit la vérité sur ce
+ * qu'elle vaut — mais les 90 Ko ne sont écrits nulle part : ils sont déjà dans
+ * le Worker, identiques pour tout le monde. `lireTexte` va les y chercher, et
+ * la première écriture matérialise la ligne par l'`ON CONFLICT` d'au-dessus,
+ * sans que personne ait à s'en occuper.
  */
 export async function creerDocument(
   base: D1Database,
   utilisateurId: string,
   sauvegardeActiveCourante: string | null,
   nom: string,
-  contenu: Contenu
+  contenu: Contenu,
+  demo = false
 ): Promise<Fiche> {
   const id = crypto.randomUUID();
   const le = maintenant();
 
-  await base.batch([
+  const instructions = [
     base
       .prepare(
         `INSERT INTO sauvegardes
-           (id, utilisateur_id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+           (id, utilisateur_id, nom, schema_version, personnes, relations, taille, revision, cree_le, modifie_le, demo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
       )
       .bind(
         id,
@@ -186,12 +217,18 @@ export async function creerDocument(
         contenu.relations,
         contenu.octets,
         le,
-        le
+        le,
+        demo ? 1 : 0
       ),
-    base
-      .prepare('INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)')
-      .bind(id, contenu.texte),
-  ]);
+  ];
+  if (!demo) {
+    instructions.push(
+      base
+        .prepare('INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)')
+        .bind(id, contenu.texte)
+    );
+  }
+  await base.batch(instructions);
 
   // Première sauvegarde du compte : elle devient l'active, sinon les routes du
   // domaine répondraient « aucune sauvegarde active » juste après une création.
@@ -207,6 +244,7 @@ export async function creerDocument(
     revision: 1,
     cree_le: le,
     modifie_le: le,
+    demo: demo ? 1 : 0,
   };
 }
 

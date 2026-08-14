@@ -14,9 +14,23 @@
          referme pas — on ne doit jamais oublier chez qui on écrit. -->
     <div class="bandeau-procuration" id="bandeau-procuration" hidden></div>
 
+    <!-- La démonstration (lot 14). Sans bouton de fermeture, et c'est voulu :
+         c'est le seul endroit de l'application où ce qu'on fait ne sera pas
+         gardé, et le dire une fois puis se taire serait un piège. Il ne
+         s'affiche que tant que la démonstration est le monde ouvert — dans le
+         sien, il disparaît. -->
+    <div class="bandeau-demo" id="bandeau-demo" hidden>
+      <span class="bandeau-demo-texte" id="bandeau-demo-texte"></span>
+      <button class="bouton bouton-primaire bouton-plat" id="btn-demo-garder" type="button"></button>
+      <button class="bouton bouton-plat" id="btn-demo-tutoriel" type="button"
+              title="Refaire la visite guidée">? Tutoriel</button>
+    </div>
+
     <!-- Essai sans compte. Discret tant qu'on regarde, insistant dès qu'on a
          modifié quelque chose : c'est à ce moment-là qu'il y a quelque chose à
-         perdre, et c'est là qu'il faut le dire. -->
+         perdre, et c'est là qu'il faut le dire. Masqué tant que le bandeau de
+         démonstration parle : deux barres empilées, c'est la moitié d'un écran
+         de téléphone pour deux fois le même conseil. -->
     <div class="bandeau-essai" id="bandeau-essai" hidden>
       <span class="bandeau-essai-texte" id="bandeau-essai-texte"></span>
       <a class="bouton bouton-primaire bouton-plat" href="/connexion.html?creer=1">Créer un compte</a>
@@ -59,6 +73,10 @@
         <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
         <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
+        <!-- La visite guidée, relançable à tout moment (lot 14.C). Une icône et
+             rien d'autre : elle ne sert qu'une fois par personne, et prendre la
+             place d'un bouton de travail pour ça serait mal la placer. -->
+        <button id="btn-tutoriel" class="bouton bouton-icone" title="Revoir la visite guidée">?</button>
         <span class="groupe-compte">
           <!-- Essai sans compte : l'invitation vit là où on cherche son compte,
                en haut à droite, et pas dans une fenêtre qui coupe le travail. -->
@@ -108,6 +126,27 @@
         <section class="rail-bloc" id="bloc-telephone" hidden>
           <h2>Réglages de l’affichage</h2>
           <div class="rail-actions" id="accueil-telephone"></div>
+        </section>
+
+        <!-- Lot 14. Bloc à part, et non mêlé aux siennes — pour la même raison
+             que « Partagés avec moi » : cet arbre n'est pas à vous, ne compte
+             pas dans votre plafond, et **ne se conserve pas**. Le ranger avec
+             les vraies sauvegardes mentirait sur ce qu'on peut en attendre. -->
+        <section class="rail-bloc" id="bloc-demonstration" hidden>
+          <h2>Démonstration</h2>
+          <p class="rail-aide">
+            Un monde d’exemple, le même pour tout le monde. Essayez tout ce que
+            vous voulez dedans : <b>rien n’y est conservé</b> — il repart à zéro
+            à votre prochaine connexion. Ce que vous voulez garder se construit
+            dans une sauvegarde à vous, juste en dessous.
+          </p>
+          <ul class="liste-sauvegardes" id="liste-demonstration"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-demo-copier"
+                    title="Copier la démonstration dans une sauvegarde à vous — celle-là, vous la gardez">⎘ En faire mon monde</button>
+            <button class="bouton bouton-plat" id="btn-demo-reinitialiser"
+                    title="Effacer ce que vous avez fait dans la démonstration et la rendre à son état d’origine">↺ Remettre à zéro</button>
+          </div>
         </section>
 
         <section class="rail-bloc">

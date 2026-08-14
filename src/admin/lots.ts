@@ -113,6 +113,15 @@ interface LigneCible {
  * qu'il a ouverte — avec le même repli que `sauvegardeActive` (la plus
  * récemment modifiée) mais **sans l'écrire** : un aperçu ne doit rien changer,
  * pas même une colonne de confort.
+ *
+ * `s.demo = 0` écarte la démonstration, pour deux raisons plutôt qu'une.
+ * D'abord elle n'est à personne : le lot d'un intendant porte sur le travail de
+ * ses joueurs, pas sur le décor qu'on leur a prêté. Ensuite y écrire serait
+ * perdu — elle repart à zéro à la prochaine connexion —, si bien qu'un
+ * panorama qui l'inclurait compterait des maisons et des doublons qui
+ * n'existent pas. C'est ce qui a déclenché le lot 14 : 32 Westeros identiques
+ * faisaient dire au rapprochement que tout le monde avait les mêmes fiches, ce
+ * qui était exact et parfaitement inutile.
  */
 export async function resoudreCibles(
   base: D1Database,
@@ -131,7 +140,7 @@ export async function resoudreCibles(
          FROM sauvegardes s
          JOIN utilisateurs u ON u.id = s.utilisateur_id
          LEFT JOIN contenus c ON c.sauvegarde_id = s.id
-        WHERE s.utilisateur_id IN (${trous})
+        WHERE s.utilisateur_id IN (${trous}) AND s.demo = 0
         ORDER BY u.email, s.modifie_le DESC`
     )
     .bind(...comptes)
@@ -149,6 +158,9 @@ export async function resoudreCibles(
       revision: ligne.revision,
       cree_le: ligne.cree_le,
       modifie_le: ligne.modifie_le,
+      // La requête ne rapporte que `demo = 0` : le dire en dur plutôt que le
+      // transporter évite une colonne de plus pour une valeur constante.
+      demo: 0,
     },
     utilisateurId: ligne.utilisateur_id,
     email: ligne.email,

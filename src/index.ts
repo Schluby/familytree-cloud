@@ -18,6 +18,7 @@ import { routesAdmin } from './admin/routes';
 import { routesDomaine, santeDuMonde } from './domaine/routes';
 import { routesPartages } from './partages/routes';
 import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
+import { contenuDepart } from './depart/contenu';
 import type { Variables } from './intergiciels';
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -85,9 +86,11 @@ app.get('/api/sante', async (c) => {
   const debut = Date.now();
   try {
     const { results } = await c.env.DB.prepare(
+      // `demo = 0` : le nombre de sauvegardes doit dire combien de mondes ont
+      // été construits, pas combien de comptes existent.
       `SELECT
          (SELECT COUNT(*) FROM utilisateurs) AS utilisateurs,
-         (SELECT COUNT(*) FROM sauvegardes)  AS sauvegardes`
+         (SELECT COUNT(*) FROM sauvegardes WHERE demo = 0)  AS sauvegardes`
     ).all<{ utilisateurs: number; sauvegardes: number }>();
 
     const ligne = results[0] ?? { utilisateurs: 0, sauvegardes: 0 };
@@ -193,6 +196,7 @@ const JOURS_INVITE = 14;
 
 async function menage(env: Env): Promise<void> {
   const maintenant = Math.floor(Date.now() / 1000);
+  const depart = contenuDepart();
   await env.DB.batch([
     env.DB.prepare('DELETE FROM sessions WHERE expire_le < ?').bind(maintenant),
     env.DB.prepare('DELETE FROM tentatives WHERE dernier_le < ?').bind(maintenant - 86400),
@@ -207,6 +211,22 @@ async function menage(env: Env): Promise<void> {
     env.DB.prepare("DELETE FROM utilisateurs WHERE role = 'invite' AND dernier_acces < ?").bind(
       maintenant - JOURS_INVITE * 86400
     ),
+    // Ce qu'on a laissé dans la démonstration (lot 14). La remise à zéro se
+    // fait normalement à l'ouverture de session ; celle-ci est pour qui ne se
+    // déconnecte jamais, et pour les 32 copies dormantes que la migration 0008
+    // a marquées sans y toucher. Seule la ligne de contenu part : la fiche
+    // reste, avec son identifiant, et `lireTexte` sert de nouveau le document
+    // livré avec le Worker.
+    env.DB.prepare(
+      'DELETE FROM contenus WHERE sauvegarde_id IN (SELECT id FROM sauvegardes WHERE demo = 1)'
+    ),
+    // Les compteurs avec, sinon la fiche annoncerait 70 personnes pour un
+    // document qui en a de nouveau 67 — et c'est la fiche que le rail affiche.
+    env.DB.prepare(
+      `UPDATE sauvegardes
+          SET schema_version = ?, personnes = ?, relations = ?, taille = ?, revision = 1
+        WHERE demo = 1 AND revision > 1`
+    ).bind(depart.schema, depart.personnes, depart.relations, depart.octets),
   ]);
 }
 

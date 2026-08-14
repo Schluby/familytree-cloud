@@ -38,7 +38,7 @@ import {
   noterInvite,
   oublierEchecsConnexion,
 } from './limites';
-import { semerDepart } from '../depart';
+import { promouvoirDemonstration, semerDemonstration } from '../depart';
 import {
   enteteCookie,
   fermerSession,
@@ -123,11 +123,12 @@ async function compteDeLaSession(c: {
  * Essayer sans compte (lot 9.C).
  *
  * Le visiteur reçoit un vrai compte, de rôle `invite` : même session, mêmes
- * routes, même sauvegarde de départ. Rien en aval ne sait qu'il n'a pas
- * d'adresse — c'est ce qui évite un second chemin de lecture et d'écriture,
- * avec ses propres trous.
+ * routes, même démonstration. Rien en aval ne sait qu'il n'a pas d'adresse —
+ * c'est ce qui évite un second chemin de lecture et d'écriture, avec ses
+ * propres trous.
  *
- * Ce que ça coûte est assumé et borné : une ligne et 90 Ko par visiteur, un
+ * Ce que ça coûte est assumé et borné : **deux lignes de quelques octets** par
+ * visiteur depuis le lot 14 — la démonstration ne recopie plus ses 90 Ko —, un
  * compteur horaire par adresse IP, et un ménage qui efface les invités
  * abandonnés (voir `menage()` dans `src/index.ts`).
  */
@@ -167,7 +168,7 @@ routesAuth.post('/invite', async (c) => {
     .run();
 
   await noterInvite(c.env.DB, ip);
-  await semerDepart(c.env.DB, id);
+  await semerDemonstration(c.env.DB, id);
 
   const { jeton, expireLe } = await ouvrirSession(c.env.DB, id, c.req.header('User-Agent') ?? '');
   c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant));
@@ -248,21 +249,25 @@ routesAuth.post('/inscription', async (c) => {
 
   await noterInscription(c.env.DB, ip);
 
-  // Un compte neuf n'ouvre pas sur une page blanche. Celui qui reprend un essai
-  // a déjà la sienne, éventuellement modifiée : on n'y touche pas.
-  const aDejaUnMonde = await c.env.DB.prepare(
-    'SELECT 1 AS oui FROM sauvegardes WHERE utilisateur_id = ? LIMIT 1'
-  )
-    .bind(id)
-    .first<{ oui: number }>();
-  if (!aDejaUnMonde) await semerDepart(c.env.DB, id);
+  // Ce que le visiteur a construit dans la démonstration devient son premier
+  // monde — c'est tout le sens de « créez un compte pour garder ce travail ».
+  // Puis une démonstration neuve, pour que le tutoriel ait où se jouer.
+  // `repris.id` en troisième argument : la fiche promue **est** celle que le
+  // compte avait ouverte, et le dire empêche la démonstration neuve de prendre
+  // sa place. Sans compte repris, la démonstration devient l'active — c'est
+  // bien elle qu'un compte tout neuf doit trouver ouverte.
+  const repris = await promouvoirDemonstration(c.env.DB, id);
+  await semerDemonstration(c.env.DB, id, repris?.id ?? null, true);
 
   // La session de l'invité reste valable — c'est le même compte — mais on en
   // ouvre une neuve : le mot de passe vient de changer de main.
   const { jeton, expireLe } = await ouvrirSession(c.env.DB, id, c.req.header('User-Agent') ?? '');
   c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant));
 
-  return c.json({ compte: { id, email, nom_affiche: '', role: 'membre' }, reprise }, 201);
+  return c.json(
+    { compte: { id, email, nom_affiche: '', role: 'membre' }, reprise, repris: repris?.nom ?? null },
+    201
+  );
 });
 
 /* -------------------------------------------------------------------------- */
@@ -306,6 +311,12 @@ routesAuth.post('/connexion', async (c) => {
   await c.env.DB.prepare('UPDATE utilisateurs SET dernier_acces = ? WHERE id = ?')
     .bind(maintenant, ligne.id)
     .run();
+
+  // Ouvrir une session, c'est arriver sur une démonstration propre : ce qu'on y
+  // a laissé la fois d'avant n'est pas un travail, c'est un brouillon. Le cas
+  // courant ne coûte qu'une lecture — la remise à zéro n'écrit que si l'on y a
+  // touché (voir `semerDemonstration`).
+  await semerDemonstration(c.env.DB, ligne.id);
 
   c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant));
   return c.json({ compte: enPublic(ligne) });
@@ -366,13 +377,18 @@ routesAuth.get('/donnees', async (c) => {
   const compte = jeton ? await resoudreSession(c.env.DB, jeton) : null;
   if (!compte) return c.json({ erreur: 'non connecté' }, 401);
 
+  // `demo = 0` partout : cette page répond à « qu'est-ce que vous gardez de
+  // moi ». La démonstration n'est pas de nous à propos d'eux — c'est le même
+  // document pour tout le monde, il n'est même pas stocké tant qu'on n'y a pas
+  // écrit, et il repart à zéro à chaque connexion. L'annoncer comme 90 Ko
+  // gardés serait faux dans les deux sens : trop, et pas à eux.
   const maintenant = Math.floor(Date.now() / 1000);
   const ligne = await c.env.DB.prepare(
     `SELECT
-       (SELECT COUNT(*) FROM sauvegardes WHERE utilisateur_id = ?1)        AS sauvegardes,
-       (SELECT COALESCE(SUM(taille), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS octets,
-       (SELECT COALESCE(SUM(personnes), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS personnes,
-       (SELECT COALESCE(SUM(relations), 0) FROM sauvegardes WHERE utilisateur_id = ?1) AS relations,
+       (SELECT COUNT(*) FROM sauvegardes WHERE utilisateur_id = ?1 AND demo = 0)        AS sauvegardes,
+       (SELECT COALESCE(SUM(taille), 0) FROM sauvegardes WHERE utilisateur_id = ?1 AND demo = 0) AS octets,
+       (SELECT COALESCE(SUM(personnes), 0) FROM sauvegardes WHERE utilisateur_id = ?1 AND demo = 0) AS personnes,
+       (SELECT COALESCE(SUM(relations), 0) FROM sauvegardes WHERE utilisateur_id = ?1 AND demo = 0) AS relations,
        (SELECT COUNT(*) FROM sessions WHERE utilisateur_id = ?1 AND expire_le > ?2) AS sessions,
        (SELECT cree_le FROM utilisateurs WHERE id = ?1)                    AS cree_le,
        (SELECT dernier_acces FROM utilisateurs WHERE id = ?1)              AS dernier_acces`
@@ -867,18 +883,18 @@ routesAuth.get('/google/retour', async (c) => {
         .run();
     }
 
-    const aDejaUnMonde = await c.env.DB.prepare(
-      'SELECT 1 AS oui FROM sauvegardes WHERE utilisateur_id = ? LIMIT 1'
-    )
-      .bind(id)
-      .first();
-    if (!aDejaUnMonde) await semerDepart(c.env.DB, id);
+    // Exactement le chemin de l'inscription par mot de passe : ce qui a été
+    // construit dans la démonstration pendant l'essai devient le premier monde,
+    // et une démonstration neuve reprend sa place.
+    const repris = await promouvoirDemonstration(c.env.DB, id);
+    await semerDemonstration(c.env.DB, id, repris?.id ?? null, true);
 
     compte = { id, email: identite.email, nom_affiche: '', role: 'membre' };
   } else {
     await c.env.DB.prepare('UPDATE utilisateurs SET dernier_acces = ? WHERE id = ?')
       .bind(maintenant, compte.id)
       .run();
+    await semerDemonstration(c.env.DB, compte.id);
   }
 
   const { jeton, expireLe } = await ouvrirSession(

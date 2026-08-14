@@ -578,6 +578,45 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   — et on ne retouche jamais le JSON à la main, la prochaine construction
   l'écraserait.
 
+## La démonstration (lot 14)
+
+- **Une sauvegarde `demo = 1` par compte, dont la ligne de contenu n'existe pas
+  tant que personne n'y a écrit.** `lireTexte` sert alors le document livré
+  avec le Worker, et la première écriture matérialise la ligne toute seule —
+  `ecrireDocument` faisait déjà un `INSERT … ON CONFLICT`. C'est la seule
+  entorse à « une sauvegarde, une ligne de contenu », et elle vaut 94 % de la
+  base : au 14/08/2026, 2,94 Mo sur 3,13 étaient 32 copies identiques et
+  jamais touchées du même Westeros.
+- **Trois lectures passent par `lireTexte`** — `GET /:id/contenu`,
+  `GET /:id/export` et la copie de `POST /` — et non par leur propre jointure.
+  Chacune serait un endroit de plus où oublier ce repli, et la copie est
+  justement le geste d'« en faire mon monde ».
+- **`demo = 0` dans tout ce qui compte quelque chose** : plafonds, « Vos
+  données », archive ZIP, `resoudreCibles`, `/api/sante`, listes de
+  l'administration. Dans la liste des comptes, le filtre est **dans le `ON`**
+  de la jointure externe : sinon un compte qui n'a encore que la démonstration
+  disparaîtrait de la liste, alors que c'est justement l'information utile.
+- **Rien n'y est conservé, et trois chemins le garantissent** : la remise à
+  zéro à l'ouverture de session (seulement si `revision > 1`), le ménage
+  nocturne, et `POST /api/sauvegardes/demonstration`. Tous font la même chose —
+  effacer la ligne de contenu et rendre ses compteurs à la fiche, **sans
+  changer son identifiant** : c'est lui que `sauvegarde_active` désigne.
+- **Une exception, et une seule** : à l'inscription, une démonstration modifiée
+  est **promue** en monde à part entière (`demo = 0`, nom « Mon Westeros »).
+  Détruire ce travail au moment précis où l'on crée un compte pour le garder
+  serait le seul endroit où l'avertissement deviendrait un piège.
+- **Elle ne se réinstalle pas d'elle-même quand on l'a supprimée**, sauf sur un
+  compte qui n'a plus rien. C'est un choix légitime ; le bouton la rappelle.
+- Dans le harnais, « ses sauvegardes » se compte avec **`siennes`**, jamais avec
+  `sauvegardes.length` : la liste porte la démonstration, qui n'appartient à
+  aucun plafond. `sienne` donne l'id du premier monde qui ne soit pas elle —
+  utile après une inscription, où la démonstration neuve passe en tête.
+- La visite guidée (`public/js/tutoriel.js`) **vise des nœuds existants et se
+  rabat quand ils manquent**. Deux pièges déjà rencontrés : `ouvrirLesFiltres`
+  est une **bascule** et refermait le tiroir d'une étape à l'autre (d'où
+  `derouler`), et un halo plus grand que l'écran n'assombrit ni ne désigne
+  plus rien (d'où le rognage sur la fenêtre, et le repli sur un calque uni).
+
 ## Pour repartir
 
 ```bash

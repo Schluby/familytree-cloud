@@ -149,7 +149,11 @@ routesAdmin.get('/utilisateurs', async (c) => {
             COALESCE(SUM(s.personnes), 0)   AS personnes,
             COALESCE(SUM(s.relations), 0)   AS relations
        FROM utilisateurs u
-       LEFT JOIN sauvegardes s ON s.utilisateur_id = u.id
+       -- La démonstration est écartée dans le ON, et pas dans un WHERE : la
+       -- jointure reste externe, donc un compte qui n'a encore qu'elle figure
+       -- bien dans la liste, avec zéro sauvegarde. C'est même ce que la colonne
+       -- a de plus utile à dire — celui-là n'a rien commencé.
+       LEFT JOIN sauvegardes s ON s.utilisateur_id = u.id AND s.demo = 0
       ${borne}
       GROUP BY u.id
       ORDER BY u.cree_le DESC`
@@ -171,9 +175,12 @@ routesAdmin.get('/utilisateurs/:id/sauvegardes', async (c) => {
     return c.json({ erreur: 'compte inconnu' }, 404);
   }
 
+  // Les arbres de quelqu'un, pas le décor qu'on lui a prêté : la démonstration
+  // n'a rien à faire ici. L'ouvrir par procuration n'aurait même pas de sens —
+  // elle repart à zéro à la prochaine connexion de son propriétaire.
   const { results } = await c.env.DB.prepare(
     `SELECT id, nom, personnes, relations, taille, revision, cree_le, modifie_le
-       FROM sauvegardes WHERE utilisateur_id = ? ORDER BY modifie_le DESC`
+       FROM sauvegardes WHERE utilisateur_id = ? AND demo = 0 ORDER BY modifie_le DESC`
   )
     .bind(id)
     .all<Objet>();

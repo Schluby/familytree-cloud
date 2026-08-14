@@ -2606,12 +2606,15 @@ export function creerEditeurSauvegarde(rappels = {}) {
   let refs = {};
 
   /** `depuis` : sauvegarde source de la copie (par défaut, l'active). */
-  function ouvrirCreation(x, y, { depuis = null, nomSource = '' } = {}) {
+  function ouvrirCreation(x, y, { depuis = null, nomSource = '', nom = '' } = {}) {
     mode = 'creation';
     brouillon = {
       depuis,
       nomSource,
-      nom: nomSource ? `${nomSource} — copie` : 'Nouvelle campagne',
+      // `nom` proposé par l'appelant : « En faire mon monde » part de la
+      // démonstration, et « Westeros — copie » dirait mal ce qu'on vient de
+      // faire. Sans lui, le nom se déduit de la source, comme avant.
+      nom: nom || (nomSource ? `${nomSource} — copie` : 'Nouvelle campagne'),
       contenu: depuis ? 'copie' : 'referentiels',
     };
     socle.monter(construire(), x, y);

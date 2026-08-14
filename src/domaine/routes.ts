@@ -38,6 +38,7 @@ import {
   versXlsx,
 } from './exports';
 import { archiver, type Entree } from './zip';
+import { contenuDepart } from '../depart/contenu';
 import * as filtres from './filtres';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
@@ -101,7 +102,16 @@ interface Monde {
   dataset: Dataset;
 }
 
-/** Charge la sauvegarde active. Sans sauvegarde, on le dit clairement. */
+/**
+ * Charge la sauvegarde active. Sans sauvegarde, on le dit clairement.
+ *
+ * La démonstration n'a de ligne de contenu que si quelqu'un y a écrit : sans
+ * elle, on sert le document livré avec le Worker. Le reste du domaine ne sait
+ * pas que ce cas existe — il reçoit un `Dataset` comme d'habitude, l'édite
+ * comme d'habitude, et `enregistrer` matérialise la ligne à la première
+ * écriture. C'est ce qui permet au terrain d'essai d'être un vrai monde
+ * éditable sans coûter les 90 Ko de tout le monde.
+ */
 async function monde(c: Contexte): Promise<Monde | Response> {
   const compte = c.get('compte');
   const fiche = await sauvegardeActive(c.env.DB, compte.id, compte.sauvegarde_active);
@@ -118,9 +128,10 @@ async function monde(c: Contexte): Promise<Monde | Response> {
   const ligne = await c.env.DB.prepare('SELECT donnees FROM contenus WHERE sauvegarde_id = ?')
     .bind(fiche.id)
     .first<{ donnees: string }>();
-  if (!ligne) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
+  const donnees = ligne?.donnees ?? (fiche.demo ? contenuDepart().texte : null);
+  if (donnees === null) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
 
-  return { fiche, dataset: Dataset.depuisDict(JSON.parse(ligne.donnees) as Objet) };
+  return { fiche, dataset: Dataset.depuisDict(JSON.parse(donnees) as Objet) };
 }
 
 /** Réécrit le document. Passe par `ecrireDocument`, le seul point d'écriture. */
@@ -1177,10 +1188,13 @@ function fichier(c: Contexte, nom: string, mime: string, octets: Uint8Array | st
 /** Toutes les sauvegardes du compte, dans un ZIP, avec de quoi s'y retrouver. */
 async function toutTelecharger(c: Contexte): Promise<Response> {
   const compte = c.get('compte');
+  // `s.demo = 0` : l'archive porte ce qui est à vous. La démonstration n'y a
+  // pas sa place — elle est livrée avec l'application, identique pour tout le
+  // monde, et on la rendrait à quelqu'un comme si c'était son travail.
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.nom, s.personnes, s.relations, s.modifie_le, c.donnees
        FROM sauvegardes s JOIN contenus c ON c.sauvegarde_id = s.id
-      WHERE s.utilisateur_id = ? ORDER BY s.modifie_le DESC`
+      WHERE s.utilisateur_id = ? AND s.demo = 0 ORDER BY s.modifie_le DESC`
   )
     .bind(compte.id)
     .all<{

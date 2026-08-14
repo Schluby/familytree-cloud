@@ -135,6 +135,21 @@ routesPartages.put('/:arbre/lecteurs', async (c) => {
   const fiche = await ficheDe(c.env.DB, moi.id, c.req.param('arbre'));
   if (!fiche) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
 
+  // La démonstration ne se partage pas : elle repart à zéro à votre prochaine
+  // connexion, et vos lecteurs verraient le monde se vider sous leurs yeux sans
+  // comprendre pourquoi. Refus explicite plutôt que 404 — celle-ci existe bel
+  // et bien, et l'indice dit quoi faire à la place.
+  if (fiche.demo) {
+    return c.json(
+      {
+        erreur: 'la démonstration ne se partage pas : rien n’y est conservé',
+        indice:
+          'dupliquez-la d’abord (clic droit sur la sauvegarde, « Dupliquer »), puis partagez la copie',
+      },
+      409
+    );
+  }
+
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
   const bruts = Array.isArray(corps.lecteurs) ? corps.lecteurs : [];
   const demandes = [

@@ -93,6 +93,38 @@ contient() { # contient <texte> : le texte apparait-il dans la derniere reponse 
   if grep -qF -- "$1" "$DOSSIER/corps.json" 2>/dev/null; then echo oui; else echo non; fi
 }
 
+siennes() { # siennes : combien de sauvegardes de la derniere reponse NE SONT PAS la demo
+  # Depuis le lot 14, `GET /api/sauvegardes` rend aussi la demonstration, qui
+  # ne compte dans aucun plafond et ne se conserve pas. Tout ce qui parle de
+  # « ses sauvegardes » doit donc l'ecarter — sinon on mesure le cadeau au lieu
+  # du travail, ce qui est exactement le defaut que ce lot repare.
+  node -e "
+    const fs=require('fs');
+    let d={};
+    try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    process.stdout.write(String((d.sauvegardes||[]).filter(s=>!s.demo).length));
+  " 2>/dev/null
+}
+
+sienne() { # sienne [rang] : l'id de la n-ieme sauvegarde qui n'est pas la demo
+  node -e "
+    const fs=require('fs');
+    let d={};
+    try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    const l=(d.sauvegardes||[]).filter(s=>!s.demo);
+    process.stdout.write(String((l[${1:-0}]||{}).id||''));
+  " 2>/dev/null
+}
+
+demo_id() { # demo_id : l'id de la demonstration dans la derniere liste, ou rien
+  node -e "
+    const fs=require('fs');
+    let d={};
+    try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    process.stdout.write(String(((d.sauvegardes||[]).find(s=>s.demo)||{}).id||''));
+  " 2>/dev/null
+}
+
 journal_vise() { # journal_vise <id> : combien de lignes du journal VISENT ce compte
   # `contient` ne suffit pas ici : l'identifiant d'un administrateur apparait
   # aussi comme AUTEUR d'une ligne, et voir « le souverain a ouvert l'arbre de
@@ -265,7 +297,10 @@ verifier "et A n'en voit rien" 1 "$(lire personnes.length)"
 echo "-- plafonds"
 code "$BOCAL_A" GET /api/sauvegardes > /dev/null
 PLAFOND="$(lire plafonds.sauvegardes)"
-DEJA="$(lire sauvegardes.length)"
+# `siennes` et non `sauvegardes.length` : depuis le lot 14 la demonstration est
+# dans la liste mais hors du plafond. Compter avec elle remplissait une place
+# de trop, et « la suivante est refusee » repondait 201.
+DEJA="$(siennes)"
 DERNIERE=201
 i="$DEJA"
 while [ "$i" -lt "$PLAFOND" ]; do
@@ -656,7 +691,20 @@ verifier "  c'est une reprise, pas un compte neuf" true "$(lire reprise)"
 verifier "  le meme identifiant qu'avant" "$ID_INVITE" "$(lire compte.id)"
 verifier "  et il n'est plus invite" membre "$(lire compte.role)"
 code "$BOCAL_I" GET /api/sauvegardes > /dev/null
-verifier "son monde l'a suivi" "$SAUVEGARDE_INVITE" "$(lire sauvegardes.0.id)"
+# `sienne` et non `sauvegardes.0.id` : l'inscription pose une demonstration
+# neuve, plus recemment modifiee, qui passe donc en tete de la liste. Le monde
+# du visiteur, lui, est le premier qui ne soit pas la demonstration — et c'est
+# **la meme ligne qu'avant**, promue plutot que recopiee (voir lot 14).
+verifier "son monde l'a suivi" "$SAUVEGARDE_INVITE" "$(sienne)"
+# La seule exception a « rien n'est conserve dans la demonstration », et elle
+# existe pour que la regle ne soit pas un piege : la remettre a zero **au
+# moment precis ou l'on cree un compte pour garder son travail** serait le pire
+# moment possible. Le visiteur a modifie son monde plus haut (PATCH /api/meta).
+verifier "  il compte comme sauvegarde a lui" 1 "$(siennes)"
+verifier "  et une demonstration neuve reprend sa place" oui "$(porte "$(demo_id)" '-')"
+code "$BOCAL_I" GET /api/sauvegardes/$SAUVEGARDE_INVITE > /dev/null
+verifier "  la ligne promue n'est plus une demonstration" 0 "$(lire sauvegarde.demo)"
+verifier "  et porte un nom qui le dit" "Mon Westeros" "$(lire sauvegarde.nom)"
 code "$BOCAL_I" GET /api/referentiels > /dev/null
 verifier "  avec ce qu'il y avait change" oui "$(contient '"annee_courante":"305 AC"')"
 verifier "maintenant il peut demander un code" 200 "$(code "$BOCAL_I" POST /api/auth/code-secours)"
@@ -1276,6 +1324,94 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Lot 14 : la demonstration, et le tutoriel
+#
+# Le constat de depart, mesure le 14/08/2026 : 2 937 472 des 3 133 838 octets
+# stockes — 94 % — etaient 32 copies identiques et jamais touchees du meme
+# Westeros. Ce qui suit verifie les trois promesses qui en decoulent : elle ne
+# coute rien tant qu'on n'y ecrit pas, elle ne compte nulle part, et **rien de
+# ce qu'on y fait n'est conserve**.
+# ---------------------------------------------------------------------------
+
+echo "-- 14.A la demonstration ne coute rien et ne compte pas"
+BOCAL_D="$DOSSIER/demo.txt"
+code "$BOCAL_D" POST /api/auth/invite > /dev/null
+code "$BOCAL_D" GET /api/sauvegardes > /dev/null
+DEMO="$(demo_id)"
+verifier "un compte neuf arrive sur la demonstration" oui "$(porte "$DEMO" '-')"
+verifier "  elle est marquee comme telle" 1 "$(lire sauvegardes.0.demo)"
+verifier "  et c'est le seul monde du compte" 0 "$(siennes)"
+verifier "  le monde se lit malgre tout" 200 "$(code "$BOCAL_D" GET /api/personnes)"
+verifier "    avec ses 67 fiches" 67 "$(lire personnes.length)"
+# Le coeur du lot : la ligne de contenu n'existe pas encore. On ne peut pas la
+# compter d'ici, mais l'export la reconstruit — s'il repondait 404, c'est que
+# la lecture ne sait pas retomber sur le document livre avec le Worker.
+verifier "  son contenu se sert sans etre stocke" 200 "$(code "$BOCAL_D" GET /api/sauvegardes/$DEMO/contenu)"
+verifier "  et s'exporte" 200 "$(code "$BOCAL_D" GET /api/sauvegardes/$DEMO/export)"
+code "$BOCAL_D" GET /api/auth/donnees > /dev/null
+verifier "« Vos donnees » n'y voit rien a garder" 0 "$(lire contenu.sauvegardes)"
+verifier "  ni octets" 0 "$(lire contenu.octets)"
+
+echo "-- 14.A on y ecrit, rien n'est conserve"
+verifier "on y cree une fiche" 201 "$(code "$BOCAL_D" POST /api/personnes '{"prenom":"Brouillon","nom":"Jetable"}')"
+code "$BOCAL_D" GET /api/sauvegardes > /dev/null
+verifier "  la fiche compte 68 personnes" 68 "$(lire sauvegardes.0.personnes)"
+verifier "  mais toujours zero sauvegarde a soi" 0 "$(siennes)"
+verifier "la remise a zero repond" 200 "$(code "$BOCAL_D" POST /api/sauvegardes/demonstration)"
+verifier "  et rend le monde d'origine" 67 "$(lire sauvegarde.personnes)"
+# Lu **avant** l'appel suivant : `lire` porte sur la derniere reponse, et le
+# 404 d'apres ecraserait le corps qu'on veut inspecter.
+# Meme identifiant : c'est lui que `sauvegarde_active` designe, et le remplacer
+# deplacerait le monde ouvert sous les pieds de quelqu'un qui recharge sa page.
+verifier "  sans changer d'identifiant" "$DEMO" "$(lire sauvegarde.id)"
+verifier "  la fiche posee a disparu" 404 "$(code "$BOCAL_D" GET /api/personnes/brouillon-jetable)"
+verifier "la demonstration ne se partage pas" 409 "$(code "$BOCAL_D" PUT /api/partages/$DEMO/lecteurs "{\"lecteurs\":[\"$EMAIL_B\"]}")"
+
+echo "-- 14.A « en faire mon monde »"
+verifier "elle se copie dans une vraie sauvegarde" 201 "$(code "$BOCAL_D" POST /api/sauvegardes "{\"nom\":\"Mon Westeros\",\"depuis\":\"$DEMO\"}")"
+verifier "  la copie porte les 67 fiches" 67 "$(lire sauvegarde.personnes)"
+verifier "  et n'est plus une demonstration" 0 "$(lire sauvegarde.demo)"
+code "$BOCAL_D" GET /api/sauvegardes > /dev/null
+verifier "  elle compte, elle" 1 "$(siennes)"
+
+echo "-- 14.A la connexion remet la demonstration a zero"
+# Sur B, deja inscrit : la limite est de 3 inscriptions par heure et par IP, et
+# le harnais en a deja consomme trois. Un quatrieme compte ferait echouer la
+# section entiere sur un 429 — c'est-a-dire sur un garde-fou qui fonctionne.
+code "$BOCAL_B" GET /api/sauvegardes > /dev/null
+DEMO_B="$(demo_id)"
+SIEN_B="$(sienne)"
+verifier "un compte inscrit a lui aussi sa demonstration" oui "$(porte "$DEMO_B" '-')"
+code "$BOCAL_B" POST /api/sauvegardes/$DEMO_B/activer > /dev/null
+code "$BOCAL_B" POST /api/personnes '{"prenom":"Encore","nom":"Jetable"}' > /dev/null
+verifier "  on y ecrit" 200 "$(code "$BOCAL_B" GET /api/personnes/encore-jetable)"
+code "$BOCAL_B" POST /api/auth/deconnexion > /dev/null
+verifier "  on se reconnecte" 200 "$(code "$BOCAL_B" POST /api/auth/connexion "{\"email\":\"$EMAIL_B\",\"cle\":\"$CLE_B\"}")"
+verifier "  et le brouillon a disparu" 404 "$(code "$BOCAL_B" GET /api/personnes/encore-jetable)"
+code "$BOCAL_B" GET /api/sauvegardes > /dev/null
+verifier "  la demonstration est revenue a 67 fiches" 67 "$(lire sauvegardes.0.personnes)"
+code "$BOCAL_B" POST /api/sauvegardes/$SIEN_B/activer > /dev/null
+verifier "  et son monde a lui n'a pas bouge" 200 "$(code "$BOCAL_B" GET /api/personnes)"
+
+echo "-- 14.B et 14.C ce que la page en dit"
+code - GET / > /dev/null
+verifier "la page porte le bandeau de demonstration" oui "$(contient 'bandeau-demo')"
+verifier "  et le bloc a part dans le rail" oui "$(contient 'bloc-demonstration')"
+verifier "  avec « en faire mon monde »" oui "$(contient 'btn-demo-copier')"
+verifier "  et « remettre a zero »" oui "$(contient 'btn-demo-reinitialiser')"
+verifier "le tutoriel a sa petite icone" oui "$(contient 'btn-tutoriel')"
+code - GET /js/tutoriel.js > /dev/null
+verifier "il dit d'abord que rien n'est conserve" oui "$(contient "n’est conservé")"
+verifier "  il montre comment creer un profil" oui "$(contient 'btn-nouveau-profil')"
+verifier "  comment relier deux fiches" oui "$(contient 'Relier deux personnes')"
+verifier "  ou vivent maisons et categories" oui "$(contient 'Catégorie de maison')"
+verifier "  et ou se construit son propre monde" oui "$(contient 'btn-nouvelle-sauvegarde')"
+# Il se propose, il ne s'impose pas : le premier ecran offre de sortir.
+verifier "  il se laisse passer" oui "$(contient 'Plus tard')"
+code - GET /js/telephone.js > /dev/null
+verifier "le tiroir s'ouvre sans se refermer" oui "$(contient 'export function derouler')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 
@@ -1291,7 +1427,7 @@ verifier "bon code accepte" 200 "$(code - POST /api/auth/recuperation "{\"email\
 verifier "l'ancien mot de passe ne marche plus" 401 "$(code - POST /api/auth/connexion "{\"email\":\"$EMAIL_A\",\"cle\":\"$CLE_A\"}")"
 verifier "le nouveau marche" 200 "$(code "$BOCAL_A" POST /api/auth/connexion "{\"email\":\"$EMAIL_A\",\"cle\":\"$CLE_A2\"}")"
 code "$BOCAL_A" GET /api/sauvegardes > /dev/null
-verifier "et les sauvegardes sont toujours la" "$PLAFOND" "$(lire sauvegardes.length)"
+verifier "et les sauvegardes sont toujours la" "$PLAFOND" "$(siennes)"
 
 echo
 if [ "$echecs" -eq 0 ]; then

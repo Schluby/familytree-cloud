@@ -1344,6 +1344,58 @@ body.sombre .bandeau-essai.presse { color: #7fd8c6; }
    pour quelqu'un qui reviendra la chercher. */
 body.en-essai #btn-instantane { display: none; }
 
+/* ------------------------------------------------------- démonstration (14)
+ *
+ * Ni un avertissement de procuration (on ne risque pas d'abîmer le travail de
+ * quelqu'un) ni une invitation d'essai (il n'y a rien à garder) : le seul
+ * endroit du produit où **ce qu'on fait ne sera pas conservé**. D'où une
+ * couleur à lui, une teinte d'encre plutôt que d'alarme, et aucun bouton de
+ * fermeture — un avertissement qu'on peut faire taire n'en est pas un.
+ */
+.bandeau-demo {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  background: #eef0f7; color: #4b4f6b; border-bottom: 1px solid #c3c8e0;
+}
+.bandeau-demo-texte { flex: 1; min-width: 200px; }
+.bandeau-demo .bouton { flex: 0 0 auto; }
+body.sombre .bandeau-demo { background: #23253a; color: #b9bde0; border-bottom-color: #3d4166; }
+/* Après une écriture, le ton change : là il y a quelque chose à perdre —
+   exactement comme le bandeau d'essai, et pour la même raison. */
+.bandeau-demo.presse { background: #fdf3d8; color: #7a5c12; border-bottom-color: #e0c169; }
+body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-bottom-color: #6b5620; }
+
+/* La démonstration se reconnaît dans le rail sans avoir à lire son nom. */
+.sauvegarde.demo .sv-pastille { background: #8b90c4; }
+
+/* --------------------------------------------------------- tutoriel (14.C)
+ *
+ * Le trou du projecteur est fait par une seule ombre de 9999 px : l'élément
+ * couvre la cible, et son ombre assombrit tout le reste. Un calque en quatre
+ * morceaux aurait quatre positions à tenir d'accord avec celle de la cible.
+ */
+.tuto { position: fixed; inset: 0; z-index: 90; }
+.tuto.tuto-sans-cible { background: rgba(12, 18, 28, .55); }
+.tuto-halo {
+  position: fixed; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(12, 18, 28, .55), 0 0 0 2px var(--accent) inset;
+  transition: all .18s ease;
+}
+.tuto-carte {
+  position: fixed; width: min(340px, calc(100vw - 24px));
+  background: var(--carte-fond); color: var(--texte);
+  border: 1px solid var(--bord); border-radius: var(--rayon);
+  box-shadow: var(--carte-ombre-forte); padding: 14px 16px 12px;
+}
+.tuto-compteur { font-size: 11px; color: var(--texte-faible); letter-spacing: .04em; }
+.tuto-titre { margin: 2px 0 6px; font-family: var(--police-titre); font-size: 16px; }
+.tuto-texte { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--texte-doux); }
+.tuto-texte b { color: var(--texte); }
+.tuto-actions { display: flex; gap: 6px; align-items: center; }
+/* « Plus tard » à gauche, seul : une sortie ne se cherche pas parmi les
+   boutons qui font avancer. */
+.tuto-passer { margin-right: auto; color: var(--texte-faible); }
+
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 1180px) {
@@ -1525,6 +1577,20 @@ body.en-essai #btn-instantane { display: none; }
   .bandeau-essai.presse .bouton-primaire { min-height: 36px; }
   .bandeau-essai-texte { min-width: 0; }
   .bandeau-essai-fermer { min-width: 36px; min-height: 36px; }
+
+  /* Le bandeau de démonstration : même règle, même raison. Mesuré à **85 px
+   * sur 812** avec ses deux boutons — ils passaient à la ligne, et l'avertis-
+   * sement coûtait 10 % de l'écran en permanence. Le texte, lui, reste : c'est
+   * lui qui porte « rien n'est conservé », et il tient sur une ligne et demie.
+   *
+   * « ? Tutoriel » disparaît tout court : la visite guidée a déjà sa porte dans
+   * le tiroir, sous 👤. « Créer un compte » / « En faire mon monde » revient
+   * dès qu'on a écrit — le moment où il y a quelque chose à perdre. */
+  .bandeau-demo { padding: 6px 10px; font-size: 11.5px; gap: 8px; }
+  .bandeau-demo #btn-demo-tutoriel { display: none; }
+  .bandeau-demo:not(.presse) #btn-demo-garder { display: none; }
+  .bandeau-demo.presse #btn-demo-garder { min-height: 36px; }
+  .bandeau-demo-texte { min-width: 0; }
 
   /* Cibles tactiles dans le rail.
    *

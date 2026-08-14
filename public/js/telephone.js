@@ -73,7 +73,17 @@ const A_DESCENDRE = [
   },
   {
     vers: 'accueil-telephone',
-    quoi: ['#btn-vue-generale', '#selecteur-couleur', '#lien-document', '#btn-annee', '#btn-theme'],
+    // `#btn-tutoriel` en dernier (lot 14.C) : une visite guidée ne se relance
+    // pas dix fois par jour, et elle a un second accès — le bandeau de la
+    // démonstration, qui est justement là où l'on est quand on en a besoin.
+    quoi: [
+      '#btn-vue-generale',
+      '#selecteur-couleur',
+      '#lien-document',
+      '#btn-annee',
+      '#btn-theme',
+      '#btn-tutoriel',
+    ],
   },
 ];
 
@@ -165,11 +175,19 @@ export function amenerLaFiche() {
  *
  * Un défilement de trop ne se voit pas. Un défilement manquant, si.
  */
-function ouvrirLeRailSur(idBloc) {
+/**
+ * `bascule` : le geste d'un bouton, qui referme s'il rouvre le même bloc.
+ *
+ * La visite guidée (14.C) appelle la même fonction avec `false`, et pour une
+ * raison qu'on a mesurée : ses étapes 4 à 6 vivent toutes dans le tiroir, et en
+ * bascule l'étape 5 refermait ce que l'étape 4 venait d'ouvrir — le halo se
+ * posait alors sur un bloc sorti de l'écran.
+ */
+function ouvrirLeRailSur(idBloc, bascule = true) {
   if (!volets) return;
   // Déjà ouvert **sur ce bloc-là** : le même geste referme. On compare le bloc
   // visé, pour que passer des filtres au compte n'exige pas de fermer d'abord.
-  if (surTelephone() && volets.rail.classList.contains('ouvert') && volets.rail.dataset.sur === idBloc) {
+  if (bascule && surTelephone() && volets.rail.classList.contains('ouvert') && volets.rail.dataset.sur === idBloc) {
     volets.rail.classList.remove('ouvert');
     delete volets.rail.dataset.sur;
     return;
@@ -185,6 +203,11 @@ function ouvrirLeRailSur(idBloc) {
 
 export function ouvrirLesFiltres() {
   ouvrirLeRailSur('bloc-maisons');
+}
+
+/** Ouvre le tiroir sur un bloc **sans jamais le refermer** (voir `bascule`). */
+export function derouler(idBloc) {
+  ouvrirLeRailSur(idBloc, false);
 }
 
 /**
