@@ -277,6 +277,34 @@ ne connaît que `membre` et `intendant`, et refuse même de toucher au rôle d'u
 administrateur. Une route qui sacre un pair ferait du premier compte compromis
 le trousseau de toute l'instance.
 
+**Sur téléphone (lot 12.B)**, ce tableau n'en est plus un : chaque compte
+devient une carte, chaque valeur porte son intitulé, et la colonne de droite
+passe en bas de la carte. La ligne « Sélection » se touche sur toute sa
+largeur — la case seule faisait 13 px.
+
+### Rapprocher les fiches d'une même table (lot 12.C)
+
+Une table qui joue le même monde à plusieurs l'écrit plusieurs fois : le même
+personnage y prend vite deux identifiants, et les lots ne le reconnaissent plus.
+
+Cochez les comptes, puis **« Relever la sélection »** dans *Comment ils ont
+structuré leurs vues*. Sous la comparaison des catalogues, **« Un même nom,
+plusieurs fiches »** montre :
+
+- **Même nom, identifiants différents** — avec, sur chaque écriture, **« Aligner
+  tout le monde sur celle-ci »**, qui remplit le formulaire de lot. Rien n'est
+  écrit : il reste l'aperçu à relire, puis « Appliquer ».
+- **Même identifiant, noms différents** — quelqu'un a renommé sa fiche dans son
+  coin. On le montre, on ne propose rien : c'est peut-être voulu.
+
+⚠️ **Le rapprochement se fait par le nom, et un nom n'identifie personne.** Dans
+Westeros, « Brandon Stark » désigne deux personnages : le frère d'Eddard et son
+fils Bran. La page le dit ; c'est à vous de trancher avant d'appliquer.
+
+⚠️ **Aligner ne fusionne pas.** Le lot pose une fiche de référence — il ajoute
+ou met à jour. Il **ne supprime pas** l'autre fiche dans l'arbre où elle vit, et
+ne rebranche pas ses liens. Ce ménage-là reste manuel, dans l'arbre concerné.
+
 ## Montrer un arbre à d'autres, en lecture seule (lot 11.B)
 
 **Ce n'est pas le « lien de campagne ».** Celui-là (le champ « Document » de la

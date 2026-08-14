@@ -1079,6 +1079,97 @@ verifier "  et la page dit ou sont les gestes" oui "$(contient 'aideComptes')"
 verifier "  y compris comment nommer un intendant" oui "$(contient 'Pour en nommer un')"
 
 # ---------------------------------------------------------------------------
+# Lot 12 : le telephone d'un visiteur, l'administration au doigt, et les
+# fiches qu'une table a ecrites plusieurs fois
+#
+# Signale le 14/08/2026 : « des qu'on utilise le tel, il y a 3 boutons qui
+# prennent toute la place et inutile (Connexion et inscrivez-vous x2), a
+# retirer pour ne laisser qu'un pictogramme de tete a cliquer ».
+#
+# Mesure : ces deux boutons reclamaient 240 px des 375, et la marque tombait a
+# 9 px — plus d'epee, plus de nom d'univers. Ils descendent maintenant dans le
+# tiroir, et le 👤 de la barre y mene.
+# ---------------------------------------------------------------------------
+
+echo "-- 12.A la barre du haut d'un visiteur au telephone"
+code - GET /js/telephone.js > /dev/null
+# Le motif passe par une variable : il porte des apostrophes, et les echapper
+# dans l'argument ferait chercher un antislash (deja paye deux fois).
+MOTIF_GROUPE_ESSAI="'#groupe-essai',"
+verifier "les boutons d'essai descendent dans le tiroir" oui "$(contient "$MOTIF_GROUPE_ESSAI")"
+verifier "  et le compte s'y ouvre d'un geste" oui "$(contient 'export function ouvrirLeCompte')"
+# Le defilement se fait AUSSI hors rAF : dans un document cache, l'image
+# suivante n'arrive jamais, et le bloc vise restait a 3309 px du haut.
+verifier "  sans dependre d'une image a dessiner" oui "$(contient 'requestAnimationFrame(viser)')"
+code - GET / > /dev/null
+verifier "la barre porte le pictogramme de compte" oui "$(contient 'btn-compte')"
+code - GET /js/main.js > /dev/null
+verifier "le bandeau connait la largeur de l'ecran" oui "$(contient 'surTelephone')"
+code - GET /css/app.css > /dev/null
+verifier "le bandeau calme perd son bouton" oui "$(contient '.bandeau-essai:not(.presse)')"
+verifier "  et la marque a un plancher" oui "$(contient '.marque { min-width: 5.5rem; }')"
+
+echo "-- 12.B l'administration au doigt"
+code - GET /js/admin.js > /dev/null
+verifier "les en-tetes sont recopies dans les cellules" oui "$(contient 'function etiqueter')"
+code - GET /admin > /dev/null
+verifier "les tableaux d'action deviennent des cartes" oui "$(contient 'donnees serree cartes')"
+verifier "  la colonne des cases a un intitule" oui "$(contient 'data-libelle')"
+code - GET /css/base.css > /dev/null
+verifier "sous 760 px le tableau cesse d'en etre un" oui "$(contient '.donnees.serree.cartes thead { display: none; }')"
+verifier "  et les cases se touchent" oui "$(contient ".donnees.serree.cartes input[type='checkbox']")"
+
+# ---------------------------------------------------------------------------
+# Lot 12.C : le rapprochement des fiches
+#
+# Une table a six joue le meme monde dans six arbres. Le meme personnage y est
+# ecrit six fois, et rien ne garantit qu'il porte six fois le meme identifiant.
+# Le panorama comparait les catalogues ; il compare maintenant les fiches.
+#
+# Deux accidents distincts, et un seul appelle un geste : meme nom sous
+# plusieurs identifiants (a rapprocher), et meme identifiant sous plusieurs
+# noms (quelqu'un a renomme, c'est peut-etre voulu).
+# ---------------------------------------------------------------------------
+
+echo "-- 12.C les fiches ecrites plusieurs fois"
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+
+# Une meme fiche posee chez tout le monde : elle doit compter comme alignee.
+LOT_P1="{\"comptes\":[$CIBLES],\"portee\":\"active\",\"operation\":{\"type\":\"personne\",\"id\":\"ser-doublon\",\"prenom\":\"Ser\",\"nom\":\"Doublon\"}}"
+verifier "une fiche posee chez tous" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_P1")"
+# La meme personne, chez un seul, sous un autre identifiant : c'est le cas que
+# le rapprochement existe pour trouver.
+LOT_P2="{\"comptes\":[\"$ID_INVITE\"],\"portee\":\"active\",\"operation\":{\"type\":\"personne\",\"id\":\"ser-doublon-bis\",\"prenom\":\"Ser\",\"nom\":\"Doublon\"}}"
+verifier "  puis une seconde ecriture chez un seul" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_P2")"
+# Un meme identifiant, renomme chez un seul.
+LOT_P3="{\"comptes\":[$CIBLES],\"portee\":\"active\",\"operation\":{\"type\":\"personne\",\"id\":\"ser-tiers\",\"prenom\":\"Ser\",\"nom\":\"Tiers\"}}"
+code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_P3" > /dev/null
+LOT_P4="{\"comptes\":[\"$ID_INVITE\"],\"portee\":\"active\",\"operation\":{\"type\":\"personne\",\"id\":\"ser-tiers\",\"prenom\":\"Messire\",\"nom\":\"Tiers\"}}"
+code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_P4" > /dev/null
+
+verifier "le panorama porte le rapprochement" 200 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES],\"portee\":\"active\"}")"
+verifier "  il isole les noms portes par plusieurs fiches" oui "$(contient '"a_unifier"')"
+verifier "  et les fiches renommees" oui "$(contient '"renommees"')"
+verifier "  la seconde ecriture est trouvee" oui "$(contient 'ser-doublon-bis')"
+verifier "  le renommage aussi" oui "$(contient 'Messire Tiers')"
+# Ce qui est deja d'accord ne doit pas remonter comme un probleme.
+verifier "  et ce qui est aligne se compte a part" oui "$(contient '"alignees"')"
+
+echo "-- le rapprochement s'arrete au perimetre de l'intendant"
+code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"intendant"}' > /dev/null
+code "$BOCAL_A" PUT /api/admin/intendants/$ID_COMPTE_B/charges "{\"comptes\":[\"$ID_INVITE\"]}" > /dev/null
+verifier "l'intendant releve sa table" 200 "$(code "$BOCAL_B" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES,\"$ID_COMPTE_A\"],\"portee\":\"active\"}")"
+# Il a demande trois comptes ; le souverain n'est pas dans son perimetre et ne
+# doit pas apparaitre, pas meme comme une ligne vide.
+verifier "  le souverain n'y entre pas" 2 "$(lire comptes.length)"
+verifier "  et il n'apparait nulle part" non "$(contient "$EMAIL_A")"
+verifier "  mais le rapprochement lui est rendu" oui "$(contient '"a_unifier"')"
+
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
+verifier "A redevient membre, le panorama se referme" 403 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES]}")"
+
+# ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google
 #
 # Le flux « Authorization Code », entierement cote serveur : pas de script

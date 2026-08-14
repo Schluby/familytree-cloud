@@ -26,10 +26,13 @@
   <div class="carte" id="carteComptes">
     <h2>Comptes</h2>
     <div class="defilant">
-      <table class="donnees serree" id="tableComptes">
+      <!-- `cartes` : sous 760 px, chaque ligne devient une carte plutôt qu'un
+           tronçon de tableau à faire glisser. Voir `etiqueter()` dans
+           `public/js/admin.js` et la règle correspondante dans `base.css`. -->
+      <table class="donnees serree cartes" id="tableComptes">
         <thead>
           <tr>
-            <th class="coche"><input type="checkbox" id="toutCocher" title="Tout sélectionner"></th>
+            <th class="coche" data-libelle="Sélection"><input type="checkbox" id="toutCocher" title="Tout sélectionner"></th>
             <th>Adresse</th><th>Rôle</th><th>Arbres</th><th>Contenu</th>
             <th>Place</th><th>Dernier accès</th><th></th>
           </tr>
@@ -67,7 +70,7 @@
       l’accorde, exprès.
     </p>
     <div class="defilant">
-      <table class="donnees serree">
+      <table class="donnees serree cartes">
         <thead>
           <tr><th>Adresse</th><th>Comptes</th><th>Lesquels</th><th>Dernier accès</th><th></th></tr>
         </thead>
@@ -151,6 +154,22 @@
         </table>
       </div>
       <div id="communDivergent"></div>
+
+      <!-- Lot 12.C. Le relevé ci-dessus compare les catalogues — maisons,
+           catégories, types. Celui-ci compare les fiches elles-mêmes, parce
+           qu'une table qui joue le même monde à six l'écrit six fois, et que
+           deux orthographes suffisent à fabriquer deux personnages. -->
+      <h3 class="sous-titre">Un même nom, plusieurs fiches</h3>
+      <p class="note" id="aideRapprochement">
+        Chaque arbre est écrit à la main : le même personnage y prend vite deux
+        identifiants, et vos lots ne le reconnaissent plus. Ce relevé rapproche
+        <strong>par le nom</strong> — il signale, il ne conclut pas.
+        <strong>« Aligner tout le monde sur celle-ci »</strong> prépare un lot
+        avec la fiche choisie ; vous relisez l’aperçu, puis vous appliquez.
+        <strong>Cela pose une fiche de référence ; cela ne supprime pas l’autre</strong>
+        dans l’arbre où elle vit, et ne rebranche pas ses liens.
+      </p>
+      <div id="rapprochement"></div>
     </div>
   </div>
 
@@ -158,7 +177,7 @@
   <div class="carte cache" id="carteSauvegardes">
     <h2 id="titreSauvegardes">Sauvegardes</h2>
     <div class="defilant">
-      <table class="donnees serree">
+      <table class="donnees serree cartes">
         <thead>
           <tr><th>Nom</th><th>Personnes</th><th>Liens</th><th>Place</th><th>Modifiée</th><th></th></tr>
         </thead>
@@ -191,7 +210,7 @@
       <strong>Ce journal ne s’efface pas</strong> : aucune route ne le supprime.
     </p>
     <div class="defilant">
-      <table class="donnees serree">
+      <table class="donnees serree cartes">
         <thead><tr><th>Quand</th><th>Qui</th><th>Quoi</th><th>Sur qui</th></tr></thead>
         <tbody id="corpsJournal"></tbody>
       </table>

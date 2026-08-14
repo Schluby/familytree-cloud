@@ -34,9 +34,21 @@ export function surTelephone() {
 /**
  * Ce qui descend dans le rail, dans cet ordre.
  *
- * Ne descendent pas : `#groupe-essai` (« Créer un compte » est l'appel à
- * l'action d'un visiteur — l'enterrer sous ☰ le perdrait), `#btn-rail` et
- * `#btn-panneau`, qui sont justement ce qui ouvre les tiroirs.
+ * Ne descendent pas `#btn-rail`, `#btn-panneau` et `#btn-compte`, qui sont
+ * justement ce qui ouvre les tiroirs.
+ *
+ * **`#groupe-essai` descend, depuis le 14/08/2026.** Il ne descendait pas :
+ * « Créer un compte » est l'appel à l'action d'un visiteur, et l'enterrer sous
+ * ☰ semblait le perdre. Mesuré sur 375 px, l'argument ne tenait pas — ses deux
+ * boutons réclamaient **240 px des 375** de la barre, et la marque, comprimée,
+ * tombait à **9 px** : plus d'épée, plus de nom d'univers. Trois boutons
+ * disaient la même chose (celui du bandeau d'essai, plus ces deux-là) et
+ * coûtaient à l'application son nom.
+ *
+ * L'invitation n'est pas perdue pour autant : le bandeau d'essai la dit en
+ * toutes lettres, en permanence, et le 👤 de la barre ouvre le tiroir
+ * exactement dessus. On la dit une fois en mots au lieu de trois fois en
+ * boutons.
  *
  * **Ni « ⤓ Tout télécharger » ni « 📸 Instantané ».** Signalé le 13/08/2026 :
  * « retirer les choses inutiles type téléchargement sur téléphone ». Un `.zip`
@@ -45,6 +57,8 @@ export function surTelephone() {
  * descendent donc pas : ils sont éteints par le CSS.
  */
 const A_DESCENDRE = [
+  // En tête : pour un visiteur, c'est la seule chose de ce bloc qui compte.
+  '#groupe-essai',
   '#btn-vue-generale',
   '#selecteur-couleur',
   '#lien-document',
@@ -130,15 +144,43 @@ export function amenerLaFiche() {
  * et ils vivaient à six blocs du haut du tiroir. Le bouton « ⛨ Filtres » de la
  * barre du bas y mène directement.
  */
-export function ouvrirLesFiltres() {
+/**
+ * Ouvre le tiroir de gauche **déroulé sur un bloc précis**.
+ *
+ * Le défilement se fait deux fois : tout de suite, et à l'image suivante. Ce
+ * n'est pas une précaution superstitieuse. Le second passage existe parce que
+ * les positions ne valent rien tant que le tiroir glisse encore ; le premier
+ * existe parce que `requestAnimationFrame` **ne se déclenche pas dans un
+ * document caché** — onglet en arrière-plan, écran éteint, application
+ * revenue au premier plan. Constaté le 14/08/2026 : le bloc visé restait à
+ * 3309 px du haut du tiroir, et le geste ne montrait rien.
+ *
+ * Un défilement de trop ne se voit pas. Un défilement manquant, si.
+ */
+function ouvrirLeRailSur(idBloc) {
   if (!volets) return;
   volets.rail.classList.add('ouvert');
   volets.rail.classList.remove('replie');
   volets.panneauVolet.classList.remove('ouvert');
-  // Après le rendu : tant que le tiroir glisse, ses positions ne valent rien.
-  requestAnimationFrame(() => {
-    document.getElementById('bloc-maisons')?.scrollIntoView({ block: 'start' });
-  });
+  const viser = () => document.getElementById(idBloc)?.scrollIntoView({ block: 'start' });
+  viser();
+  requestAnimationFrame(viser);
+}
+
+export function ouvrirLesFiltres() {
+  ouvrirLeRailSur('bloc-maisons');
+}
+
+/**
+ * Ouvre le rail **déroulé sur le compte** — ce que fait le 👤 de la barre.
+ *
+ * C'est la contrepartie de la disparition de « Créer un compte » et « Se
+ * connecter » : le geste reste à un doigt de distance, il ne coûte simplement
+ * plus la barre entière. Pour un visiteur d'essai, le bloc s'ouvre sur ces deux
+ * boutons mêmes ; pour un compte, sur son adresse, ⚙, 🛡 et ⏻.
+ */
+export function ouvrirLeCompte() {
+  ouvrirLeRailSur('bloc-telephone');
 }
 
 export function installerTelephone(elements) {
@@ -170,6 +212,7 @@ export function installerTelephone(elements) {
 
   document.getElementById('btn-fermer-rail').addEventListener('click', fermerLesTiroirs);
   document.getElementById('btn-filtres').addEventListener('click', ouvrirLesFiltres);
+  document.getElementById('btn-compte').addEventListener('click', ouvrirLeCompte);
 
   // Toucher la scène referme : c'est le geste qu'on tente d'instinct devant un
   // panneau qui recouvre ce qu'on voulait regarder. `capture` parce que la vue

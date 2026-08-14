@@ -1372,19 +1372,28 @@ body.en-essai #btn-instantane { display: none; }
   .astuce-telephone { display: block; }
 
   .barre-haut { gap: 8px; padding: 7px 10px; flex-wrap: nowrap; }
-  .marque { min-width: 0; }
+  /* Un plancher, et non `min-width: 0`. Mesuré le 14/08/2026, boutons d'essai
+     encore dans la barre : la marque tombait à **9 px** de large — ni épée, ni
+     nom d'univers. `.marque-univers` sait déjà se rogner tout seul ; ce plancher
+     fait que c'est lui qui perd des lettres, et non l'ensemble qui disparaît. */
+  .marque { min-width: 5.5rem; }
   .marque-titre { display: none; }
   .marque-univers { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* `flex: none` sur les deux boutons de tiroir : sans ça, un nom d'univers
      long les comprimerait jusqu'à l'illisible plutôt que de se laisser rogner
      lui-même — et c'est lui qui peut se permettre de perdre des lettres. */
   .barre-controles { margin-left: auto; gap: 6px; flex: none; }
+  /* La marque doit rester lisible. Mesuré le 14/08/2026 avec les boutons
+     d'essai encore dans la barre : elle tombait à **9 px** de large — ni épée,
+     ni nom d'univers. Un plancher, pour que ce soit le nom qui perde des
+     lettres et non l'ensemble qui disparaisse. */
+  .marque { min-width: 5.5rem; }
   /* ☰ et 👤 sont la navigation entière de cet écran : ils méritent la même
      cible que le reste. `flex: none` en plus, pour qu'un nom d'univers long
      les comprime jamais — c'est lui qui peut se permettre de perdre des
      lettres, pas eux. */
   .barre-haut .bouton { min-height: 40px; }
-  #btn-rail, #btn-panneau { flex: none; min-width: 40px; }
+  #btn-rail, #btn-panneau, #btn-compte { flex: none; min-width: 40px; }
   /* Ce qui ne sert pas à naviguer quitte la barre. `telephone.js` le descend
      dans le rail ; ces règles restent la ceinture, si le script n'a pas encore
      tourné — sauf pour ☰ et 👤, qui doivent tenir dans tous les cas. */
@@ -1446,6 +1455,28 @@ body.en-essai #btn-instantane { display: none; }
   #accueil-telephone .champ select { min-height: 44px; }
   /* L'adresse du compte n'est pas un bouton : elle occupe sa propre ligne. */
   #accueil-telephone .compte { grid-column: 1 / -1; max-width: none; font-size: 12px; }
+  /* « Créer un compte » et « Se connecter », descendus ici depuis la barre du
+     haut. Ils tiennent la largeur entière et se partagent la ligne : c'est le
+     premier bloc que voit un visiteur qui touche 👤, et il n'a rien à chercher. */
+  #accueil-telephone .groupe-essai { grid-column: 1 / -1; gap: 8px; }
+  #accueil-telephone .groupe-essai .bouton { flex: 1; min-height: 44px; justify-content: center; }
+
+  /* Le bandeau d'essai : le texte, pas le bouton.
+   *
+   * Il portait la troisième « Créer un compte » de l'écran, et réclamait 103 px
+   * de haut sur 812 — 13 % de l'écran pour un rappel. Le bouton s'en va tant
+   * que le bandeau est calme : le 👤 de la barre est à un doigt, et le texte
+   * dit déjà quoi faire.
+   *
+   * Il revient dès que le bandeau est `.presse`, c'est-à-dire dès qu'on a
+   * modifié quelque chose et qu'il y a du travail à perdre. C'est exactement la
+   * distinction sur laquelle ce bandeau a été construit — discret tant qu'on
+   * regarde, insistant dès qu'on écrit — et non une exception de plus. */
+  .bandeau-essai { padding: 6px 10px; font-size: 11.5px; gap: 8px; }
+  .bandeau-essai:not(.presse) .bouton-primaire { display: none; }
+  .bandeau-essai.presse .bouton-primaire { min-height: 36px; }
+  .bandeau-essai-texte { min-width: 0; }
+  .bandeau-essai-fermer { min-width: 36px; min-height: 36px; }
 
   /* Cibles tactiles dans le rail.
    *

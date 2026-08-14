@@ -49,6 +49,40 @@ function bouton(libelle, surClic, classe = 'lien') {
   return b;
 }
 
+/**
+ * Recopie les en-têtes dans chaque cellule, pour que le tableau puisse cesser
+ * d'en être un.
+ *
+ * **Le défaut qu'on répare (12.B).** Mesuré le 14/08/2026 sur 375 px : le
+ * tableau des comptes faisait **715 px dans une boîte de 281** — 434 px de
+ * défilement latéral. Lire une ligne demandait de la faire glisser sous les
+ * yeux colonne par colonne, en retenant de mémoire à quoi correspondait chaque
+ * nombre, puisque l'en-tête, lui, était resté en haut.
+ *
+ * Sous 760 px, `.donnees.serree.cartes` cesse donc d'être une grille : chaque
+ * ligne devient une carte, et chaque cellule affiche son intitulé à gauche. Le
+ * CSS seul n'y suffit pas — une règle ne sait pas lire le `<th>` d'une colonne
+ * depuis une cellule. On l'inscrit donc ici, une fois par dessin.
+ *
+ * Un `<th>` vide ne donne pas d'intitulé : la cellule s'affiche alors pleine
+ * largeur, ce qui est exactement ce qu'on veut pour la colonne d'actions.
+ */
+function etiqueter(tbody) {
+  const table = tbody.closest('table');
+  const entetes = [...(table?.tHead?.rows[0]?.cells ?? [])].map(
+    (th) => th.dataset.libelle ?? th.textContent.trim()
+  );
+  for (const ligne of tbody.rows) {
+    [...ligne.cells].forEach((cellule, rang) => {
+      const intitule = entetes[rang];
+      // Une ligne « il n'y a rien » s'étale sur toute la largeur : lui coller un
+      // intitulé de colonne serait faux.
+      if (intitule && cellule.colSpan === 1) cellule.dataset.libelle = intitule;
+      else delete cellule.dataset.libelle;
+    });
+  }
+}
+
 /* ---------------------------------------------------------------- comptes */
 
 let comptes = [];
@@ -133,6 +167,14 @@ function dessinerComptes() {
       });
       const celluleCoche = el('td', null, 'coche');
       celluleCoche.append(caseACocher);
+      // Au téléphone, la cellule devient la ligne « Sélection » d'une carte :
+      // toute la bande se touche, et pas seulement les 22 px de la case. Sur
+      // écran large, la cellule fait la taille de la case et la règle ne change
+      // rien. Le garde sur `target` évite de défaire ce que la case vient de
+      // faire quand c'est elle qu'on a touchée.
+      celluleCoche.addEventListener('click', (evenement) => {
+        if (evenement.target !== caseACocher) caseACocher.click();
+      });
       ligne.append(celluleCoche);
 
       ligne.append(
@@ -165,6 +207,7 @@ function dessinerComptes() {
     })
   );
 
+  etiqueter($('corpsComptes'));
   majSelection();
 }
 
@@ -298,6 +341,7 @@ async function chargerIntendants() {
           ),
         ])
   );
+  etiqueter($('corpsIntendants'));
 }
 
 /**
@@ -388,6 +432,7 @@ async function chargerSauvegardes(compte) {
       : [ligneVide('Aucune sauvegarde.', 6)])
   );
 
+  etiqueter($('corpsSauvegardes'));
   $('carteSauvegardes').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -489,6 +534,7 @@ async function chargerJournal() {
         })
       : [ligneVide('Rien pour l’instant.', 4)])
   );
+  etiqueter($('corpsJournal'));
 }
 
 /* ------------------------------------------------------------------- lots */
@@ -989,6 +1035,137 @@ async function relever() {
   $('communDivergent').replaceChildren(
     ...(blocs.length ? blocs : [el('p', 'Rien à comparer.', 'note')])
   );
+
+  dessinerRapprochement(donnees.rapprochement);
+}
+
+/* ---------------------------------------------------- rapprochement (12.C) */
+
+/**
+ * Les fiches qu'une même table a écrites plusieurs fois, chacun de son côté.
+ *
+ * Le relevé du dessus compare les **catalogues** — maisons, catégories, types.
+ * Celui-ci compare les **fiches**, et c'est un autre problème : six joueurs qui
+ * saisissent le même personnage produisent six fiches, et il suffit d'un titre
+ * accolé au nom pour que deux d'entre elles cessent de se reconnaître. Le
+ * maître de jeu voit alors une divergence là où il n'y a qu'une orthographe.
+ *
+ * Deux accidents, et un seul appelle un geste :
+ *
+ * - **à unifier** — un nom, plusieurs identifiants. On propose d'aligner.
+ * - **renommées** — un identifiant, plusieurs noms. Personne n'est en double :
+ *   quelqu'un a renommé sa fiche, et c'est peut-être voulu. On le montre, on ne
+ *   propose rien.
+ */
+function dessinerRapprochement(fiches) {
+  if (!fiches) {
+    $('rapprochement').replaceChildren();
+    return;
+  }
+
+  const blocs = [
+    el(
+      'p',
+      `${fiches.a_unifier.length} nom(s) portés par plusieurs fiches · ${fiches.renommees.length} renommée(s) · ` +
+        `${fiches.alignees} déjà d’accord · ${fiches.propres} propre(s) à un seul compte`,
+      'note'
+    ),
+  ];
+
+  if (fiches.a_unifier.length) {
+    blocs.push(el('p', 'Même nom, identifiants différents', 'sous-titre'));
+    // Ce n'est pas une liste de doublons, et le dire autrement serait mentir.
+    // Constaté le 14/08/2026 sur le monde livré : « Brandon Stark » y est deux
+    // personnes — `brandon-stark-aine`, le frère d'Eddard, et `bran-stark`, son
+    // fils. Un rapprochement par le nom ne peut pas les distinguer, et ne doit
+    // donc pas conclure à leur place.
+    blocs.push(
+      el(
+        'p',
+        'Deux écritures d’une même personne, ou deux personnes qui portent le même nom : ' +
+          'seul vous pouvez trancher. Dans Westeros, « Brandon Stark » est les deux à la ' +
+          'fois — le frère d’Eddard et son fils Bran.',
+        'note'
+      )
+    );
+    for (const groupe of fiches.a_unifier) blocs.push(groupeDeFiches(groupe, true));
+  }
+  if (fiches.renommees.length) {
+    blocs.push(el('p', 'Même identifiant, noms différents — quelqu’un a renommé', 'sous-titre'));
+    for (const groupe of fiches.renommees) blocs.push(groupeDeFiches(groupe, false));
+  }
+  if (!fiches.a_unifier.length && !fiches.renommees.length) {
+    blocs.push(
+      el('p', 'Aucune fiche en double : les arbres de cette sélection sont d’accord.', 'note')
+    );
+  }
+
+  $('rapprochement').replaceChildren(...blocs);
+}
+
+/** Un groupe et ses écritures. Le bouton n'est offert que quand il a un sens. */
+function groupeDeFiches(groupe, proposerAlignement) {
+  const bloc = el('div', null, 'groupe-fiches');
+  bloc.append(
+    el(
+      'p',
+      `${groupe.label} — ${groupe.variantes.length} écritures, ${groupe.comptes} compte${
+        groupe.comptes > 1 ? 's' : ''
+      }`,
+      'titre-groupe'
+    )
+  );
+
+  const liste = el('ul', null, 'liste-variantes');
+  for (const variante of groupe.variantes) {
+    const item = el('li');
+    const gauche = el('div', null, 'variante-quoi');
+    gauche.append(el('span', variante.label, 'variante-nom'), el('code', variante.id));
+    gauche.append(
+      el(
+        'span',
+        `${variante.comptes.length} compte${variante.comptes.length > 1 ? 's' : ''} · ${variante.comptes.join(', ')}`,
+        'detail'
+      )
+    );
+    item.append(gauche);
+    if (proposerAlignement) {
+      item.append(bouton('Aligner tout le monde sur celle-ci', () => alignerSur(variante)));
+    }
+    liste.append(item);
+  }
+
+  bloc.append(liste);
+  return bloc;
+}
+
+/**
+ * Prépare un lot « fiche » à partir d'une écriture existante.
+ *
+ * On **prépare**, on n'applique pas : le lot garde sa règle — rien ne s'écrit
+ * sans un aperçu relu. Le bouton amène simplement le formulaire déjà rempli, à
+ * l'endroit où l'on relit avant d'écrire.
+ */
+function alignerSur(variante) {
+  $('choixOperation').value = 'personne';
+  construireFormulaire();
+
+  const poser = (nom, valeur) => {
+    const trouve = champsCourants.find((entree) => entree.champ.nom === nom);
+    if (trouve && trouve.entree instanceof HTMLElement) trouve.entree.value = valeur ?? '';
+  };
+  // L'identifiant surtout : c'est lui qui décide si le lot met à jour la fiche
+  // existante ou en fabrique une de plus.
+  poser('id', variante.id);
+  poser('prenom', variante.prenom);
+  poser('nom', variante.nom);
+  poser('maison', variante.maison);
+
+  perimerApercu();
+  message(
+    `Lot préparé sur « ${variante.label} » (${variante.id}). Relisez les champs, faites l’aperçu, puis appliquez.`
+  );
+  $('carteLots').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ------------------------------------------------------------- câblage */

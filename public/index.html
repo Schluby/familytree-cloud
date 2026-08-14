@@ -73,7 +73,14 @@
           <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter">⏻</button>
         </span>
         <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer le panneau de gauche">☰</button>
-        <button id="btn-panneau" class="bouton bouton-icone btn-telephone" title="Afficher/masquer la liste des personnes">👤</button>
+        <!-- Deux têtes pour la liste des personnes, une seule pour le compte :
+             au téléphone ces deux boutons se touchent, et il faut pouvoir les
+             distinguer sans lire l'infobulle — qui n'existe pas au doigt. -->
+        <button id="btn-panneau" class="bouton bouton-icone btn-telephone" title="Afficher/masquer la liste des personnes">👥</button>
+        <!-- Le compte au téléphone. Il remplace « Créer un compte » et « Se
+             connecter », qui réclamaient 240 px des 375 de la barre et n'en
+             laissaient que 9 à la marque. Voir `public/js/telephone.js`. -->
+        <button id="btn-compte" class="bouton bouton-icone btn-telephone" title="Votre compte et les réglages">👤</button>
       </div>
     </header>
 

@@ -24,7 +24,7 @@ import {
   creerEditeurType,
   creerFormulairePersonne,
 } from './editeurs.js';
-import { amenerLaFiche, installerTelephone } from './telephone.js';
+import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -2475,10 +2475,25 @@ function dessinerBandeauEssai() {
   }
   elements.bandeauEssai.hidden = false;
   elements.bandeauEssai.classList.toggle('presse', etat.essaiModifie);
+  // Deux longueurs pour un même propos. Sur 375 px, la phrase longue tenait sur
+  // trois lignes et le bandeau faisait 103 px de haut — 13 % de l'écran pour un
+  // rappel. Ce n'est pas un texte au rabais : c'est le même, dit dans la place
+  // dont on dispose, et il renvoie au 👤 qui a remplacé les boutons.
+  const court = surTelephone();
   elements.bandeauEssaiTexte.textContent = etat.essaiModifie
-    ? 'Vos modifications sont enregistrées, mais rattachées à ce navigateur seulement. Un compte suffit à les garder — adresse et mot de passe, rien d’autre.'
-    : 'Essai sans compte : vous pouvez tout modifier. Créez un compte quand vous voudrez retrouver ce travail ailleurs.';
+    ? court
+      ? 'Ce travail tient à ce navigateur seul. Un compte suffit à le garder.'
+      : 'Vos modifications sont enregistrées, mais rattachées à ce navigateur seulement. Un compte suffit à les garder — adresse et mot de passe, rien d’autre.'
+    : court
+      ? 'Essai sans compte : modifiez tout. 👤 en haut pour en créer un.'
+      : 'Essai sans compte : vous pouvez tout modifier. Créez un compte quand vous voudrez retrouver ce travail ailleurs.';
 }
+
+// Le texte dépend de la largeur : il doit donc se refaire quand elle change.
+// Sans ça, ouvrir en grand puis réduire laisse la phrase longue sur 375 px.
+window.addEventListener('resize', () => {
+  if (etat.invite) dessinerBandeauEssai();
+});
 
 /**
  * Première écriture d'un visiteur : là, il a quelque chose à perdre.

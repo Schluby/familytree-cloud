@@ -53,6 +53,7 @@ import {
   MAX_SAUVEGARDES,
   appliquerLot,
   panorama,
+  rapprochement,
   resoudreCibles,
   TYPES_OPERATION,
   type Cible,
@@ -604,6 +605,11 @@ async function preparerLot(
  * de liens, filtres et listes, avec ce qui est **commun à toute la sélection**
  * et ce qui n'appartient qu'à certains.
  *
+ * Depuis le lot 12.C, la même réponse porte le **rapprochement des fiches** :
+ * les personnes qu'une table a écrites plusieurs fois, chacun de son côté. Un
+ * seul relevé, deux lectures — le coût est déjà payé, les sauvegardes sont
+ * lues et analysées une fois pour toutes.
+ *
  * C'est une lecture, malgré le POST : la sélection tient mal dans une adresse
  * dès qu'elle dépasse la poignée de comptes.
  */
@@ -617,7 +623,8 @@ routesAdmin.post('/lots/panorama', async (c) => {
   const comptes = auPerimetre(demandes, c.get('perimetre'));
 
   const portee: Portee = corps.portee === 'active' ? 'active' : 'toutes';
-  return c.json(panorama(await resoudreCibles(c.env.DB, comptes, portee)));
+  const cibles = await resoudreCibles(c.env.DB, comptes, portee);
+  return c.json({ ...panorama(cibles), rapprochement: rapprochement(cibles) });
 });
 
 /** L'aperçu : exactement le même calcul, sans écrire ni journaliser. */

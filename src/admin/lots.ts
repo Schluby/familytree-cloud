@@ -575,6 +575,172 @@ export function panorama(cibles: Cible[]): Panorama {
   return { comptes, commun, divergent };
 }
 
+/* --------------------------------------------------------------------------
+ * Le rapprochement des fiches
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Une écriture d'une même personne : son identifiant, et qui la porte ainsi.
+ */
+export interface Variante {
+  id: string;
+  label: string;
+  prenom: string;
+  nom: string;
+  maison: string;
+  /** Les comptes dont l'arbre contient **cette** écriture-là. */
+  comptes: string[];
+}
+
+export interface GroupeFiches {
+  /** Ce qui rapproche les variantes : un nom normalisé, ou un identifiant. */
+  cle: string;
+  /** La forme la plus répandue, celle qu'on montre. */
+  label: string;
+  /** Combien de comptes distincts, toutes variantes confondues. */
+  comptes: number;
+  variantes: Variante[];
+}
+
+export interface Rapprochement {
+  /** Même nom, identifiants différents : deux fiches pour une personne. */
+  a_unifier: GroupeFiches[];
+  /** Même identifiant, noms différents : quelqu'un a renommé dans son coin. */
+  renommees: GroupeFiches[];
+  /** Présentes chez plusieurs comptes, et déjà d'accord. */
+  alignees: number;
+  /** Présentes chez un seul compte : rien à rapprocher. */
+  propres: number;
+}
+
+/**
+ * Le nom réduit à ce qui permet de reconnaître quelqu'un.
+ *
+ * Accents dépliés, casse effacée, ponctuation retirée, espaces resserrés.
+ * « Jon Snow », « jon snow » et « Jon  Snow » se rejoignent ; « Jon Snow » et
+ * « Jon Snow le Bâtard » restent séparés — et c'est voulu. Un rapprochement
+ * approximatif qui réunit deux personnages différents coûte plus cher que celui
+ * qu'il fait gagner : c'est une fiche écrasée dans l'arbre de quelqu'un.
+ */
+function normaliserNom(texte: string): string {
+  return texte
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Les fiches que plusieurs comptes ont écrites chacun de leur côté.
+ *
+ * **Le besoin.** Une table à six joue le même monde dans six arbres. Le même
+ * personnage y est créé six fois, et rien ne garantit qu'il porte six fois le
+ * même identifiant : il suffit qu'un joueur ait tapé « Petyr Baelish » là où un
+ * autre a mis « Petyr Baelish » avec un titre, et les deux fiches ne se
+ * reconnaîtront plus jamais. Le maître de jeu voit alors des divergences là où
+ * il n'y a qu'une orthographe.
+ *
+ * On sépare donc deux accidents, qui n'appellent pas le même geste :
+ *
+ * - **`a_unifier`** — un même nom sous plusieurs identifiants. C'est ce qu'on
+ *   corrige en posant une fiche de référence à tout le monde… **quand c'est
+ *   bien la même personne**. Ce n'est pas toujours vrai, et le rapprochement ne
+ *   peut pas le savoir : dans le monde livré avec l'application, « Brandon
+ *   Stark » désigne deux personnages — `brandon-stark-aine`, le frère d'Eddard,
+ *   et `bran-stark`, son fils. On signale, on ne conclut pas, et l'interface
+ *   dit cet exemple-là plutôt que de laisser croire à une liste de doublons.
+ * - **`renommees`** — un même identifiant sous plusieurs noms. Là, personne
+ *   n'est en double : quelqu'un a renommé sa fiche, et c'est peut-être exprès.
+ *   On le montre, on ne propose rien.
+ *
+ * **Ce que cette lecture ne fait pas** : elle ne fusionne rien. Poser une fiche
+ * de référence *ajoute ou met à jour* — elle ne supprime pas le doublon dans
+ * l'arbre où il vit, et ne rebranche pas ses liens. Ce serait une opération
+ * destructive à travers plusieurs comptes ; elle mérite son propre lot, avec
+ * son propre aperçu.
+ */
+export function rapprochement(cibles: Cible[]): Rapprochement {
+  /** cle normalisée → id de variante → variante, avec ses comptes. */
+  const parNom = new Map<string, Map<string, Variante>>();
+  /** id → cle normalisée → variante : la lecture inverse, pour les renommages. */
+  const parId = new Map<string, Map<string, Variante>>();
+
+  const ranger = (
+    index: Map<string, Map<string, Variante>>,
+    cle: string,
+    sousCle: string,
+    fabriquer: () => Variante,
+    compte: string
+  ) => {
+    let groupe = index.get(cle);
+    if (!groupe) index.set(cle, (groupe = new Map()));
+    let variante = groupe.get(sousCle);
+    if (!variante) groupe.set(sousCle, (variante = fabriquer()));
+    if (!variante.comptes.includes(compte)) variante.comptes.push(compte);
+  };
+
+  for (const cible of cibles) {
+    if (!cible.donnees) continue;
+    let dataset: Dataset;
+    try {
+      dataset = Dataset.depuisDict(JSON.parse(cible.donnees) as Objet);
+    } catch {
+      continue; // une sauvegarde illisible ne doit pas emporter le relevé
+    }
+    const compte = cible.email || `essai ${cible.utilisateurId.slice(0, 8)}`;
+
+    for (const personne of Object.values(dataset.personnes)) {
+      const label = personne.nomComplet;
+      const cle = normaliserNom(label);
+      if (!cle) continue;
+      const fabriquer = (): Variante => ({
+        id: personne.id,
+        label,
+        prenom: personne.prenom,
+        nom: personne.nom,
+        maison: personne.maison,
+        comptes: [],
+      });
+      ranger(parNom, cle, personne.id, fabriquer, compte);
+      ranger(parId, personne.id, cle, fabriquer, compte);
+    }
+  }
+
+  const rassembler = (index: Map<string, Map<string, Variante>>): GroupeFiches[] =>
+    [...index.entries()]
+      .filter(([, variantes]) => variantes.size > 1)
+      .map(([cle, variantes]) => {
+        const liste = [...variantes.values()].sort(
+          (a, b) => b.comptes.length - a.comptes.length || a.label.localeCompare(b.label)
+        );
+        const comptes = new Set(liste.flatMap((variante) => variante.comptes));
+        // Le libellé du groupe est celui de la variante la plus portée : c'est
+        // la graphie de la table, et non la première rencontrée par hasard.
+        return { cle, label: liste[0]?.label ?? cle, comptes: comptes.size, variantes: liste };
+      })
+      // D'abord ce qui touche le plus de monde : c'est là qu'un lot sert le plus.
+      .sort((a, b) => b.comptes - a.comptes || a.label.localeCompare(b.label));
+
+  let alignees = 0;
+  let propres = 0;
+  for (const variantes of parNom.values()) {
+    if (variantes.size > 1) continue;
+    const seule = [...variantes.values()][0];
+    if (!seule) continue;
+    if (seule.comptes.length > 1) alignees += 1;
+    else propres += 1;
+  }
+
+  return {
+    a_unifier: rassembler(parNom),
+    renommees: rassembler(parId),
+    alignees,
+    propres,
+  };
+}
+
 /** Ajoute les entrées d'un catalogue à la liste d'un compte, sans doublon. */
 function fusionner(liste: Nomme[], catalogue: Record<string, Objet>): void {
   const connus = new Set(liste.map((entree) => entree.id));

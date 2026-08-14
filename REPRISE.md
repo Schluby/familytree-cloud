@@ -116,6 +116,30 @@ le défaut que le 11.C n'avait pas vu :
   elle « Arbres » et « Nommer intendant ». Au téléphone elle redevient
   ordinaire — elle fait 386 px, elle y recouvrirait tout.
 
+Le lot 12, du 14/08/2026, reprend le téléphone une troisième fois. Ce qu'il
+laisse derrière lui :
+
+- **Un tiroir qu'on ouvre sur un bloc précis vise deux fois : tout de suite, et
+  à l'image suivante.** Le second passage existe parce que les positions ne
+  valent rien tant que le tiroir glisse ; le premier, parce que
+  `requestAnimationFrame` **ne se déclenche pas dans un document caché** — le
+  bloc visé restait alors à 3309 px du haut. `ouvrirLeRailSur` fait les deux, et
+  toute ouverture nouvelle doit passer par elle.
+- **Un pictogramme par sens, et deux qui se touchent doivent se distinguer sans
+  infobulle** : 👥 pour la liste des personnes, 👤 pour le compte. Au doigt il
+  n'y a pas de survol.
+- **`.donnees.serree.cartes` n'est pas décoratif** : sous 760 px, la table cesse
+  d'être une grille et chaque cellule affiche son intitulé, recopié par
+  `etiqueter()`. **Un nouveau tableau d'action doit porter la classe et appeler
+  `etiqueter()` après son dessin**, sinon ses cartes s'affichent sans étiquettes
+  — des valeurs nues, sans rien pour dire ce qu'elles sont. Les tableaux de
+  relevé (panorama, résultat de lot, arbre à plat) ne la portent pas, exprès :
+  on les compare ligne à ligne, et leur défilement latéral est correct.
+- **À 375 px, rien de ce qui se touche ne descend sous 40 px sur la page
+  d'administration.** Les cases à cocher font 22 px, mais dans une bande de 40
+  qui les commande — le clic est transmis depuis la cellule, avec un garde sur
+  `target` pour ne pas défaire ce que la case vient de faire.
+
 Le lot 11.B, du même jour, répond à la question « le lien de campagne, est-ce
 que ça crée une vue partagée ? » — **non** : `meta.document` est une adresse
 http(s) vers un document hébergé ailleurs, rien d'autre. Le partage, lui, ouvre
@@ -332,6 +356,19 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   (`identifiantDuLot`). Le réflexe naturel — appeler `idsLibres()` par
   sauvegarde, comme le font les routes du domaine — fabriquerait `tully` chez
   les uns et `tully-2` chez les autres, et rendrait le lot non rejouable.
+- **`rapprochement` (12.C) rapproche par le nom, et un nom n'identifie
+  personne.** Sur le monde livré, « Brandon Stark » désigne deux personnages :
+  `brandon-stark-aine`, le frère d'Eddard, et `bran-stark`, son fils. Aucune
+  normalisation ne les distinguera. Toute formulation qui conclut — « doublons »,
+  « à fusionner », un bouton qui agirait sans aperçu — ment sur un cas du
+  produit. **On signale, l'humain tranche.** Et surtout : ne jamais élargir la
+  clé à de l'approximatif (préfixes, distance d'édition). Un rapprochement trop
+  large réunit deux personnages différents, et ce qu'on gagne se paie d'une
+  fiche écrasée dans l'arbre de quelqu'un.
+- **Le rapprochement voyage dans la réponse du panorama**, il n'a pas de route à
+  lui. C'est voulu : les sauvegardes sont déjà lues et analysées, une seconde
+  route les relirait toutes. Une route neuve ici serait aussi une garde de
+  périmètre de plus à ne pas oublier.
 
 **Ce que l'administration ne doit jamais devenir :**
 

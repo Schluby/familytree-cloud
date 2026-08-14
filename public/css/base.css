@@ -286,15 +286,101 @@ body.tres-large main { max-width: 68rem; }
     -8px 0 8px -8px rgba(0, 0, 0, .55);
 }
 
-/* Au téléphone, la coller serait pire que le mal : cette colonne fait 386 px,
-   soit plus large que l'écran — elle recouvrirait tout le tableau. Elle
-   redevient une colonne ordinaire, et ses boutons s'empilent. */
+/* -------------------------------------------- l'administration au doigt (12.B)
+ *
+ * Mesuré le 14/08/2026 sur 375 px : le tableau des comptes faisait **715 px
+ * dans une boîte de 281** — 434 px de défilement latéral pour lire une ligne,
+ * colonne par colonne, l'en-tête resté hors champ. Et les cases à cocher, dont
+ * dépendent les lots, le panorama et les tutelles, mesuraient **13 × 13 px**.
+ *
+ * Un tableau de sept colonnes ne rentre pas dans 375 px et n'y rentrera jamais.
+ * On cesse donc d'en faire un : chaque ligne devient une carte, chaque cellule
+ * porte l'intitulé de sa colonne à gauche. Les tableaux qui restent des
+ * tableaux — le panorama, le résultat d'un lot, l'arbre à plat — n'ont pas la
+ * classe `cartes` : ce sont des relevés qu'on parcourt, pas des objets sur
+ * lesquels on agit, et leur défilement latéral est le bon comportement.
+ */
 @media (max-width: 760px) {
+  /* 1,5 rem de marge de chaque côté sur un écran de 375, c'est 13 % de la
+     largeur donnée au vide. */
+  body { padding: .8rem; }
+  .carte { padding: .9rem; }
+
+  /* La colonne d'actions collée serait pire que le mal : elle fait 386 px, plus
+     large que l'écran — elle recouvrirait le tableau qu'elle accompagne. */
   .donnees.serree td.actions,
   .donnees.serree thead th:last-child { position: static; box-shadow: none; }
   .donnees.serree td.actions { white-space: normal; }
   .donnees.serree td.actions .lien,
-  .donnees.serree td.actions a { min-height: 34px; display: inline-flex; align-items: center; }
+  .donnees.serree td.actions a { display: inline-flex; align-items: center; }
+
+  /* Le tableau cesse d'être une grille. `display: block` partout : les cellules
+     ne sont plus alignées entre lignes, et c'est exactement le but. */
+  .donnees.serree.cartes,
+  .donnees.serree.cartes tbody,
+  .donnees.serree.cartes tr,
+  .donnees.serree.cartes td { display: block; width: auto; }
+  .donnees.serree.cartes { white-space: normal; }
+  .donnees.serree.cartes thead { display: none; }
+
+  .donnees.serree.cartes tr {
+    border: 1px solid var(--bord);
+    border-radius: .5rem;
+    padding: .55rem .7rem;
+    margin-bottom: .7rem;
+  }
+  .donnees.serree.cartes td {
+    display: flex;
+    gap: .6rem;
+    align-items: baseline;
+    padding: .22rem 0;
+    border-bottom: 0;
+  }
+  /* L'intitulé vient du `<th>`, recopié par `etiqueter()`. Une cellule sans
+     intitulé — la colonne d'actions, une ligne « il n'y a rien » — s'étale sur
+     toute la largeur, ce qui est le bon rendu pour elles. */
+  .donnees.serree.cartes td[data-libelle]::before {
+    content: attr(data-libelle);
+    flex: 0 0 7rem;
+    color: var(--encre-douce);
+    font-size: .78rem;
+  }
+
+  /* La case à cocher gouverne toute la carte : c'est elle qui décide si le
+     compte entre dans un lot. À 13 px, on la manquait une fois sur deux. */
+  .donnees.serree.cartes td.coche {
+    width: auto;
+    min-height: 40px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .donnees.serree.cartes input[type='checkbox'] { width: 22px; height: 22px; }
+
+  .donnees.serree.cartes td.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem .9rem;
+    margin-top: .45rem;
+    padding-top: .45rem;
+    border-top: 1px solid var(--bord);
+  }
+
+  /* Une seule règle pour toute la page : à cette largeur, rien de ce qui se
+     touche ne descend sous 40 px. « ← Revenir à mes arbres », le seul bouton
+     toujours présent, en faisait 23. */
+  .lien,
+  .bouton { min-height: 40px; display: inline-flex; align-items: center; }
+
+  /* Les champs du formulaire de lot. `font-size: 16px` n'est pas une
+     coquetterie : en dessous, iOS zoome sur le champ au premier appui et laisse
+     la page décadrée, impossible à récupérer d'une main. */
+  select,
+  textarea,
+  input:not([type='checkbox']) { min-height: 40px; font-size: 16px; }
+  /* Les bascules du lot — « Poser la date », « Poser le lien de campagne » —
+     décidaient d'un geste sur tous les arbres d'une table depuis 13 px. */
+  .bascule { min-height: 40px; }
+  .bascule input[type='checkbox'] { width: 22px; height: 22px; }
 }
 
 .actions { display: flex; gap: .6rem; align-items: center; }
@@ -387,6 +473,40 @@ input:disabled, select:disabled, textarea:disabled { opacity: .45; }
   color: var(--encre-douce);
 }
 .etiquettes li.partage { border-color: var(--reussite); color: var(--reussite); }
+
+/* ------------------------------ le rapprochement des fiches (12.C) */
+
+/* Un groupe = une personne, et ses écritures concurrentes. Pas un tableau :
+   il n'y a que deux ou trois lignes par groupe, et chacune porte un bouton —
+   une liste se lit mieux, et tient au téléphone sans défiler de côté. */
+.groupe-fiches {
+  border: 1px solid var(--bord);
+  border-radius: .5rem;
+  padding: .6rem .8rem;
+  margin-top: .7rem;
+}
+.groupe-fiches .titre-groupe { margin: 0; font-weight: 600; font-size: .92rem; }
+
+.liste-variantes { list-style: none; margin: .5rem 0 0; padding: 0; }
+.liste-variantes li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: .45rem 0;
+  border-top: 1px solid var(--bord);
+}
+.variante-quoi { display: flex; flex-wrap: wrap; gap: .2rem .6rem; align-items: baseline; }
+.variante-nom { font-size: .88rem; }
+/* L'identifiant est la vraie information de cette ligne : c'est lui qui décide
+   si un lot met à jour la fiche ou en fabrique une de plus. */
+.liste-variantes code { font-size: .78rem; color: var(--accent); }
+.liste-variantes .detail {
+  flex-basis: 100%;
+  font-size: .78rem;
+  color: var(--encre-douce);
+}
 
 /* ------------------------------------------- la connexion Google (10.C) */
 

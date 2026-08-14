@@ -1207,3 +1207,110 @@ dans la même colonne invisible.
 l'horizontale ; barre du bas à sept commandes de 40 px dans 332 px de large ;
 « ⛨ Filtres » amène le bloc des maisons à 226 px du haut d'un écran de 812, et
 toucher une maison en éteint 18 sur 19.
+
+# Lot 12 — Le téléphone d'un visiteur, l'administration au doigt, et les fiches écrites deux fois  ☑
+
+*Demandé le 14/08/2026 : « dès qu'on utilise le tél, il y a 3 boutons qui
+prennent toute la place et inutile (Connexion et inscrivez-vous ×2), à retirer
+pour ne laisser qu'un pictogramme de tête à cliquer » ; puis « design et teste
+la partie administrateur intermédiaire, réfléchis à un usage réel — checker les
+vues de ses joueurs, ajouter des trucs, checker différentes versions de profils
+similaires, les regrouper si ce sont les mêmes, et push les modifs ».*
+
+## 12.A — Trois boutons pour une idée, et la marque n'avait plus de place
+
+Mesuré sur 375 px, en essai sans compte :
+
+| | avant | après |
+|---|---|---|
+| `#groupe-essai` dans la barre du haut | **240 px des 375** | descendu dans le tiroir |
+| `.marque` (⚔ + nom de l'univers) | **9 px** — écrasée à rien | **77 px**, « ⚔ Westeros » lisible |
+| `#bandeau-essai` (+ sa 3ᵉ « Créer un compte ») | **103 px de haut** | **49 px** |
+| premier pixel d'arbre | 158 px | **118 px** |
+
+- ☑ `#groupe-essai` **descend dans le tiroir** avec le reste des réglages. Il
+  n'y descendait pas, au motif que « Créer un compte » est l'appel à l'action
+  d'un visiteur ; la mesure a tranché contre l'argument.
+- ☑ Un **👤** dans la barre ouvre le tiroir **déroulé sur le bloc du compte** —
+  « Créer un compte » et « Se connecter » y sont, pleine largeur, à 44 px.
+  Le 👤 de la liste des personnes devient **👥** : les deux boutons se touchent,
+  il faut pouvoir les distinguer sans infobulle.
+- ☑ Le bandeau d'essai **garde son texte et perd son bouton** tant qu'il est
+  calme ; il le retrouve dès qu'on a modifié quelque chose et qu'il y a du
+  travail à perdre. C'est la distinction sur laquelle ce bandeau était déjà
+  construit, pas une exception de plus.
+- ☑ Le texte du bandeau a **deux longueurs**, choisies sur la largeur.
+
+**Un défaut trouvé en passant, et corrigé.** `ouvrirLesFiltres` visait son bloc
+dans un `requestAnimationFrame`. Dans un document caché, l'image suivante
+n'arrive jamais : le bloc visé restait à **3309 px** du haut du tiroir et le
+geste ne montrait rien. Le défilement se fait maintenant tout de suite **et** à
+l'image suivante — un défilement de trop ne se voit pas, un défilement manquant
+si.
+
+## 12.B — L'administration au doigt
+
+Mesuré sur 375 px :
+
+| | avant | après |
+|---|---|---|
+| tableau des comptes | **715 px dans une boîte de 281** | **320 dans 320**, zéro défilement |
+| case à cocher (lots, panorama, tutelles) | **13 × 13 px** | 22 px dans une **bande tactile de 40** |
+| « ← Revenir à mes arbres » | 23 px de haut | 40 px |
+| marge de `body` | 1,5 rem, soit 13 % de la largeur | 0,8 rem |
+
+Un tableau de sept colonnes ne rentre pas dans 375 px et n'y rentrera jamais.
+Sous 760 px il **cesse d'être un tableau** : chaque ligne devient une carte,
+chaque cellule porte l'intitulé de sa colonne à gauche. Le CSS seul n'y suffit
+pas — une règle ne sait pas lire le `<th>` d'une colonne depuis une cellule ;
+`etiqueter()` le recopie une fois par dessin.
+
+- ☑ Comptes, intendants, sauvegardes et journal portent la classe `cartes`.
+- ☑ Le panorama, le résultat d'un lot et l'arbre à plat **ne l'ont pas** : ce
+  sont des relevés qu'on parcourt et qu'on compare ligne à ligne, pas des objets
+  sur lesquels on agit. Leur défilement latéral est le bon comportement, et le
+  panorama en garde 301 px — dans sa propre boîte, jamais la page.
+- ☑ À cette largeur, **rien de ce qui se touche ne descend sous 40 px**. Les
+  seules exceptions mesurées sont des cases à cocher de 22 px posées dans une
+  bande de 40 qui les commande.
+
+## 12.C — Les mêmes fiches, écrites plusieurs fois
+
+Le panorama comparait les **catalogues** — maisons, catégories, types de liens,
+filtres, listes. Il compare maintenant aussi les **fiches**, et c'est un autre
+problème : six joueurs qui saisissent le même personnage produisent six fiches,
+et il suffit d'un titre accolé au nom pour que deux d'entre elles cessent de se
+reconnaître. Le maître de jeu voit alors une divergence là où il n'y a qu'une
+orthographe.
+
+- ☑ **Même nom, identifiants différents.** Le cas qu'on vient chercher.
+- ☑ **Même identifiant, noms différents.** Personne n'est en double : quelqu'un
+  a renommé sa fiche, et c'est peut-être voulu. On le montre, on ne propose
+  rien.
+- ☑ **« Aligner tout le monde sur celle-ci »** remplit le formulaire de lot avec
+  la fiche choisie — identifiant compris, puisque c'est lui qui décide si le lot
+  met à jour ou fabrique une fiche de plus. Le lot garde sa règle : rien ne
+  s'écrit sans un aperçu relu.
+- ☑ Un seul relevé, deux lectures : le rapprochement voyage dans la réponse du
+  panorama, dont les sauvegardes sont déjà lues et analysées.
+- ☑ Borné au périmètre de l'intendant comme le reste de la route.
+
+**Ce que le rapprochement ne fait pas, et pourquoi c'est écrit dans la page.**
+Il rapproche **par le nom**, et deux personnes peuvent porter le même. Constaté
+sur le monde livré avec l'application : « Brandon Stark » y désigne deux
+personnages — `brandon-stark-aine`, le frère d'Eddard, et `bran-stark`, son
+fils. Le premier intitulé disait « à unifier » ; il mentait sur un cas du
+produit. Il dit maintenant « même nom, identifiants différents », et la page
+donne cet exemple-là. **On signale, on ne conclut pas.**
+
+Il ne **fusionne** rien non plus : poser une fiche de référence ajoute ou met à
+jour, mais ne supprime pas l'autre dans l'arbre où elle vit et ne rebranche pas
+ses liens. Ce serait une opération destructive à travers plusieurs comptes ;
+elle mérite son propre lot, avec son propre aperçu. **Non fait, à décider.**
+
+## Vérification
+
+**489/489.** Les mesures ne sont pas dans le harnais : elles sont dans les deux
+tableaux ci-dessus, prises au navigateur à 375 × 812 avec les transitions
+neutralisées, et confirmées à 1280 px (l'écran large est inchangé : le tableau
+reste un tableau, l'en-tête reste visible, la colonne d'actions reste collante).
