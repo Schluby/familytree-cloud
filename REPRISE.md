@@ -140,6 +140,36 @@ laisse derrière lui :
   qui les commande — le clic est transmis depuis la cellule, avec un garde sur
   `target` pour ne pas défaire ce que la case vient de faire.
 
+Le lot 13, du même jour, retire l'en-tête du tiroir et le ☰. Quatre choses à ne
+pas défaire :
+
+- **`[hidden] { display: none !important; }` reste, dans `app.css` comme dans
+  `base.css`.** Le `display: none` d'un élément `hidden` est une règle d'agent
+  utilisateur : **la moindre règle d'auteur qui donne un `display` la bat**.
+  Cinq éléments l'ont payé, dont `#bandeau-procuration`, qui annonçait « vous
+  écrivez chez les autres » à quelqu'un qui écrivait chez lui. Ne jamais retirer
+  cette règle en la croyant redondante, et ne jamais cacher par une classe ce
+  que `hidden` dit déjà.
+- **Le tiroir de gauche n'a plus de croix : ses deux boutons sont des
+  bascules.** ⛨ et 👤 referment ce qu'ils ouvrent, en comparant `dataset.sur`.
+  **Toute nouvelle façon d'ouvrir ce tiroir doit passer par `ouvrirLeRailSur`**,
+  sinon elle ouvre quelque chose qui ne se referme plus.
+- **`.barre-basse` est à `z-index: 40`, au-dessus des tiroirs, exprès.** C'est
+  ce qui garde « ⛨ Filtres » sous le doigt tiroir ouvert — donc ce qui fait de
+  lui une sortie. La réserve de 72 px en bas du tiroir va avec : sans elle, son
+  dernier bloc se termine sous la barre.
+- **Ce qui décrit un nœud déménageable se pose sur le nœud, pas sur son
+  parent.** `.groupe-compte .lib { display: none }` cessait de s'appliquer dès
+  que `telephone.js` descendait le bouton dans le tiroir. La règle porte
+  maintenant sur `#lien-admin`, `#lien-donnees`, `#btn-deconnexion`.
+
+Et un défaut de rôle à ne pas refabriquer : **`#lien-admin` (⚙) doit apparaître
+à `admin` *et* à `intendant`** — miroir de `exigerGestion`. La condition était
+restée sur `admin` seul depuis le lot 7, quand ce rôle était le seul au-dessus
+de `membre` : un intendant, à qui `/admin` répond pourtant 200, n'avait aucune
+porte pour y aller. Toute condition d'affichage écrite sur un rôle doit être
+relue quand un rôle est ajouté.
+
 Le lot 11.B, du même jour, répond à la question « le lien de campagne, est-ce
 que ça crée une vue partagée ? » — **non** : `meta.document` est une adresse
 http(s) vers un document hébergé ailleurs, rien d'autre. Le partage, lui, ouvre

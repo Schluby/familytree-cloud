@@ -56,19 +56,29 @@ export function surTelephone() {
  * données » (🛡), qui reste, est le vrai endroit pour sortir ses données. Ils ne
  * descendent donc pas : ils sont éteints par le CSS.
  */
+/**
+ * **Deux destinations depuis le 14/08/2026 (13.B).** Tout arrivait dans un seul
+ * bloc « Compte et réglages » : l'adresse du compte y voisinait avec le choix
+ * de couleur et l'année de campagne. Ce sont deux questions qu'on ne se pose
+ * jamais en même temps — « qui suis-je, comment je sors » d'un côté, « comment
+ * s'affiche l'arbre » de l'autre. Le 👤 de la barre ouvre le tiroir sur le
+ * premier, et le second suit en dessous pour qui le cherche.
+ */
 const A_DESCENDRE = [
-  // En tête : pour un visiteur, c'est la seule chose de ce bloc qui compte.
-  '#groupe-essai',
-  '#btn-vue-generale',
-  '#selecteur-couleur',
-  '#lien-document',
-  '#btn-annee',
-  '#btn-theme',
-  '#compte',
-  '#lien-admin',
-  '#lien-donnees',
-  '#btn-deconnexion',
+  {
+    vers: 'accueil-compte',
+    // « Créer un compte » et « Se connecter » en tête : pour un visiteur, c'est
+    // la seule chose de ce bloc qui existe.
+    quoi: ['#groupe-essai', '#compte', '#lien-admin', '#lien-donnees', '#btn-deconnexion'],
+  },
+  {
+    vers: 'accueil-telephone',
+    quoi: ['#btn-vue-generale', '#selecteur-couleur', '#lien-document', '#btn-annee', '#btn-theme'],
+  },
 ];
+
+/** Tous les sélecteurs, dans l'ordre où ils descendent. */
+const TOUT = A_DESCENDRE.flatMap((groupe) => groupe.quoi);
 
 /** D'où chaque nœud vient, pour savoir le remettre. */
 const places = new Map();
@@ -86,15 +96,18 @@ function bloc(selecteur) {
 }
 
 function descendre() {
-  const accueil = document.getElementById('accueil-telephone');
-  for (const selecteur of A_DESCENDRE) {
-    const noeud = bloc(selecteur);
-    if (!noeud || noeud.parentNode === accueil) continue;
-    if (!places.has(noeud)) {
-      places.set(noeud, { parent: noeud.parentNode, suivant: noeud.nextSibling });
+  for (const groupe of A_DESCENDRE) {
+    const accueil = document.getElementById(groupe.vers);
+    for (const selecteur of groupe.quoi) {
+      const noeud = bloc(selecteur);
+      if (!noeud || noeud.parentNode === accueil) continue;
+      if (!places.has(noeud)) {
+        places.set(noeud, { parent: noeud.parentNode, suivant: noeud.nextSibling });
+      }
+      accueil.append(noeud);
     }
-    accueil.append(noeud);
   }
+  document.getElementById('bloc-compte').hidden = false;
   document.getElementById('bloc-telephone').hidden = false;
 }
 
@@ -102,22 +115,16 @@ function remonter() {
   // À rebours : chaque nœud se repose devant celui qui le suivait, et ce
   // suivant doit donc être déjà revenu. Dans l'ordre direct, on insérerait
   // devant un nœud encore exilé — c'est-à-dire nulle part.
-  for (const selecteur of [...A_DESCENDRE].reverse()) {
+  for (const selecteur of [...TOUT].reverse()) {
     const noeud = bloc(selecteur);
     const place = noeud && places.get(noeud);
     if (!place) continue;
     place.parent.insertBefore(noeud, place.suivant);
   }
+  document.getElementById('bloc-compte').hidden = true;
   document.getElementById('bloc-telephone').hidden = true;
 }
 
-/**
- * Câble la bascule, et les deux sorties du tiroir de gauche.
- *
- * Le volet de droite avait son ✕ depuis le lot 8 ; le rail n'en avait pas. Sur
- * un tiroir qui couvre tout l'écran, ne pas pouvoir sortir revient à ne pas
- * pouvoir entrer.
- */
 /** Les deux tiroirs, retenus pour que les ouvertures d'ailleurs y accèdent. */
 let volets = null;
 
@@ -138,14 +145,15 @@ export function amenerLaFiche() {
 }
 
 /**
- * Ouvre le rail **déroulé sur les filtres**.
+ * Ouvre le tiroir de gauche **déroulé sur un bloc précis** — ou le referme.
  *
- * Les maisons et les types de liens sont ce qu'on vient régler le plus souvent,
- * et ils vivaient à six blocs du haut du tiroir. Le bouton « ⛨ Filtres » de la
- * barre du bas y mène directement.
- */
-/**
- * Ouvre le tiroir de gauche **déroulé sur un bloc précis**.
+ * **Bascule depuis le 14/08/2026 (13.A).** Le tiroir avait une barre collante
+ * portant « Menu » et une croix : 341 × 61 px, sur 694 px de hauteur utile.
+ * Signalée comme inutile, et elle l'était pour neuf dixièmes — mais la croix
+ * était **la seule sortie**, le tiroir couvrant tout l'écran. On la remplace
+ * par la règle qu'on essaie d'instinct : le bouton qui ouvre referme. Il en
+ * reste deux, ⛨ et 👤, et tous deux restent sous le doigt tiroir ouvert (la
+ * barre du haut n'est pas recouverte, la barre du bas est passée au-dessus).
  *
  * Le défilement se fait deux fois : tout de suite, et à l'image suivante. Ce
  * n'est pas une précaution superstitieuse. Le second passage existe parce que
@@ -159,8 +167,16 @@ export function amenerLaFiche() {
  */
 function ouvrirLeRailSur(idBloc) {
   if (!volets) return;
+  // Déjà ouvert **sur ce bloc-là** : le même geste referme. On compare le bloc
+  // visé, pour que passer des filtres au compte n'exige pas de fermer d'abord.
+  if (surTelephone() && volets.rail.classList.contains('ouvert') && volets.rail.dataset.sur === idBloc) {
+    volets.rail.classList.remove('ouvert');
+    delete volets.rail.dataset.sur;
+    return;
+  }
   volets.rail.classList.add('ouvert');
   volets.rail.classList.remove('replie');
+  volets.rail.dataset.sur = idBloc;
   volets.panneauVolet.classList.remove('ouvert');
   const viser = () => document.getElementById(idBloc)?.scrollIntoView({ block: 'start' });
   viser();
@@ -180,7 +196,7 @@ export function ouvrirLesFiltres() {
  * boutons mêmes ; pour un compte, sur son adresse, ⚙, 🛡 et ⏻.
  */
 export function ouvrirLeCompte() {
-  ouvrirLeRailSur('bloc-telephone');
+  ouvrirLeRailSur('bloc-compte');
 }
 
 export function installerTelephone(elements) {
@@ -207,10 +223,10 @@ export function installerTelephone(elements) {
 
   const fermerLesTiroirs = () => {
     elements.rail.classList.remove('ouvert');
+    delete elements.rail.dataset.sur;
     elements.panneauVolet.classList.remove('ouvert');
   };
 
-  document.getElementById('btn-fermer-rail').addEventListener('click', fermerLesTiroirs);
   document.getElementById('btn-filtres').addEventListener('click', ouvrirLesFiltres);
   document.getElementById('btn-compte').addEventListener('click', ouvrirLeCompte);
 

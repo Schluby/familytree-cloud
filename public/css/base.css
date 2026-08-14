@@ -142,6 +142,11 @@ button.principal:disabled { opacity: .55; cursor: progress; }
 
 .cache { display: none !important; }
 
+/* Même garde que dans `app.css` : le `display: none` d'un élément `hidden` est
+   une règle d'agent utilisateur, que la moindre règle d'auteur bat. Ces pages
+   n'ont pas encore payé ce défaut ; elles ne le paieront pas. */
+[hidden] { display: none !important; }
+
 /* --------------------------------------------------------------------------
  * La liste des sauvegardes (provisoire : l'interface des arbres arrive au
  * lot 4, celle-ci sert à manipuler ses mondes en attendant).

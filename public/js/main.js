@@ -2450,12 +2450,46 @@ async function dessinerCompte() {
   if (etat.invite) dessinerBandeauEssai();
 
   elements.compte.textContent = compte.nom_affiche || compte.email || '';
-  elements.compte.title =
-    `${compte.email || ''}${compte.role === 'admin' ? ' · administrateur' : ''}`;
-  // Le lien n'apparaît que pour un admin. Ce n'est pas ce qui protège la page
-  // — c'est `exigerAdmin`, côté serveur — mais un bouton qui mène à un 403 ne
-  // sert personne.
-  if (elements.lienAdmin) elements.lienAdmin.hidden = compte.role !== 'admin';
+  elements.compte.title = `${compte.email || ''}${ROLES[compte.role] ? ` · ${ROLES[compte.role]}` : ''}`;
+  // Le lien n'apparaît qu'à qui la page répondra. Ce n'est pas ce qui la
+  // protège — c'est `exigerGestion`, côté serveur — mais un bouton qui mène à
+  // un 403 ne sert personne, et un bouton absent pour qui y a droit non plus :
+  // **un intendant l'a**. Il ne l'avait pas jusqu'au 14/08/2026, la condition
+  // étant restée sur `admin` seul depuis le lot 7, quand ce rôle était le seul.
+  if (elements.lienAdmin) elements.lienAdmin.hidden = !PEUVENT_ADMINISTRER.has(compte.role);
+
+  dessinerAideCompte(compte);
+}
+
+/** Ce que les rôles se disent en français, dans l'application. */
+const ROLES = {
+  admin: 'administrateur',
+  intendant: 'intendant',
+  membre: 'membre',
+  invite: 'essai sans compte',
+};
+
+/** Les rôles auxquels `/admin` répond. Miroir de `exigerGestion`. */
+const PEUVENT_ADMINISTRER = new Set(['admin', 'intendant']);
+
+/**
+ * La ligne d'état du bloc « Votre compte », au téléphone (13.B).
+ *
+ * Le bloc ne montrait que des boutons ; qui l'ouvre veut d'abord savoir **sous
+ * quel compte il travaille**. L'adresse seule ne suffit pas : le rôle décide de
+ * ce que la page d'administration lui montrera, et c'est justement ce qu'on
+ * vient vérifier quand on l'ouvre.
+ */
+function dessinerAideCompte(compte) {
+  const aide = document.getElementById('aide-compte');
+  if (!aide) return;
+  if (compte.role === 'invite') {
+    aide.textContent =
+      'Vous travaillez sans compte : ce monde est rattaché à ce navigateur seulement.';
+    return;
+  }
+  const role = ROLES[compte.role] || compte.role || '';
+  aide.textContent = `${compte.email || 'compte sans adresse'}${role ? ` — ${role}` : ''}.`;
 }
 
 /* ------------------------------------------------------- l'essai sans compte

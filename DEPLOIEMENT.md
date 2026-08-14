@@ -282,6 +282,24 @@ devient une carte, chaque valeur porte son intitulé, et la colonne de droite
 passe en bas de la carte. La ligne « Sélection » se touche sur toute sa
 largeur — la case seule faisait 13 px.
 
+**Pour entrer dans la page**, depuis l'application : le **⚙** de la barre du
+haut, ou — au téléphone — le **👤**, qui ouvre le tiroir sur « Votre compte »,
+où il s'appelle **« ⚙ Administration »**. Il apparaît aux administrateurs
+**et aux intendants** (depuis le lot 13.B ; avant, un intendant devait taper
+`/admin` à la main).
+
+### Redonner le rôle d'administrateur
+
+Nommer quelqu'un intendant est réversible depuis la page. **Reprendre le rôle
+`admin`, non** — il ne s'accorde qu'en SQL, dans les deux sens :
+
+```bash
+npx wrangler d1 execute familytree --remote --command "UPDATE utilisateurs SET role='admin' WHERE email_norm='vous@exemple.fr'"
+```
+
+Gardez toujours **un second compte administrateur** : un instance dont le seul
+admin s'est démis lui-même ne se rattrape que par cette commande.
+
 ### Rapprocher les fiches d'une même table (lot 12.C)
 
 Une table qui joue le même monde à plusieurs l'écrit plusieurs fois : le même

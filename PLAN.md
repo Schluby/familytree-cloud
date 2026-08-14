@@ -1314,3 +1314,91 @@ elle mérite son propre lot, avec son propre aperçu. **Non fait, à décider.**
 tableaux ci-dessus, prises au navigateur à 375 × 812 avec les transitions
 neutralisées, et confirmées à 1280 px (l'écran large est inchangé : le tableau
 reste un tableau, l'en-tête reste visible, la colonne d'actions reste collante).
+
+# Lot 13 — Le tiroir sans sa barre, et « hidden » qui cache enfin  ☑
+
+*Demandé le 14/08/2026, après le lot 12 : « retire le kebab menu, qui prend les
+mêmes options que la petite icône de tête » ; « retirer la grosse barre qui nous
+suit (“Menu” puis plus loin une croix), totalement useless sur téléphone » ;
+« laisse l'option de créer un compte ou se connecter seulement si l'utilisateur
+n'est pas connecté — s'il est connecté, une vue de son profil, pour voir les
+détails de son compte et se déconnecter ».*
+
+## 13.A — Trois boutons pour un tiroir, sur l'écran où la place manque
+
+☰ ouvrait le même tiroir que 👤 et que « ⛨ Filtres ». Il s'en va au téléphone ;
+restent les deux qui disent **où** ils mènent.
+
+L'en-tête du tiroir mesurait **341 × 61 px, collants**, sur une hauteur utile de
+**694 px** — 9 % dépensés en permanence pour le mot « Menu » et une croix. Il
+disparaît, balisage compris.
+
+Mais la croix, elle, servait : c'était **la seule sortie**, le tiroir couvrant
+tout l'écran. Deux mesures l'ont remplacée :
+
+- ☑ **Le bouton qui ouvre referme.** ⛨ et 👤 sont des bascules, et elles
+  comparent le bloc visé — passer des filtres au compte n'oblige donc pas à
+  fermer d'abord.
+- ☑ **La barre du bas passe au-dessus du tiroir** (`z-index: 40`). Mesuré :
+  tiroir ouvert, `elementFromPoint` sur « ⛨ Filtres » ne rendait plus le bouton
+  mais le tiroir posé par-dessus. Une sortie recouverte n'est pas une sortie.
+  Le tiroir gagne 72 px de réserve en bas pour que son dernier bloc se lise.
+
+## 13.B — « hidden » ne cachait pas
+
+`#groupe-essai` portait bien `hidden` quand le compte était réel. Il s'affichait
+quand même : le `display: none` d'un élément `hidden` est une règle **d'agent
+utilisateur**, et la moindre règle d'auteur qui donne un `display` la bat.
+`.groupe-essai { display: flex }` suffisait.
+
+Mesuré sur un compte d'intendant, **cinq éléments** étaient dans ce cas :
+
+| élément | ce qu'il affirmait à tort |
+|---|---|
+| `#bandeau-procuration` | « vous écrivez chez les autres » — alors qu'on écrivait chez soi |
+| `#bandeau-essai` | l'invitation à créer un compte, sur un compte existant |
+| `#groupe-essai` | « Créer un compte » et « Se connecter » à quelqu'un de connecté |
+| `#lien-document` | « 📜 Document » sans document où aller |
+| `#scene-message` | un message de scène vide |
+
+- ☑ Une règle, `[hidden] { display: none !important; }`, dans `app.css` **et**
+  dans `base.css`. Le `!important` est à sa place : il n'existe pas de cas où
+  l'on veuille afficher un `hidden`.
+
+## 13.B (suite) — Le compte a sa vue
+
+Le bloc du tiroir s'appelait « Compte et réglages » et mêlait l'adresse du
+compte au choix de couleur. Ce sont deux questions qu'on ne se pose jamais en
+même temps.
+
+- ☑ **« Votre compte »** — l'adresse et le rôle en toutes lettres, puis
+  **« ⚙ Administration »**, **« 🛡 Vos données »**, **« ⏻ Se déconnecter »**,
+  chacun 46 px et **avec son libellé** : au doigt il n'y a pas d'infobulle à
+  survoler. Pour un visiteur sans compte, ce bloc ne porte que « Créer un
+  compte » et « Se connecter » — et ni ⚙ ni ⏻, qui ne voudraient rien dire.
+- ☑ **« Réglages de l'affichage »** en dessous : vue générale, couleur,
+  document, année, thème.
+- ☑ 👤 ouvre le tiroir sur le premier.
+
+**Un défaut trouvé en chemin.** `#lien-admin` (⚙) n'apparaissait qu'au rôle
+`admin` — la condition était restée telle qu'écrite au lot 7, quand ce rôle
+était le seul au-dessus de `membre`. **Un intendant, à qui la page répond
+pourtant, n'avait aucune porte pour y aller.** La condition suit maintenant
+`exigerGestion` : `admin` ou `intendant`.
+
+## Mesures
+
+| sur 375 px | avant | après |
+|---|---|---|
+| en-tête du tiroir | 341 × 61 px collants | supprimé |
+| boutons ouvrant le tiroir | 3 (☰, ⛨, 👤) | 2 (⛨, 👤), tous deux bascules |
+| « ⛨ Filtres » tiroir ouvert | recouvert par le tiroir | sous le doigt |
+| premier pixel d'arbre, compte réel | 118 px | **55 px** |
+| éléments `hidden` pourtant affichés | 5 | **0** |
+
+## Vérification
+
+**502/502.** Une assertion du lot 11.C a dû être réécrite, et non supprimée :
+« le tiroir de gauche a une sortie » cherchait `btn-fermer-rail`. Ce qu'elle
+protège n'a pas changé — sur un tiroir qui couvre tout l'écran, ne pas pouvoir
+sortir revient à ne pas pouvoir entrer — mais elle vise maintenant la bascule.

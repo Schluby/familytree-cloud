@@ -68,9 +68,12 @@
             <a class="bouton" href="/connexion.html">Se connecter</a>
           </span>
           <span class="compte" id="compte" title="Compte connecté">…</span>
-          <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden>⚙</a>
-          <a class="bouton bouton-icone" id="lien-donnees" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer">🛡</a>
-          <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter">⏻</button>
+          <!-- Les `.lib` ne servent qu'au téléphone, où ces boutons quittent la
+               barre pour le bloc « Votre compte » : là ils ont la largeur de
+               les porter, et au doigt il n'y a pas d'infobulle à survoler. -->
+          <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden><span class="ico">⚙</span><span class="lib">Administration</span></a>
+          <a class="bouton bouton-icone" id="lien-donnees" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer"><span class="ico">🛡</span><span class="lib">Vos données</span></a>
+          <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter"><span class="ico">⏻</span><span class="lib">Se déconnecter</span></button>
         </span>
         <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer le panneau de gauche">☰</button>
         <!-- Deux têtes pour la liste des personnes, une seule pour le compte :
@@ -88,18 +91,22 @@
 
       <!-- Rail gauche : vues, légendes, filtres -->
       <aside class="rail" id="rail">
-        <!-- Téléphone : le rail devient un tiroir plein écran. Il lui faut une
-             sortie — le volet de droite en avait une, pas lui — et il accueille
-             ce que la barre du haut ne peut plus porter. Voir
+        <!-- Téléphone : le rail devient un tiroir plein écran, et accueille ce
+             que la barre du haut ne peut plus porter. Voir
              `public/js/telephone.js`, qui descend les commandes ici et les
-             remonte quand l'écran s'élargit. -->
-        <div class="rail-entete" id="rail-entete">
-          <h2>Menu</h2>
-          <button class="bouton bouton-icone btn-fermer-volet" id="btn-fermer-rail" title="Fermer">✕</button>
-        </div>
+             remonte quand l'écran s'élargit.
+
+             Deux blocs et non un : « votre compte » et « comment s'affiche
+             l'arbre » ne se cherchent pas au même moment. Le 👤 de la barre
+             ouvre le tiroir sur le premier. -->
+        <section class="rail-bloc" id="bloc-compte" hidden>
+          <h2>Votre compte</h2>
+          <p class="rail-aide" id="aide-compte"></p>
+          <div class="rail-actions" id="accueil-compte"></div>
+        </section>
 
         <section class="rail-bloc" id="bloc-telephone" hidden>
-          <h2>Compte et réglages</h2>
+          <h2>Réglages de l’affichage</h2>
           <div class="rail-actions" id="accueil-telephone"></div>
         </section>
 

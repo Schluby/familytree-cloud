@@ -1,5 +1,26 @@
 /* FamilyTree_GOT — interface claire, fiches façon arbre généalogique. */
 
+/* `hidden` doit cacher. Toujours.
+ *
+ * **Le défaut qu'on répare (13.B).** Le navigateur pose `display: none` sur un
+ * élément `hidden`, mais c'est une règle d'agent utilisateur : **la moindre
+ * règle d'auteur qui donne un `display` la bat**. Cinq éléments de cette
+ * application recevaient un `display: flex` par leur classe et restaient donc
+ * visibles alors que le script les avait cachés — mesuré le 14/08/2026 sur un
+ * compte d'intendant :
+ *
+ * - `#groupe-essai` — « Créer un compte » et « Se connecter » proposés à
+ *   quelqu'un de déjà connecté. C'est ce qui a été signalé.
+ * - `#bandeau-procuration` — « vous écrivez chez les autres », affiché alors
+ *   qu'on écrivait chez soi. Le plus grave : ce bandeau ment sur où l'on écrit.
+ * - `#bandeau-essai` — l'invitation à créer un compte, sur un compte existant.
+ * - `#lien-document` — « 📜 Document » sans document où aller.
+ * - `#scene-message` — un message de scène vide.
+ *
+ * Une règle, et la classe entière de défauts disparaît. Le `!important` est ici
+ * à sa place : il n'y a pas de cas où l'on veuille afficher un `hidden`. */
+[hidden] { display: none !important; }
+
 :root {
   --fond: #eaeef3;
   --fond-2: #ffffff;
@@ -131,6 +152,16 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .bouton-plat { background: transparent; border-color: transparent; }
 .bouton-plat:hover { background: var(--fond-3); border-color: var(--bord); }
 .bouton .ico { opacity: .75; margin-right: 4px; }
+/* Les libellés de ⚙, 🛡 et ⏻ n'existent qu'au téléphone (13.B) : dans la barre
+   du haut, l'infobulle suffit et la place manque.
+ *
+ * La règle porte sur **les boutons eux-mêmes**, pas sur l'ancêtre qui les
+ * contient. Écrite en `.groupe-compte .lib`, elle cessait de s'appliquer dès
+ * que `telephone.js` les déménageait — et la contrepartie est vraie aussi :
+ * ces trois nœuds voyagent, ce qui les décrit doit voyager avec eux. */
+#lien-admin .lib,
+#lien-donnees .lib,
+#btn-deconnexion .lib { display: none; }
 .bouton:disabled { opacity: .45; cursor: default; }
 /* Le seul bouton de la barre basse qui *écrit* : il se distingue des commandes
    de cadrage, qui ne font que regarder. */
@@ -1343,9 +1374,11 @@ body.en-essai #btn-instantane { display: none; }
 .astuce-telephone { display: none; }
 .btn-fermer-volet { margin-left: auto; align-self: center; margin-right: 6px; }
 
-/* L'en-tête du tiroir de gauche : sa sortie. Sur écran large le rail est une
-   colonne, pas un tiroir — il n'y a rien à fermer. */
-#rail-entete { display: none; }
+/* L'en-tête du tiroir de gauche a disparu au lot 13.A, y compris son balisage.
+ * Il ne servait que sur téléphone, où il portait le mot « Menu » et une croix
+ * — mesuré **341 × 61 px, collants**, sur un tiroir de 694 px de haut. Neuf
+ * pour cent de la hauteur utile, en permanence, pour un titre qu'on n'a pas
+ * besoin de lire et une sortie qui existe ailleurs. */
 
 /* ------------------------------------------------------------ téléphone
  *
@@ -1393,7 +1426,14 @@ body.en-essai #btn-instantane { display: none; }
      les comprime jamais — c'est lui qui peut se permettre de perdre des
      lettres, pas eux. */
   .barre-haut .bouton { min-height: 40px; }
-  #btn-rail, #btn-panneau, #btn-compte { flex: none; min-width: 40px; }
+  #btn-panneau, #btn-compte { flex: none; min-width: 40px; }
+
+  /* ☰ s'en va (13.A). Signalé le 14/08/2026 : « retire le kebab menu, qui
+     prend les mêmes options que la petite icône de tête ». C'est exact — il
+     ouvrait le même tiroir que 👤, et que « ⛨ Filtres » de la barre du bas.
+     Trois boutons pour un tiroir, sur l'écran où la place manque le plus.
+     Restent les deux qui disent *où* ils mènent : ⛨ aux filtres, 👤 au compte. */
+  #btn-rail { display: none; }
   /* Ce qui ne sert pas à naviguer quitte la barre. `telephone.js` le descend
      dans le rail ; ces règles restent la ceinture, si le script n'a pas encore
      tourné — sauf pour ☰ et 👤, qui doivent tenir dans tous les cas. */
@@ -1425,7 +1465,6 @@ body.en-essai #btn-instantane { display: none; }
    * contiennent. Là où `:has()` manquerait, eux seuls resteraient à leur place
    * du HTML : l'ordre serait moins bon, rien ne casserait. */
   .rail { display: flex; flex-direction: column; }
-  #rail-entete { order: 0; }
   #bloc-maisons { order: 1; }
   #bloc-liens { order: 2; }
   .rail > section:has(#liste-vues) { order: 3; }
@@ -1435,31 +1474,40 @@ body.en-essai #btn-instantane { display: none; }
   #bloc-partages { order: 7; }
   #bloc-edition { order: 8; }
   .rail > section:has(#stats) { order: 9; }
-  #bloc-telephone { order: 10; }
+  #bloc-compte { order: 10; }
+  #bloc-telephone { order: 11; }
 
-  /* L'en-tête du tiroir de gauche, et ce qu'il accueille. */
-  #rail-entete {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px; border-bottom: 1px solid var(--bord);
-    position: sticky; top: 0; z-index: 1; background: var(--fond-2);
-  }
-  #rail-entete h2 { margin: 0; }
   /* Les commandes descendues : en grille, avec des cibles qu'un doigt atteint
      sans viser. 44 px est la hauteur en dessous de laquelle on tape à côté. */
-  #accueil-telephone {
+  #accueil-telephone,
+  #accueil-compte {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
     gap: 8px; align-items: stretch;
   }
   #accueil-telephone .bouton { min-height: 44px; justify-content: center; }
   #accueil-telephone .champ { flex-direction: column; align-items: stretch; gap: 3px; }
   #accueil-telephone .champ select { min-height: 44px; }
+
+  /* Le bloc « Votre compte » (13.B). Une colonne, pleine largeur : ce sont
+     quatre gestes rares et distincts — voir son compte, administrer, sortir ses
+     données, se déconnecter — et non une grille de réglages à parcourir. */
+  #accueil-compte { grid-template-columns: 1fr; }
+  #accueil-compte .bouton {
+    min-height: 46px; justify-content: flex-start; gap: 8px; font-size: 14px;
+  }
+  /* C'est ici, et ici seulement, que ⚙ 🛡 ⏻ disent leur nom. */
+  #accueil-compte #lien-admin .lib,
+  #accueil-compte #lien-donnees .lib,
+  #accueil-compte #btn-deconnexion .lib { display: inline; }
+  #accueil-compte .bouton .ico { margin-right: 2px; font-size: 16px; opacity: 1; }
+  #accueil-compte #btn-deconnexion { border-color: var(--bord); color: var(--texte-faible); }
   /* L'adresse du compte n'est pas un bouton : elle occupe sa propre ligne. */
-  #accueil-telephone .compte { grid-column: 1 / -1; max-width: none; font-size: 12px; }
+  #accueil-compte .compte { max-width: none; font-size: 13px; padding: 2px 0; }
   /* « Créer un compte » et « Se connecter », descendus ici depuis la barre du
-     haut. Ils tiennent la largeur entière et se partagent la ligne : c'est le
-     premier bloc que voit un visiteur qui touche 👤, et il n'a rien à chercher. */
-  #accueil-telephone .groupe-essai { grid-column: 1 / -1; gap: 8px; }
-  #accueil-telephone .groupe-essai .bouton { flex: 1; min-height: 44px; justify-content: center; }
+     haut. Ils se partagent la ligne : c'est tout ce que voit un visiteur sans
+     compte qui touche 👤, et il n'a rien à chercher. */
+  #accueil-compte .groupe-essai { gap: 8px; }
+  #accueil-compte .groupe-essai .bouton { flex: 1; min-height: 46px; justify-content: center; }
 
   /* Le bandeau d'essai : le texte, pas le bouton.
    *
@@ -1500,8 +1548,7 @@ body.en-essai #btn-instantane { display: none; }
   .rail .liste-sauvegardes li { min-height: 44px; }
   .rail .axe-puce { min-height: 36px; padding: 6px 12px; font-size: 12px; }
   .rail .btn-entete,
-  .rail .joueur-rail-fiche,
-  #btn-fermer-rail { min-width: 40px; min-height: 40px; font-size: 16px; }
+  .rail .joueur-rail-fiche { min-width: 40px; min-height: 40px; font-size: 16px; }
   .rail .option { min-height: 40px; }
   .rail .option input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 20px; }
   /* Les options numériques d'une vue (taille des cartes, écartement…). */
@@ -1549,6 +1596,9 @@ body.en-essai #btn-instantane { display: none; }
   .panneau { right: 0; transform: translateX(100%); }
   .rail.ouvert, .panneau.ouvert { transform: translateX(0); }
   .rail.replie { margin-left: 0; }
+  /* La barre du bas flotte maintenant par-dessus : sans cette réserve, le
+     dernier bloc du tiroir se termine dessous et ne se lit jamais en entier. */
+  .rail, .panneau { padding-bottom: 72px; }
 
   /* Tiroirs fermés : hors de l'écran, mais ils comptaient encore dans la
      largeur de défilement — on pouvait faire glisser la page vers le vide. */
@@ -1556,8 +1606,17 @@ body.en-essai #btn-instantane { display: none; }
 
   /* La barre basse sert au doigt, mais elle ne doit pas manger le tiers de
      l'écran : les commandes de cadrage passent en icônes, seul « ＋ Profil »
-     — le seul bouton qui écrit — garde son libellé. */
-  .barre-basse { flex-wrap: nowrap; gap: 2px; padding: 5px 7px; max-width: calc(100vw - 20px); }
+     — le seul bouton qui écrit — garde son libellé.
+   *
+   * **`z-index: 40`, au-dessus des tiroirs (13.A).** Mesuré le 14/08/2026,
+   * tiroir ouvert : `elementFromPoint` sur « ⛨ Filtres » ne rendait plus le
+   * bouton mais le tiroir posé par-dessus. Tant que le tiroir avait sa barre et
+   * sa croix, cela ne se voyait pas ; sans elles, la barre du bas est l'une des
+   * deux sorties, et une sortie recouverte n'est pas une sortie. */
+  .barre-basse {
+    flex-wrap: nowrap; gap: 2px; padding: 5px 7px;
+    max-width: calc(100vw - 20px); z-index: 40;
+  }
   /* 40 px de haut, comme le reste : c'est ici que vit « ＋ Profil », le seul
      bouton de cette barre qui écrit. Le curseur de zoom passe de 16 à 34 px —
      en dessous, on attrape sa poignée une fois sur deux. */

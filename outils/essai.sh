@@ -1025,7 +1025,16 @@ verifier "  sans session, pas d'essai mais la connexion" oui "$(code - GET /js/a
 
 echo "-- 11.C l'arbre au telephone"
 code - GET / > /dev/null
-verifier "le tiroir de gauche a une sortie" oui "$(contient 'btn-fermer-rail')"
+# La sortie du tiroir a change de forme au lot 13.A : la croix d'une barre
+# collante de 341 x 61 px est devenue la bascule des deux boutons qui l'ouvrent.
+# Ce qu'on protege n'a pas change — sur un tiroir qui couvre tout l'ecran, ne
+# pas pouvoir sortir revient a ne pas pouvoir entrer — mais l'assertion doit
+# viser le mecanisme d'aujourd'hui, pas celui d'hier.
+code - GET /js/telephone.js > /dev/null
+# Le motif passe par une variable : il porte des apostrophes.
+MOTIF_SORTIE="rail.classList.remove('ouvert')"
+verifier "le tiroir de gauche a une sortie" oui "$(contient "$MOTIF_SORTIE")"
+code - GET / > /dev/null
 verifier "  et un bloc qui accueille la barre du haut" oui "$(contient 'accueil-telephone')"
 verifier "  « Vos donnees » est nommable pour le demenagement" oui "$(contient 'lien-donnees')"
 code - GET /js/telephone.js > /dev/null
@@ -1168,6 +1177,50 @@ verifier "  mais le rapprochement lui est rendu" oui "$(contient '"a_unifier"')"
 sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
 sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_A'"
 verifier "A redevient membre, le panorama se referme" 403 "$(code "$BOCAL_A" POST /api/admin/lots/panorama "{\"comptes\":[$CIBLES]}")"
+
+# ---------------------------------------------------------------------------
+# Lot 13 : le tiroir sans sa barre, et « hidden » qui cache enfin
+#
+# Signale le 14/08/2026 : « retire le kebab menu, qui prend les memes options
+# que la petite icone de tete », « retirer la grosse barre qui nous suit
+# (Menu puis une croix), totalement useless », et « laisse creer un compte / se
+# connecter seulement si l'utilisateur n'est pas connecte ».
+#
+# Le troisieme point n'etait pas une preference : `#groupe-essai` portait bien
+# `hidden`, mais `.groupe-essai { display: flex }` battait la regle d'agent
+# utilisateur. CINQ elements etaient dans ce cas, dont le bandeau « vous ecrivez
+# chez les autres » affiche alors qu'on ecrivait chez soi.
+# ---------------------------------------------------------------------------
+
+echo "-- 13.A le tiroir sans sa barre ni le ☰"
+code - GET / > /dev/null
+verifier "l'en-tete du tiroir n'existe plus" non "$(contient 'rail-entete')"
+verifier "  ni sa croix" non "$(contient 'btn-fermer-rail')"
+code - GET /css/app.css > /dev/null
+verifier "le ☰ s'efface au telephone" oui "$(contient '#btn-rail { display: none; }')"
+# Sans la croix, la barre du bas est une des deux sorties. Recouverte par le
+# tiroir, elle n'en serait pas une.
+verifier "  et la barre du bas passe au-dessus du tiroir" oui "$(contient 'max-width: calc(100vw - 20px); z-index: 40;')"
+code - GET /js/telephone.js > /dev/null
+verifier "le bouton qui ouvre referme" oui "$(contient 'delete volets.rail.dataset.sur')"
+verifier "  en retenant sur quoi il a ouvert" oui "$(contient 'volets.rail.dataset.sur = idBloc')"
+
+echo "-- 13.B « hidden » cache, et le compte a sa vue"
+code - GET /css/app.css > /dev/null
+# La regle qui repare cinq defauts d'un coup.
+verifier "un element cache l'est vraiment" oui "$(contient '[hidden] { display: none !important; }')"
+code - GET /css/base.css > /dev/null
+verifier "  sur les pages de compte aussi" oui "$(contient '[hidden] { display: none !important; }')"
+code - GET / > /dev/null
+verifier "le tiroir a un bloc « Votre compte »" oui "$(contient 'accueil-compte')"
+verifier "  separe des reglages d'affichage" oui "$(contient 'Réglages de l’affichage')"
+verifier "  et les icones y disent leur nom" oui "$(contient 'Se déconnecter</span>')"
+code - GET /js/telephone.js > /dev/null
+verifier "les commandes ont deux destinations" oui "$(contient "vers: 'accueil-compte'")"
+code - GET /js/main.js > /dev/null
+# Le lien d'administration n'apparaissait qu'aux `admin` : un intendant, a qui
+# la page repond pourtant, n'avait aucune porte pour y aller.
+verifier "l'intendant voit le lien d'administration" oui "$(contient 'PEUVENT_ADMINISTRER')"
 
 # ---------------------------------------------------------------------------
 # Lot 10.C : la connexion Google
