@@ -1367,12 +1367,26 @@ verifier "  sans changer d'identifiant" "$DEMO" "$(lire sauvegarde.id)"
 verifier "  la fiche posee a disparu" 404 "$(code "$BOCAL_D" GET /api/personnes/brouillon-jetable)"
 verifier "la demonstration ne se partage pas" 409 "$(code "$BOCAL_D" PUT /api/partages/$DEMO/lecteurs "{\"lecteurs\":[\"$EMAIL_B\"]}")"
 
+echo "-- 14.A la supprimer est un choix, la rappeler aussi"
+code "$BOCAL_D" POST /api/sauvegardes '{"nom":"Le mien"}' > /dev/null
+verifier "on peut la supprimer" 204 "$(code "$BOCAL_D" DELETE /api/sauvegardes/$DEMO)"
+code "$BOCAL_D" GET /api/auth/moi > /dev/null
+code "$BOCAL_D" GET /api/sauvegardes > /dev/null
+# Elle ne se repose pas d'elle-meme : effacer le decor commun sur un compte qui
+# a ses propres mondes est une decision, pas un accident a rattraper.
+verifier "  elle ne revient pas toute seule" "" "$(demo_id)"
+verifier "  mais le bouton la repose" 200 "$(code "$BOCAL_D" POST /api/sauvegardes/demonstration)"
+verifier "    avec ses 67 fiches" 67 "$(lire sauvegarde.personnes)"
+code "$BOCAL_D" GET /api/sauvegardes > /dev/null
+DEMO="$(demo_id)"
+verifier "    et elle ne compte toujours pas" 1 "$(siennes)"
+
 echo "-- 14.A « en faire mon monde »"
 verifier "elle se copie dans une vraie sauvegarde" 201 "$(code "$BOCAL_D" POST /api/sauvegardes "{\"nom\":\"Mon Westeros\",\"depuis\":\"$DEMO\"}")"
 verifier "  la copie porte les 67 fiches" 67 "$(lire sauvegarde.personnes)"
 verifier "  et n'est plus une demonstration" 0 "$(lire sauvegarde.demo)"
 code "$BOCAL_D" GET /api/sauvegardes > /dev/null
-verifier "  elle compte, elle" 1 "$(siennes)"
+verifier "  elle compte, elle" 2 "$(siennes)"
 
 echo "-- 14.A la connexion remet la demonstration a zero"
 # Sur B, deja inscrit : la limite est de 3 inscriptions par heure et par IP, et

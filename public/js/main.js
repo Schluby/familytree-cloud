@@ -598,12 +598,7 @@ async function dessinerSauvegardes() {
   elements.listeSauvegardes.replaceChildren(
     ...etat.sauvegardes.filter((fiche) => !fiche.demo).map(itemSauvegarde)
   );
-  if (elements.blocDemonstration) {
-    elements.blocDemonstration.hidden = !etat.demo;
-    elements.listeDemonstration.replaceChildren(
-      ...(etat.demo ? [itemSauvegarde(etat.demo)] : [])
-    );
-  }
+  dessinerBlocDemonstration();
   dessinerBandeauDemo();
 
   await dessinerPartages();
@@ -2621,6 +2616,39 @@ function marquerEssaiModifie() {
  */
 
 const demonstrationOuverte = () => !!etat.demo?.actif && !PROCURATION && !PARTAGE;
+
+/**
+ * Le bloc du rail — y compris quand il n'y a plus de démonstration.
+ *
+ * Supprimer la démonstration est un choix qu'on respecte : le serveur ne la
+ * repose jamais d'elle-même sur un compte qui a ses propres mondes. Mais un
+ * bloc masqué emportait alors **le seul bouton capable de la faire revenir**,
+ * et il n'existait plus aucun chemin depuis l'interface — c'était le cas du
+ * compte `…@neoma-bs.com` au moment du déploiement. Le bloc reste donc, réduit
+ * à une phrase et à ce bouton-là.
+ */
+function dessinerBlocDemonstration() {
+  if (!elements.blocDemonstration) return;
+  const bloc = elements.blocDemonstration;
+  bloc.hidden = false;
+  elements.listeDemonstration.replaceChildren(...(etat.demo ? [itemSauvegarde(etat.demo)] : []));
+
+  const aide = bloc.querySelector('.rail-aide');
+  if (aide) {
+    aide.textContent = etat.demo
+      ? 'Un monde d’exemple, le même pour tout le monde. Essayez tout ce que vous voulez dedans : rien n’y est conservé — il repart à zéro à votre prochaine connexion. Ce que vous voulez garder se construit dans une sauvegarde à vous, juste en dessous.'
+      : 'Vous l’avez retirée. C’est un monde d’exemple où rien n’est conservé — de quoi essayer un geste sans risque, ou refaire la visite guidée.';
+  }
+  if (elements.btnDemoCopier) elements.btnDemoCopier.hidden = !etat.demo;
+  if (elements.btnDemoReinitialiser) {
+    elements.btnDemoReinitialiser.textContent = etat.demo
+      ? '↺ Remettre à zéro'
+      : '⚗ Remettre la démonstration';
+    elements.btnDemoReinitialiser.title = etat.demo
+      ? 'Effacer ce que vous avez fait dans la démonstration et la rendre à son état d’origine'
+      : 'Reposer le monde d’exemple — il ne comptera dans aucun de vos plafonds';
+  }
+}
 
 function dessinerBandeauDemo() {
   if (!elements.bandeauDemo) return;
