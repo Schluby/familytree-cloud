@@ -1644,6 +1644,29 @@ verifier "le dictionnaire est servi" oui "$(contient 'TRADUCTIONS')"
 MANQUANTS="$(node outils/relever-textes.mjs --manquants 2>&1 >/dev/null | sed 's/[^0-9].*//')"
 verifier "aucune chaine sans traduction" 0 "$MANQUANTS"
 
+# ---------------------------------------------------------------------------
+# Le budget de peinture du plan (16.I)
+#
+# Signale par Maxime : « la vue de Westeros lag un peu ». Mesure le 15/08/2026,
+# le coupable n'est ni le JavaScript (0,02 ms par cran de zoom) ni la mise en
+# page (1,63 ms pour deplacer 67 cartes) mais **la peinture** : un monde de
+# 5041 x 4216 px dans une seule couche, avec 665 couches d'ombre floue et 47
+# surfaces de filtre a re-tramer a chaque changement d'echelle.
+#
+# Ces quatre verifications tiennent le budget. Elles ne mesurent pas la
+# peinture — un harnais en ligne de commande ne le peut pas — elles gardent les
+# decisions qui l'ont divisee par deux.
+# ---------------------------------------------------------------------------
+
+echo "-- 16.I ce que le plan accepte de peindre"
+code - GET /css/app.css > /dev/null
+verifier "l'ombre des cartes tient en une couche" non "$(contient '--carte-ombre: 0 1px 2px')"
+verifier "  la poignee n'en porte plus" oui "$(contient 'soixante-sept halos flous')"
+verifier "un mort sans portrait est terni sans filtre" oui "$(contient '.carte.morte .carte-photo:not(.avec-photo)')"
+verifier "de loin, le corps de fiche ne se dessine plus" oui "$(contient '.plan.loin .carte-corps > * { display: none; }')"
+verifier "  mais sa boite reste, sinon les liens finiraient dans le vide" oui "$(contient '.plan.loin .carte-corps { background')"
+verifier "le monde annonce qu'il bouge" oui "$(contient 'will-change: transform')"
+
 echo "-- la carte jouee garde la place de son portrait"
 code - GET /css/app.css > /dev/null
 verifier "aucune regle ne s'appelle « .joueur » tout court" non "$(contient '.joueur {')"

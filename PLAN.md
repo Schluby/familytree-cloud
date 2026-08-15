@@ -1822,3 +1822,59 @@ Ce que ça ne fait pas, et il faut le savoir : **une phrase ajoutée demain rest
 en français** jusqu'à ce qu'on l'ajoute au dictionnaire, et le changement de
 langue **recharge la page** (retraduire de l'anglais vers le français ne serait
 pas une opération sûre).
+
+## 16.I — « La vue de Westeros lag un peu »
+
+Signalé le 15/08/2026. **Mesuré avant de toucher à quoi que ce soit**, sur 67
+fiches et 180 liens dans une fenêtre de 760 × 707 :
+
+| Ce qu'on soupçonnait | Ce que ça coûte |
+| --- | --- |
+| Le gestionnaire de zoom | **0,02 ms** par cran |
+| Déplacer les 67 cartes en `left/top` | **1,63 ms** — et 1,76 en `transform` |
+| La bascule « loin » quand rien ne change | **0,001 ms** |
+
+Rien de tout ça. **Deux hypothèses vérifiées et abandonnées** : `left/top` ne
+coûte pas plus que `transform` à cette taille, et `classList.toggle(nom, force)`
+n'invalide rien quand la valeur ne change pas.
+
+Ce qui coûte, c'est **la peinture** : le monde mesure **5041 × 4216 px** — 21
+mégapixels dans **une seule couche** — et porte **665 couches d'ombre floue**
+(289 déclarations, `--carte-ombre` en empilait deux dont une à 10 px de flou) et
+**47 surfaces de filtre**. Chaque cran de zoom change l'échelle et force à
+re-tramer le tout.
+
+Quatre décisions, et le compte après :
+
+1. **Une seule couche d'ombre** au lieu de deux. On avait d'abord voulu poser
+   une ombre unique sur `.carte` : c'est faux, `.carte` réserve 34 px
+   transparents pour le portrait et l'ombre aurait cerné cette bande vide.
+2. **La poignée ＋ perd la sienne** : transparente au repos, elle traînait 67
+   halos flous sous un bouton qu'on ne voit pas.
+3. **Les morts sont ternis par un voile**, pas par `filter` — un filtre ouvre
+   une surface de rendu à part. Un vrai portrait garde son filtre : un voile
+   plat ne désature pas une photographie, il la salit.
+4. **De loin, le corps de fiche ne se dessine plus.** `opacity: .18` le
+   pâlissait *et le peignait quand même*. On cache ses **enfants**, pas la
+   boîte : `display: none` sur le corps ferait rétrécir la carte alors que les
+   traits de liaison visent des boîtes calculées en JavaScript — les liens
+   finiraient dans le vide.
+
+**Mesuré après** : 665 → **309** couches floues (−54 %), 47 → **0** filtres, et
+de loin **628 nœuds rendus en moins sur 1536** (−41 %), la carte gardant
+exactement sa hauteur.
+
+**Une réserve à ne pas oublier** : le volet de vérification ne compose pas
+d'images, donc **la peinture elle-même n'a pas pu être chronométrée**. Les
+chiffres ci-dessus sont des compteurs et des durées de style ou de mise en
+page ; le diagnostic « c'est la peinture » vient du raisonnement sur ces
+compteurs, pas d'un profil. `contain: layout style` a d'ailleurs été essayé et
+**écarté** : il n'améliore pas le recalcul de style (5,34 → 5,75 ms).
+
+**Ce qui reste à faire quand un monde dépassera ~300 fiches** : ne construire
+que les cartes qui touchent l'écran. Attention au piège : à « tout afficher »,
+**tout** est à l'écran — le fenêtrage ne sert que zoomé, et c'est le niveau de
+détail ci-dessus qui couvre l'autre régime. Les deux se complètent, aucun ne
+remplace l'autre. **Canvas ou WebGL est écarté** : on perdrait le texte
+sélectionnable, l'accessibilité, les infobulles et le menu contextuel, pour un
+gain qui ne devient décisif qu'à plusieurs milliers de nœuds.

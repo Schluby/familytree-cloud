@@ -750,6 +750,35 @@ pas se tromper en le modifiant :
 - L'observateur **se met en pause pendant qu'il écrit** (`enCours`), sinon ses
   propres remplacements le rappelleraient en boucle.
 
+## Le budget de peinture du plan (lot 16.I)
+
+Le plan est **une seule couche transformée de 21 mégapixels** (5041 × 4216 sur
+Westeros). Ce qui s'y trouve est re-tramé à chaque changement d'échelle : c'est
+la peinture qui coûte, pas le JavaScript (0,02 ms par cran de zoom) ni la mise
+en page (1,63 ms pour déplacer 67 cartes).
+
+- **Ne pas ajouter d'ombre par élément de carte.** Elles se comptent par le
+  nombre de cartes multiplié par le nombre d'éléments qui en portent. Une
+  déclaration à deux couches en fait deux fois plus. Le budget actuel : **309
+  couches floues** au lieu de 665.
+- **Ne pas utiliser `filter` sur les cartes.** Chaque filtre ouvre une surface
+  de rendu à part. Il en reste zéro, sauf sur un vrai portrait — où un voile
+  plat salirait la photographie au lieu de la désaturer.
+- **`.plan.loin` doit retirer, pas pâlir.** Une opacité peint quand même, et
+  ouvre une couche de composition en prime. On cache les **enfants** du corps,
+  **jamais le corps** : `display: none` dessus ferait rétrécir la carte, et les
+  traits de liaison — tracés d'après les boîtes calculées en JavaScript — se
+  mettraient à finir dans le vide.
+- **`will-change: transform` sur `.monde`** rend le panoramique gratuit. Le zoom
+  reste un vrai retraçage : c'est le niveau de détail qui compte pour lui.
+- Deux hypothèses vérifiées et **abandonnées**, à ne pas rejouer : `left/top` ne
+  coûte pas plus que `transform` à cette taille, et `contain: layout style`
+  n'améliore pas le recalcul de style.
+- **Le volet de vérification ne compose pas d'images** : on ne peut y mesurer ni
+  la peinture ni le nombre d'images par seconde. On mesure des compteurs
+  (ombres, filtres, nœuds rendus) et des durées de style ou de mise en page ; le
+  reste se raisonne, et se confirme sur une vraie machine.
+
 ## Pour repartir
 
 ```bash

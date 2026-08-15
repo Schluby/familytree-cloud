@@ -36,8 +36,20 @@
   --accent-fonce: #24796d;
   --accent-doux: #dff2ee;
   --carte-fond: #ffffff;
-  --carte-ombre: 0 1px 2px rgba(23, 33, 46, .10), 0 3px 10px rgba(23, 33, 46, .07);
-  --carte-ombre-forte: 0 4px 12px rgba(23, 33, 46, .16), 0 12px 28px rgba(23, 33, 46, .14);
+  /* Une seule couche, et non deux.
+   *
+   * L'ombre d'une carte était empilée : un liseré net à 2 px de flou, plus un
+   * halo à 10. Or elle est posée sur le bandeau **et** sur le corps de chaque
+   * fiche, plus la photo, plus la poignée — mesuré le 15/08/2026 sur Westeros,
+   * **665 couches d'ombre floue** dans un monde de 21 mégapixels, à re-tramer
+   * à chaque cran de zoom. Une couche unique, un peu plus large et un peu plus
+   * douce, rend le même relief pour la moitié du travail.
+   *
+   * On a d'abord voulu poser une seule ombre sur `.carte` au lieu de deux à
+   * l'intérieur. C'est faux : `.carte` réserve 34 px transparents pour le
+   * portrait, et l'ombre aurait cerné cette bande vide. */
+  --carte-ombre: 0 2px 7px rgba(23, 33, 46, .13);
+  --carte-ombre-forte: 0 6px 18px rgba(23, 33, 46, .22);
   --ombre-panneau: 0 8px 26px rgba(23, 33, 46, .10);
   --rayon: 9px;
   --police: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -59,8 +71,8 @@ body.sombre {
   --accent-fonce: #2f9e8f;
   --accent-doux: #17342f;
   --carte-fond: #1c222b;
-  --carte-ombre: 0 1px 2px rgba(0, 0, 0, .5), 0 4px 14px rgba(0, 0, 0, .35);
-  --carte-ombre-forte: 0 6px 18px rgba(0, 0, 0, .55), 0 16px 34px rgba(0, 0, 0, .45);
+  --carte-ombre: 0 2px 9px rgba(0, 0, 0, .55);
+  --carte-ombre-forte: 0 8px 22px rgba(0, 0, 0, .62);
   --ombre-panneau: 0 8px 26px rgba(0, 0, 0, .45);
 }
 
@@ -265,7 +277,15 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   touch-action: none; -webkit-tap-highlight-color: transparent;
 }
 .plan:active { cursor: grabbing; }
-.monde { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+/* `will-change` dit au navigateur que ce nœud-là va bouger sans arrêt : il lui
+   réserve sa propre couche, et le panoramique n'est plus qu'un déplacement de
+   couche — sans re-tramer les 21 mégapixels du monde. Le zoom, lui, change
+   l'échelle et reste un vrai retraçage : c'est pourquoi le niveau de détail
+   ci-dessous compte plus que cette ligne. */
+.monde {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  will-change: transform;
+}
 .liens { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .cartes { position: absolute; left: 0; top: 0; }
 
@@ -342,7 +362,16 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   color: #fff; font-weight: 600; font-size: 16px; letter-spacing: .03em;
   z-index: 2;
 }
-.carte.morte .carte-photo { filter: saturate(.55) brightness(.92); }
+/* Un mort a le portrait terni. Par un voile, et non par `filter` : un filtre
+   force le navigateur à ouvrir une surface de rendu à part pour l'élément, et
+   il y en avait **quarante-sept** dans Westeros. Le voile est une couleur
+   posée par-dessus — le compositeur ne fait rien de plus.
+   Un vrai portrait, lui, garde son filtre : un voile plat ne désature pas une
+   photographie, il la salit. Ils sont rares, et le coût suit. */
+.carte.morte .carte-photo:not(.avec-photo) {
+  background-image: linear-gradient(rgba(120, 124, 130, .38), rgba(120, 124, 130, .38));
+}
+.carte.morte .carte-photo.avec-photo { filter: saturate(.55) brightness(.92); }
 .carte.morte .carte-photo::after {
   content: '†';
   position: absolute; right: -3px; bottom: -3px;
@@ -468,7 +497,9 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   color: var(--texte-doux); font-size: 14px; line-height: 1; font-weight: 600;
   display: flex; align-items: center; justify-content: center;
   cursor: crosshair; opacity: 0; z-index: 3;
-  box-shadow: var(--carte-ombre);
+  /* Pas d'ombre : ce bouton est transparent au repos, et il y en avait une par
+     fiche — soixante-sept halos flous dessinés sous un bouton qu'on ne voit
+     pas. Affiché, c'est un rond de 20 px : son bord suffit à le détacher. */
   transition: opacity .15s ease, background .15s ease, color .15s ease;
 }
 .carte:hover .carte-poignee,
@@ -505,7 +536,20 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .carte.en-deport .carte-photo { transform: translateX(-50%) scale(1.06); }
 
 /* niveau de détail : au loin, seuls les bandeaux restent lisibles */
-.plan.loin .carte-corps { opacity: .18; }
+/* Niveau de détail : de loin, on ne dessine plus ce qu'on ne peut pas lire.
+ *
+ * `opacity: .18` pâlissait le corps de la fiche **et le peignait quand même**,
+ * en ouvrant au passage une couche de composition par carte. Or ces corps
+ * portent 41 % des nœuds du plan (629 sur 1545, mesuré sur Westeros), et ce
+ * sont ceux qui portent du texte — le plus cher à tramer.
+ *
+ * On cache les **enfants**, pas la boîte : `display: none` sur le corps ferait
+ * rétrécir la carte, alors que les traits de liaison sont tracés d'après les
+ * boîtes calculées en JavaScript, qui ne bougeraient pas. Les liens
+ * finiraient dans le vide. La boîte reste donc, vide et pâle ; ce qu'elle
+ * contenait s'en va. */
+.plan.loin .carte-corps { background: var(--carte-fond); opacity: .55; }
+.plan.loin .carte-corps > * { display: none; }
 
 /* ----------------------------------------------------------------- liens */
 
