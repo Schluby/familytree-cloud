@@ -272,6 +272,38 @@ Ce que ça implique, précisément :
 - **R2 devient inutile** : plus de deuxième service, plus de clés à gérer. Tout
   tient dans D1.
 
+Le carnet (lot 15) hérite de cette décision sans discussion : son rendu Markdown
+ne reconnaît **pas** la syntaxe des images. `![](data:…)` dans une note de séance
+serait la même porte, rouverte dans un champ de texte libre. Une adresse d'image
+y reste un lien cliquable.
+
+### Le carnet est une clef du document — décidé le 15/08/2026
+
+Les notes des joueurs vivent dans `carnet`, à la racine du document de la
+sauvegarde, à côté de `personnes` et `relations`. Pas une table D1, pas un
+service à part. Trois raisons, dans cet ordre :
+
+1. **Le contrat d'adresses tient.** `/api/carnet` porte sur la sauvegarde active
+   du compte, comme `/api/personnes`. Rien à nommer, rien à router autrement.
+2. **Tout ce qui existe déjà s'applique.** Le plafond de 2 Mo, le point
+   d'écriture unique, l'export, l'archive ZIP — et surtout **la procuration** :
+   `routesAdmin.route('/arbres/:arbre', routesDomaine)` monte aussi `/carnet/*`,
+   donc l'administrateur et l'intendant atteignent les notes sans une ligne de
+   plus, avec les mêmes validations et le même journal.
+3. **Le format reste un fichier.** Une sauvegarde exportée emporte ses notes ;
+   réimportée ailleurs, elle les retrouve.
+
+Ce que ça coûte, et qui est assumé : les notes **comptent dans le plafond de la
+sauvegarde**. D'où le choix de stocker le Markdown tapé plutôt qu'un modèle de
+document riche — mesuré sur une note de séance de 2 945 signes, 3 061 octets
+stockés contre 11 965 pour la même note rendue en HTML. Le plafond tient environ
+680 notes de cette taille, et une note seule est bornée à 200 000 signes.
+
+Ce que ça coûte aussi, et qu'il faut savoir : **la version Python locale ne
+connaît pas cette clef**. Un document qui ferait l'aller-retour par elle perdrait
+son carnet — `Dataset.versDict` n'écrit que les clefs qu'il connaît, des deux
+côtés.
+
 ## Faisabilité — les chiffres
 
 Mesurés sur la vraie campagne (72 fiches, 178 liens) et sur l'application qui

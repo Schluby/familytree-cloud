@@ -10,11 +10,17 @@
  */
 
 import type { Vue } from './vues/base';
+import { VueCarnet } from './vues/carnet';
 import { VueMaisons } from './vues/maisons';
 import { VueSociogramme } from './vues/sociogramme';
 import { VueTableau } from './vues/tableau';
 
-const VUES: Vue[] = [new VueSociogramme(), new VueMaisons(), new VueTableau()];
+const VUES: Vue[] = [
+  new VueSociogramme(),
+  new VueMaisons(),
+  new VueCarnet(),
+  new VueTableau(),
+];
 
 export function toutes(): Vue[] {
   return VUES;

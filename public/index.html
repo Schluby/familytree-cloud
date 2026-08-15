@@ -261,6 +261,13 @@
                   title="Créer un profil — il apparaît sur le plan sans quitter la vue">
             <span class="ico">＋</span><span class="lib">Profil</span>
           </button>
+          <!-- Le carnet s'ouvre **à côté** du plan, sans le fermer : on écrit
+               pendant qu'on regarde. Son propre en-tête sait ensuite le
+               déplacer en pleine page. -->
+          <button class="bouton bouton-plat" id="btn-carnet"
+                  title="Carnet de notes — écrire pendant la partie, à côté du plan">
+            <span class="ico">✎</span><span class="lib">Carnet</span>
+          </button>
           <!-- Téléphone : la porte directe vers ce qu'on vient filtrer. Les
                maisons et les types de liens vivent dans le rail, à six blocs de
                défilement du haut — ce bouton l'ouvre déjà déroulé dessus. -->
@@ -284,6 +291,11 @@
           </span>
         </div>
       </main>
+
+      <!-- Le carnet, quand il est en volet. Il n'y a qu'un carnet dans la
+           page : ce conteneur l'accueille, et la vue « Carnet » le lui prend
+           le temps qu'elle reste ouverte. -->
+      <aside class="volet-carnet" id="volet-carnet" hidden></aside>
 
       <!-- Panneau droit : liste des personnes / fiche -->
       <aside class="panneau" id="panneau">

@@ -42,6 +42,12 @@ export function creerPanneau(element, rappels = {}) {
   let aEnvoyer = {};
   let minuterie = null;
   const DELAI_ENVOI = 500;
+  /**
+   * L'onglet « Cité dans le carnet » garde son état d'une fiche à l'autre :
+   * quelqu'un qui vient de l'ouvrir est en train de dépouiller ses notes, et
+   * le refermer à chaque profil lui ferait refaire le geste vingt fois.
+   */
+  let citationsOuvertes = false;
 
   function definirEtat(texte, classe = '') {
     if (elementEtat) {
@@ -98,10 +104,110 @@ export function creerPanneau(element, rappels = {}) {
     element.replaceChildren(
       entete(personne, maison, couleurMaison),
       sectionNotes(personne),
+      sectionCitations(),
       sectionJoueurs(personne),
       sectionIdentite(personne),
       pied()
     );
+  }
+
+  /* ------------------------------------------------------ cité dans le carnet
+   *
+   * Replié par défaut, et il le reste d'une fiche à l'autre : c'est un
+   * complément, pas le sujet. Mais **le nombre est dans le titre**, donc
+   * visible sans rien déplier — sinon il faudrait ouvrir chaque fiche pour
+   * savoir si elle a quelque chose à montrer.
+   */
+
+  function sectionCitations() {
+    const citations = donnees.citations || { total: 0, par_note: [], par_chapitre: [] };
+    const bloc = h('details', {
+      class: 'pn-section pn-citations',
+      open: citationsOuvertes,
+      ontoggle: (evenement) => {
+        citationsOuvertes = evenement.target.open;
+      },
+    });
+
+    const resume = citations.total
+      ? `${citations.total} apparition${citations.total > 1 ? 's' : ''} · ` +
+        `${citations.par_note.length} note${citations.par_note.length > 1 ? 's' : ''}` +
+        (citations.par_chapitre.length > 1 ? ` · ${citations.par_chapitre.length} chapitres` : '')
+      : 'aucune';
+
+    bloc.append(
+      h('summary', {}, [
+        h('span', { class: 'pn-citations-titre' }, [
+          h('span', { texte: 'Cité dans le carnet' }),
+          h('span', { class: 'pn-citations-nombre', texte: resume }),
+        ]),
+      ]),
+      ...(citations.total ? corpsCitations(citations) : [aucuneCitation()])
+    );
+    return bloc;
+  }
+
+  function aucuneCitation() {
+    return h('p', {
+      class: 'echelle-aide',
+      texte:
+        'Personne ne parle encore de cette fiche. Dans le carnet (✎ en bas de ' +
+        'l’écran), tapez « / » puis son nom pour la citer — les passages ' +
+        'apparaîtront ici.',
+    });
+  }
+
+  /** Groupé par chapitre, dans l'ordre du carnet : on relit une campagne dans l'ordre. */
+  function corpsCitations(citations) {
+    const notesParChapitre = new Map();
+    for (const entree of citations.par_note) {
+      const liste = notesParChapitre.get(entree.chapitre) ?? [];
+      liste.push(entree);
+      notesParChapitre.set(entree.chapitre, liste);
+    }
+
+    return citations.par_chapitre.map((chapitre) =>
+      h('div', { class: 'pn-cit-groupe' }, [
+        h('div', {
+          class: 'pn-cit-chapitre',
+          texte: `${chapitre.titre || 'Hors chapitre'} — ${chapitre.occurrences} fois`,
+        }),
+        ...(notesParChapitre.get(chapitre.id) || []).map(blocNote),
+      ])
+    );
+  }
+
+  function blocNote(entree) {
+    return h('div', { class: 'pn-cit-note' }, [
+      h('div', { class: 'pn-cit-note-titre' }, [
+        h('span', { texte: entree.titre || 'Note sans titre' }),
+        h('span', {
+          class: 'pn-citations-nombre',
+          texte: `${entree.occurrences}×`,
+        }),
+      ]),
+      ...entree.extraits.map((extrait) =>
+        h(
+          'button',
+          {
+            class: 'pn-cit-extrait',
+            type: 'button',
+            title: 'Ouvrir le carnet à ce passage',
+            onclick: () =>
+              rappels.surCitation?.(entree.note, {
+                genre: 'p',
+                id: brouillon?.id,
+                rang: extrait.rang,
+              }),
+          },
+          [
+            extrait.avant,
+            h('b', { texte: extrait.libelle }),
+            extrait.apres,
+          ]
+        )
+      ),
+    ]);
   }
 
   // ------------------------------------------------------------ portrait
@@ -565,9 +671,30 @@ export function creerPanneau(element, rappels = {}) {
     }
   }
 
+  /**
+   * Relit les citations de la fiche ouverte, sans toucher au reste.
+   *
+   * Appelé quand le carnet vient d'écrire : le nombre affiché doit suivre. On
+   * ne redessine **que** cette section — repasser par `afficher` remonterait
+   * le panneau en haut et écraserait les champs en cours de saisie.
+   */
+  async function majCitations() {
+    if (!brouillon) return;
+    const id = brouillon.id;
+    try {
+      const citations = await Api.citations('p', id);
+      if (brouillon?.id !== id || !donnees) return;
+      donnees.citations = citations;
+      element.querySelector('.pn-citations')?.replaceWith(sectionCitations());
+    } catch (erreur) {
+      // Un compteur qui ne se met pas à jour n'est pas une raison de crier.
+    }
+  }
+
   return {
     afficher,
     fermer,
+    majCitations,
     estOuvert: () => !!brouillon,
     idCourant: () => brouillon?.id || null,
     definirReferentiels(nouveaux) {

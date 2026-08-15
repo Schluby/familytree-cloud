@@ -350,6 +350,29 @@ export const Api = {
   creerRelation: (donnees) =>
     requete(`${DOMAINE}/relations`, { method: 'POST', body: JSON.stringify(donnees) }),
   supprimerRelation: (id) => requete(`${DOMAINE}/relations/${id}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------------------- le carnet
+  //
+  // Une seule lecture pour tout ouvrir : chapitres, notes **et** catalogue des
+  // cibles citables. Le « / » de l'éditeur puise dans ce catalogue, et un
+  // carnet qui s'ouvrirait sans lui ne proposerait rien à sa première frappe.
+  carnet: () => requete(`${DOMAINE}/carnet`),
+  creerChapitre: (donnees) =>
+    requete(`${DOMAINE}/carnet/chapitres`, { method: 'POST', body: JSON.stringify(donnees) }),
+  majChapitre: (id, patch) =>
+    requete(`${DOMAINE}/carnet/chapitres/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  /** Le chapitre s'en va, ses notes restent — elles passent hors chapitre. */
+  supprimerChapitre: (id) => requete(`${DOMAINE}/carnet/chapitres/${id}`, { method: 'DELETE' }),
+  creerNote: (donnees) =>
+    requete(`${DOMAINE}/carnet/notes`, { method: 'POST', body: JSON.stringify(donnees) }),
+  majNote: (id, patch) =>
+    requete(`${DOMAINE}/carnet/notes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  supprimerNote: (id) => requete(`${DOMAINE}/carnet/notes/${id}`, { method: 'DELETE' }),
+  /** Qui parle de cette cible, où, et combien de fois. */
+  citations: (genre, id) => requete(`${DOMAINE}/carnet/citations${versQuery({ genre, id })}`),
 };
 
 export { versQuery };

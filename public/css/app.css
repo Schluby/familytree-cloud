@@ -1396,6 +1396,268 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
    boutons qui font avancer. */
 .tuto-passer { margin-right: auto; color: var(--texte-faible); }
 
+/* ---------------------------------------------------------------- carnet
+ *
+ * Le carnet a **deux places** et un seul jeu de règles : volet à côté du plan
+ * (étroit, sommaire replié) ou pleine scène (`.carnet-large`, sommaire en
+ * colonne permanente). Ce qui change tient en trois déclarations — le reste
+ * est commun, sinon les deux places se mettraient à diverger. */
+
+.volet-carnet {
+  width: 400px; flex: 0 0 400px;
+  background: var(--fond-2);
+  border-left: 1px solid var(--bord);
+  min-height: 0; min-width: 0;
+  display: flex;
+}
+
+.carnet {
+  position: relative; /* la liste de complétion se pose dedans */
+  display: flex; flex-direction: column;
+  flex: 1; min-width: 0; min-height: 0;
+  background: var(--fond-2);
+}
+.carnet-large { background: var(--fond-2); }
+
+.cn-barre {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px; flex: 0 0 auto;
+  border-bottom: 1px solid var(--bord);
+}
+.cn-fil {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 5px;
+  font-size: 12.5px; white-space: nowrap; overflow: hidden;
+}
+.cn-fil-chapitre { color: var(--texte-faible); }
+.cn-fil-sep { color: var(--texte-faible); }
+.cn-fil-note { color: var(--texte); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.cn-etat { font-size: 11px; color: var(--texte-faible); white-space: nowrap; }
+.cn-etat.modifie { color: var(--texte-doux); }
+.cn-etat.ok { color: var(--accent-fonce); }
+.cn-etat.erreur { color: #b4483a; }
+.cn-btn-mode { white-space: nowrap; }
+
+/* L'avertissement de la démonstration, à l'endroit où l'on perdrait le plus.
+   Une ligne, pas un bandeau : il ne doit pas manger la place du texte. */
+.cn-avertissement {
+  flex: 0 0 auto; margin: 0; padding: 5px 10px;
+  background: var(--accent-doux); border-bottom: 1px solid var(--bord);
+  font-size: 11px; line-height: 1.4; color: var(--accent-fonce);
+}
+
+.cn-corps { flex: 1; display: flex; min-height: 0; min-width: 0; position: relative; }
+
+/* sommaire */
+.cn-sommaire {
+  display: none;
+  flex-direction: column; gap: 2px;
+  padding: 8px; overflow-y: auto;
+  background: var(--fond-3);
+  border-right: 1px solid var(--bord);
+}
+/* Étroit : le sommaire se pose **par-dessus** la note. Le volet fait 400 px ;
+   lui prendre 230 pour une liste laisserait 170 px de texte, ce qui n'est plus
+   une note mais une colonne de mots. */
+.cn-sommaire-ouvert .cn-sommaire {
+  display: flex;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 78%;
+  z-index: 5; box-shadow: var(--ombre-panneau);
+}
+.carnet-large .cn-sommaire {
+  display: flex; position: static; width: 250px; flex: 0 0 250px; box-shadow: none;
+}
+.carnet-large .cn-btn-sommaire { display: none; }
+
+.cn-sommaire-entete { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.cn-sommaire-entete h3 {
+  flex: 1; margin: 0; font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--texte-faible);
+}
+.cn-groupe { margin-bottom: 10px; }
+.cn-groupe-titre { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+.cn-groupe-titre .nombre {
+  font-size: 10.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
+}
+.cn-hors-chapitre {
+  font-size: 11px; color: var(--texte-faible); text-transform: uppercase; letter-spacing: .08em;
+}
+.cn-chap-titre {
+  flex: 1; min-width: 0; background: transparent; border: 1px solid transparent;
+  border-radius: 5px; padding: 3px 5px; font-size: 12px; font-weight: 600;
+}
+.cn-chap-titre:hover:not([readonly]) { border-color: var(--bord); }
+.cn-chap-titre:focus { background: var(--fond-2); border-color: var(--accent); outline: none; }
+
+.cn-ligne {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: transparent; border: 0; border-radius: 6px;
+  padding: 6px 8px; text-align: left; cursor: pointer; color: var(--texte-doux);
+  font-size: 12.5px;
+}
+.cn-ligne:hover { background: var(--fond-2); color: var(--texte); }
+.cn-ligne.actif { background: var(--accent-doux); color: var(--accent-fonce); font-weight: 600; }
+.cn-ligne-titre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-ligne-cites { font-size: 10.5px; color: var(--texte-faible); white-space: nowrap; }
+.cn-nouvelle-note { width: 100%; margin-top: 4px; }
+.cn-danger:hover { color: #b4483a; border-color: #e0b4ac; }
+
+/* la note */
+.cn-note { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.cn-titre {
+  flex: 0 0 auto; margin: 10px 12px 6px; padding: 4px 6px;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  font-family: var(--police-titre); font-size: 17px; font-weight: 600;
+}
+.cn-titre:hover:not([readonly]) { border-color: var(--bord); }
+.cn-titre:focus { background: var(--fond-3); border-color: var(--accent); outline: none; }
+
+.cn-outils {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 2px;
+  padding: 0 10px 6px; overflow-x: auto; scrollbar-width: thin;
+}
+.cn-outil { min-width: 26px; height: 26px; font-size: 11.5px; padding: 0 5px; flex: 0 0 auto; }
+.cn-outil-gras { font-weight: 800; }
+.cn-outil-italique { font-style: italic; font-family: var(--police-titre); }
+.cn-outil-barre { text-decoration: line-through; }
+.cn-outil-balise { color: var(--accent-fonce); font-weight: 700; }
+.cn-outils-sep { width: 1px; height: 16px; background: var(--bord); margin: 0 3px; flex: 0 0 auto; }
+
+.cn-source {
+  flex: 1; min-height: 0; resize: none;
+  margin: 0 10px; padding: 10px 12px;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: var(--rayon);
+  font-size: 13.5px; line-height: 1.65; tab-size: 2;
+}
+.cn-source:focus { outline: none; border-color: var(--accent); background: var(--fond-2); }
+
+.cn-rendu {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 2px 14px 10px; font-size: 13.5px; line-height: 1.65; color: var(--texte);
+}
+
+.cn-pied {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-top: 1px solid var(--bord);
+}
+.cn-pied-aide { flex: 1; min-width: 0; font-size: 10.5px; color: var(--texte-faible); }
+.cn-chapitre-choix { font-size: 11.5px; max-width: 45%; }
+
+.cn-vide { padding: 26px 20px; color: var(--texte-doux); font-size: 12.5px; line-height: 1.6; }
+.cn-vide-titre { font-family: var(--police-titre); font-size: 16px; color: var(--texte); margin: 0 0 8px; }
+.cn-vide .bouton { margin-top: 12px; }
+
+/* complétion « / » */
+.cn-suggestions {
+  position: absolute; z-index: 20; margin: 0; padding: 4px; list-style: none;
+  min-width: 230px; max-width: 320px;
+  background: var(--fond-2); border: 1px solid var(--bord-clair);
+  border-radius: var(--rayon); box-shadow: var(--ombre-panneau);
+}
+.cn-suggestions li {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 5px 7px; border-radius: 5px; cursor: pointer; font-size: 12.5px;
+}
+.cn-suggestions li.survol { background: var(--accent-doux); }
+.cn-sug-ico { flex: 0 0 auto; font-size: 11px; }
+.cn-sug-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-sug-detail { font-size: 10.5px; color: var(--texte-faible); white-space: nowrap; }
+
+/* --------------------------------------------------------------- markdown */
+
+.cn-rendu h1, .cn-rendu h2, .cn-rendu h3,
+.cn-rendu h4, .cn-rendu h5, .cn-rendu h6 {
+  font-family: var(--police-titre); margin: 16px 0 6px; line-height: 1.3;
+}
+.cn-rendu h1 { font-size: 19px; }
+.cn-rendu h2 { font-size: 16.5px; }
+.cn-rendu h3 { font-size: 14.5px; }
+.cn-rendu h4, .cn-rendu h5, .cn-rendu h6 { font-size: 13.5px; color: var(--texte-doux); }
+.cn-rendu p { margin: 8px 0; }
+.cn-rendu ul, .cn-rendu ol { margin: 8px 0; padding-left: 22px; }
+.cn-rendu li { margin: 2px 0; }
+.cn-rendu blockquote {
+  margin: 10px 0; padding: 4px 12px;
+  border-left: 3px solid var(--accent); color: var(--texte-doux); font-style: italic;
+}
+.cn-rendu hr { border: 0; border-top: 1px solid var(--bord); margin: 14px 0; }
+.cn-rendu code {
+  background: var(--fond-3); border: 1px solid var(--bord);
+  border-radius: 4px; padding: 0 4px; font-size: 12px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.cn-rendu pre.md-code {
+  margin: 10px 0; padding: 9px 11px; overflow-x: auto;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: var(--rayon);
+}
+.cn-rendu pre.md-code code { background: none; border: 0; padding: 0; }
+.cn-rendu a { color: var(--accent-fonce); }
+/* Un tableau large défile **dans sa boîte** : sans ça, c'est la note entière
+   qui se met à glisser latéralement, et le texte autour part avec. */
+.md-table-boite { overflow-x: auto; margin: 10px 0; }
+.md-table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.md-table th, .md-table td {
+  border: 1px solid var(--bord); padding: 5px 8px; text-align: left; vertical-align: top;
+}
+.md-table th { background: var(--fond-3); font-weight: 600; }
+
+/* les balises */
+.balise {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  background: var(--accent-doux); border: 1px solid transparent;
+  border-radius: 5px; padding: 0 5px; margin: 0 1px;
+  color: var(--accent-fonce); font: inherit; font-size: .95em; font-weight: 600;
+  cursor: pointer; vertical-align: baseline;
+}
+.balise:hover { border-color: var(--accent); }
+.balise-ico { font-size: .8em; opacity: .8; }
+/* Une cible supprimée : la note garde ce qu'elle disait, mais elle ne mène
+   plus nulle part — et ça se voit. */
+.balise-perdue {
+  background: var(--fond-3); color: var(--texte-faible);
+  border-style: dashed; border-color: var(--bord-clair);
+  text-decoration: line-through; cursor: not-allowed;
+}
+.balise-visee {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+  background: var(--accent); color: #fff;
+}
+
+/* citations, dans la fiche d'une personne */
+.pn-citations > summary {
+  cursor: pointer; list-style: none;
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texte-faible);
+}
+.pn-citations > summary::-webkit-details-marker { display: none; }
+/* Le chevron dit d'un coup d'œil qu'il y a quelque chose dessous — et de quel
+   côté. Sans lui, un `<summary>` déshabillé de sa flèche n'a plus l'air
+   cliquable du tout. */
+.pn-citations > summary::before { content: '▸ '; letter-spacing: 0; }
+.pn-citations[open] > summary::before { content: '▾ '; }
+.pn-citations[open] > summary { margin-bottom: 8px; }
+.pn-citations > summary:hover { color: var(--texte-doux); }
+.pn-citations-titre { display: inline-flex; align-items: baseline; gap: 6px; }
+.pn-citations-nombre {
+  font-size: 10.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
+}
+.pn-cit-chapitre {
+  margin: 10px 0 4px; font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--texte-faible);
+}
+.pn-cit-note { margin-bottom: 8px; }
+.pn-cit-note-titre {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--texte-doux); margin-bottom: 3px;
+}
+.pn-cit-extrait {
+  display: block; width: 100%; text-align: left;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 6px;
+  padding: 5px 8px; margin: 3px 0; cursor: pointer;
+  font-size: 12px; line-height: 1.5; color: var(--texte-doux);
+}
+.pn-cit-extrait:hover { border-color: var(--accent); color: var(--texte); }
+.pn-cit-extrait b { color: var(--accent-fonce); }
+
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 1180px) {
@@ -1404,6 +1666,20 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 }
 @media (max-width: 860px) {
   .panneau { position: absolute; right: 0; top: 0; bottom: 0; z-index: 19; width: 300px; flex-basis: 300px; }
+}
+
+/* Le carnet en volet mange la scène avant tout le monde : à 1180 px il reste
+   large, à 1040 il passe par-dessus le plan plutôt que de le réduire à une
+   bande. Un plan de 200 px de large ne montre plus de réseau — autant assumer
+   le recouvrement et laisser une sortie visible (le ✕ de son en-tête). */
+@media (max-width: 1180px) {
+  .volet-carnet { width: 360px; flex-basis: 360px; }
+}
+@media (max-width: 1040px) {
+  .volet-carnet {
+    position: absolute; right: 0; top: 0; bottom: 0; z-index: 20;
+    width: 380px; flex-basis: 380px; box-shadow: var(--ombre-panneau);
+  }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -1687,10 +1963,52 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
      bouton de cette barre qui écrit. Le curseur de zoom passe de 16 à 34 px —
      en dessous, on attrape sa poignée une fois sur deux. */
   .barre-basse .bouton { padding: 6px 7px; min-height: 40px; }
+  /* « Carnet » perd son libellé ici, et pas ailleurs.
+   *
+   * Mesuré le 15/08/2026 sur 375 px : la barre tenait à 354 px pour 354
+   * disponibles — au caractère près. Le bouton du carnet, libellé compris,
+   * la faisait déborder de 48 px, et ce qui débordait était le curseur de
+   * zoom, hors de l'écran et donc perdu. En pastille, ✎ tient dans ce qui
+   * reste ; « ＋ Profil » et « ⛨ Filtres » gardent les leurs, ce sont les deux
+   * seuls dont le geste n'est pas devinable à l'icône. */
   .barre-basse #btn-ajuster .lib,
+  .barre-basse #btn-carnet .lib,
   .barre-basse #btn-focus .lib { display: none; }
   .barre-basse .bouton .ico { margin-right: 0; }
   #btn-nouveau-profil { flex: 0 0 auto; }
-  #zoom-curseur { width: 68px; height: 34px; }
+  /* 60 px de large et non 68 : les huit derniers pixels de débordement, une
+     fois « ✎ » réduit à sa pastille. C'est la **largeur** qui cède, jamais la
+     hauteur — 34 px reste ce en dessous de quoi on rate la poignée. */
+  #zoom-curseur { width: 60px; height: 34px; }
   .separateur-vertical { margin: 0 1px; }
+
+  /* Le carnet, au doigt.
+   *
+   * En volet il prend tout l'écran : à 375 px il n'y a pas de « à côté du
+   * plan », et un carnet de 380 px sur un écran de 375 est un carnet qui
+   * déborde. Le ✕ de son en-tête est donc la sortie, et il reste visible.
+   *
+   * Le sommaire repasse en calque **même en pleine page** : une colonne de
+   * 250 px sur 375, c'est les deux tiers de l'écran pour une liste. */
+  .volet-carnet {
+    position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+    width: 100%; flex-basis: 100%; z-index: 32;
+    border-left: 0; padding-bottom: 0;
+  }
+  .carnet-large .cn-sommaire { display: none; }
+  .carnet-large.cn-sommaire-ouvert .cn-sommaire {
+    display: flex; position: absolute; width: 84%; box-shadow: var(--ombre-panneau);
+  }
+  .carnet-large .cn-btn-sommaire { display: inline-flex; }
+
+  .cn-barre .bouton { min-height: 38px; }
+  .cn-outil { min-width: 34px; height: 34px; font-size: 12.5px; }
+  .cn-ligne { min-height: 42px; }
+  .cn-chap-titre, .cn-titre { min-height: 38px; }
+  /* 16 px : en dessous, iOS zoome sur le champ dès qu'on y pose le doigt, et
+     la note se retrouve à moitié hors de l'écran. */
+  .cn-source { font-size: 16px; }
+  .cn-suggestions { min-width: 60vw; max-width: 88vw; }
+  .cn-suggestions li { min-height: 40px; align-items: center; }
+  .cn-chapitre-choix { min-height: 36px; }
 }

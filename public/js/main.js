@@ -26,6 +26,7 @@ import {
 } from './editeurs.js';
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
 import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
+import { creerCarnet, definirCarnetPartage } from './carnet.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -103,6 +104,8 @@ const elements = {
   listeDemonstration: document.getElementById('liste-demonstration'),
   btnDemoCopier: document.getElementById('btn-demo-copier'),
   btnDemoReinitialiser: document.getElementById('btn-demo-reinitialiser'),
+  btnCarnet: document.getElementById('btn-carnet'),
+  voletCarnet: document.getElementById('volet-carnet'),
 };
 
 /**
@@ -161,6 +164,12 @@ const etat = {
   // Joueur en cours d'édition rapide : la liste de droite devient une
   // grille d'humeurs envers lui.
   joueurActif: null,
+  // Le carnet (lot 15) : où il est posé — `null`, `'volet'` (à côté du plan)
+  // ou `'vue'` (pleine scène) — et la vue à laquelle revenir quand il quitte
+  // la scène. Il n'y en a **qu'un** dans la page : ces deux champs disent où
+  // il se trouve, ils n'en créent jamais un second.
+  carnetPlace: null,
+  vueAvantCarnet: null,
 };
 
 const modulesCharges = new Map();
@@ -178,9 +187,44 @@ const panneau = creerPanneau(elements.panneauFiche, {
     amenerLaFiche();
   },
   surEnregistrement: () => rechargerVue({ conserverFocus: true }),
+  // Un passage cité dans le carnet : on ouvre le carnet **sans fermer la vue**
+  // — d'où le volet — et on descend jusqu'à l'endroit exact.
+  surCitation: (note, ancre) => ouvrirLeCarnetSur(note, ancre),
 });
 
 const menu = creerMenu();
+
+/**
+ * Le carnet de notes — un seul exemplaire pour toute la page.
+ *
+ * Il n'est pas monté ici : `etat.carnetPlace` dit où il se trouve, et
+ * `poserLeCarnet` le déplace. `views/carnet.js` vient chercher **cet**
+ * exemplaire quand la vue s'ouvre, au lieu d'en fabriquer un second.
+ */
+const carnet = definirCarnetPartage(
+  creerCarnet({
+    lectureSeule: () => !!PARTAGE,
+    placeActuelle: () => etat.carnetPlace,
+    // Le seul endroit où l'on écrit longuement de ses propres mots : le
+    // redire ici n'est pas une redite du bandeau du haut, c'est le dire là où
+    // l'on perdrait le plus.
+    // Court exprès : le bandeau du haut porte déjà le bouton qui **agit**
+    // (« en faire mon monde »). Ici on avertit, on ne refait pas l'appel —
+    // deux lignes dans un volet de 400 px, c'est de la place prise au texte.
+    avertissement: () =>
+      demonstrationOuverte() ? 'Démonstration — ces notes ne sont pas conservées.' : '',
+    surBalise: (genre, id, evenement) => ouvrirLaCible(genre, id, evenement),
+    surDeplacement: () => deplacerLeCarnet(),
+    surFermeture: () => rangerLeCarnet(),
+    // Une note écrite compte comme une écriture : le bandeau d'essai et celui
+    // de la démonstration doivent le savoir, il y a maintenant à perdre.
+    surEcriture: () => {
+      marquerEssaiModifie();
+      marquerDemoModifiee();
+      rafraichirCitations();
+    },
+  })
+);
 
 const editeurLien = creerEditeurLien({
   types: () => etat.referentiels.types_relations || [],
@@ -653,6 +697,10 @@ async function dessinerPartages() {
 /** Changer de sauvegarde = changer de monde : on repart de la vue générale. */
 async function ouvrirSauvegarde(identifiant) {
   message('Ouverture de la sauvegarde…');
+  // Ce qui n'est pas encore parti appartient au monde qu'on quitte : on le
+  // pousse **avant** de changer d'active, sinon la note d'une campagne
+  // s'écrirait dans une autre.
+  await carnet.vider();
   try {
     await Api.activerSauvegarde(identifiant);
   } catch (erreur) {
@@ -913,6 +961,23 @@ function remplirSelecteurCouleur() {
 async function choisirVue(vueId) {
   const vue = etat.vues.find((v) => v.id === vueId);
   if (!vue) return;
+
+  // Le carnet n'existe qu'en un exemplaire : entrer dans sa vue le prend au
+  // volet, en sortir le laisse disponible. On n'en ouvre jamais un deuxième —
+  // ce serait deux brouillons sur le même texte.
+  if (vueId !== 'carnet') etat.vueAvantCarnet = vueId;
+  if (vueId === 'carnet') {
+    if (etat.carnetPlace === 'volet') {
+      await carnet.vider();
+      elements.voletCarnet.hidden = true;
+      elements.voletCarnet.replaceChildren();
+    }
+    etat.carnetPlace = 'vue';
+  } else if (etat.carnetPlace === 'vue') {
+    etat.carnetPlace = null;
+  }
+  majBoutonCarnet();
+
   etat.vueCourante = vue;
   etat.parametres = {};
   (vue.parametres || []).forEach((parametre) => {
@@ -1023,6 +1088,10 @@ async function rechargerVue({ conserverFocus = false } = {}) {
   majStats();
   // Les compteurs du rail suivent ce que contient réellement la sauvegarde.
   dessinerSauvegardes();
+  // Le carnet en volet affiche des **noms**, pas des identifiants : un profil
+  // renommé, une maison créée, et son catalogue est en retard. Il se recharge
+  // sans jamais écraser un texte en cours de frappe (voir `carnet.js`).
+  if (etat.carnetPlace === 'volet') carnet.charger();
 
   if (conserverFocus && etat.selection) etat.moteur.focus(etat.selection, { animer: false });
 }
@@ -1071,6 +1140,114 @@ async function chargerMoteur(payload) {
     return null;
   }
   return obtenirRendu(payload);
+}
+
+// ---------------------------------------------------------------- carnet
+//
+// Un seul carnet, deux places. Ce bloc ne fait que le **déplacer** : rien ici
+// n'en fabrique un second, et c'est la règle qui rend l'ancre possible — une
+// citation ouverte depuis une fiche atterrit dans le carnet qu'on est en train
+// d'écrire, pas dans une copie de son dernier état enregistré.
+
+/** La première vue qui n'est pas le carnet : là où l'on revient en le quittant. */
+const vueDeRepli = () => etat.vueAvantCarnet || etat.vues.find((v) => v.id !== 'carnet')?.id;
+
+async function poserLeCarnetEnVolet() {
+  if (etat.carnetPlace === 'vue') await choisirVue(vueDeRepli());
+  etat.carnetPlace = 'volet';
+  elements.voletCarnet.hidden = false;
+  elements.voletCarnet.replaceChildren(carnet.element);
+  carnet.replacer(false);
+  majBoutonCarnet();
+  await carnet.charger();
+}
+
+/** Le carnet quitte le volet. Ce qui n'était pas parti part d'abord. */
+async function rangerLeCarnet() {
+  await carnet.vider();
+  etat.carnetPlace = null;
+  elements.voletCarnet.hidden = true;
+  elements.voletCarnet.replaceChildren();
+  majBoutonCarnet();
+}
+
+/** Le bouton de la barre basse : ouvre, ferme, et ramène du plein écran. */
+async function basculerLeCarnet() {
+  if (etat.carnetPlace === 'volet') return rangerLeCarnet();
+  if (etat.carnetPlace === 'vue') {
+    // On le referme pour de bon : quelqu'un qui appuie sur l'interrupteur du
+    // carnet alors qu'il occupe tout l'écran veut retrouver son plan.
+    await carnet.vider();
+    return choisirVue(vueDeRepli());
+  }
+  return poserLeCarnetEnVolet();
+}
+
+/** Le bouton ⇄ de son en-tête : d'une place à l'autre, jamais un deuxième. */
+async function deplacerLeCarnet() {
+  if (etat.carnetPlace === 'vue') return poserLeCarnetEnVolet();
+  return choisirVue('carnet');
+}
+
+function majBoutonCarnet() {
+  if (!elements.btnCarnet) return;
+  const ouvert = etat.carnetPlace !== null;
+  elements.btnCarnet.classList.toggle('actif', ouvert);
+  elements.btnCarnet.title = ouvert
+    ? 'Fermer le carnet de notes'
+    : 'Carnet de notes — écrire pendant la partie, à côté du plan';
+}
+
+/**
+ * Une citation cliquée dans une fiche : le carnet s'ouvre **en volet**, donc
+ * sans fermer la vue qu'on regardait, et descend jusqu'au passage.
+ */
+async function ouvrirLeCarnetSur(noteId, ancre) {
+  if (etat.carnetPlace === null) await poserLeCarnetEnVolet();
+  carnet.ouvrirSur(noteId, ancre);
+}
+
+/**
+ * L'autre sens : une balise cliquée dans une note ouvre ce qu'elle désigne,
+ * **sans quitter le carnet**. Un profil va dans le panneau de droite, une
+ * maison, un joueur ou un lien dans leur éditeur flottant.
+ */
+async function ouvrirLaCible(genre, id, evenement) {
+  const x = evenement?.clientX ?? 240;
+  const y = evenement?.clientY ?? 160;
+
+  if (genre === 'p') {
+    if (!trouverNoeud(id)) return message(`Ce profil n’existe plus : ${id}`);
+    await selectionner(id);
+    return;
+  }
+  if (PARTAGE) return; // en lecture seule, les éditeurs n'ont rien à faire là
+
+  if (genre === 'm') {
+    const maison = (etat.referentiels.maisons || []).find((entree) => entree.id === id);
+    if (maison) editeurMaison.ouvrirModification(maison, x, y);
+    return;
+  }
+  if (genre === 'j') {
+    const joueur = (etat.referentiels.joueurs || []).find((entree) => entree.id === id);
+    if (joueur) editeurJoueur.ouvrirModification(joueur, x, y);
+    return;
+  }
+  if (genre === 'l') {
+    // Les liens ne sont pas dans les référentiels : on va chercher celui-là.
+    try {
+      const { relations = [] } = await Api.relations();
+      const lien = relations.find((entree) => entree.id === id);
+      if (lien) editeurLien.ouvrirModification(lien, x, y);
+    } catch (erreur) {
+      message(`Lien introuvable : ${erreur.message}`);
+    }
+  }
+}
+
+/** La fiche ouverte affiche un nombre de citations : il vient de changer. */
+function rafraichirCitations() {
+  if (panneau.estOuvert()) panneau.majCitations();
 }
 
 // -------------------------------------------------------------- sélection
@@ -2438,6 +2615,7 @@ elements.btnAnnee.addEventListener('click', (evenement) => {
   editeurAnnee.ouvrir(boite.left, boite.bottom + 6);
 });
 elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
+elements.btnCarnet.addEventListener('click', () => basculerLeCarnet());
 // Sur écran large, ☰ replie le rail. Sur téléphone, les deux volets sont des
 // tiroirs qui couvrent la scène : ouvrir l'un ferme l'autre, sinon on empile
 // deux panneaux plein écran sans savoir lequel on regarde.

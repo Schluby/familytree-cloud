@@ -6,10 +6,15 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8, 9, 10 et 11** — des
-tranches qui n'étaient pas au plan d'origine, demandées entre le 10 et le
-13/08/2026. En ligne sur https://familytree.schlub-perso.workers.dev et sur
+**Les sept lots du plan sont livrés, puis les lots 8 à 15** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 15/08/2026. En
+ligne sur https://familytree.schlub-perso.workers.dev et sur
 https://myschlub.com (**le même Worker**, pas un second déploiement).
+
+Le lot 15 ajoute le **carnet** : des notes en Markdown, rangées en chapitres,
+qui citent les fiches du monde et savent dire à chaque fiche où l'on parle
+d'elle. Il n'apporte **aucune migration** — tout vit dans le document de la
+sauvegarde. Voir « Le carnet (lot 15) » plus bas pour les pièges.
 
 Le lot 9 change quelque chose de plus profond que les précédents : **le service
 n'exige plus de compte pour être essayé.** Un visiteur arrive dans un monde déjà
@@ -616,6 +621,42 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   est une **bascule** et refermait le tiroir d'une étape à l'autre (d'où
   `derouler`), et un halo plus grand que l'écran n'assombrit ni ne désigne
   plus rien (d'où le rognage sur la fenêtre, et le repli sur un calque uni).
+
+## Le carnet (lot 15)
+
+- **`carnet` est une clef du document, pas une table.** Elle passe par `monde()`
+  et `ecrireDocument` comme tout le reste, ce qui lui donne gratuitement les
+  plafonds, les exports, l'archive et **la procuration** :
+  `routesAdmin.route('/arbres/:arbre', routesDomaine)` monte aussi `/carnet/*`,
+  donc l'administrateur et l'intendant y arrivent sans une ligne de plus.
+- **Elle disparaît quand le carnet est vide.** `ecrireCarnet` pose `null` sur un
+  carnet sans chapitre ni note, et `versDict` ne l'écrit que si elle porte
+  quelque chose. C'est ce qui garde `outils/comparer.mjs` muet sur les mondes
+  d'avant le lot — et il faut le savoir : **la version Python locale ne connaît
+  pas cette clef**, un document qui ferait l'aller-retour par elle la perdrait.
+- **La grammaire des balises est écrite deux fois** — `src/domaine/carnet.ts` et
+  `public/js/markdown.js` — et les deux doivent rester d'accord. Surtout sur un
+  point : `data-rang` compte les apparitions **de cette cible-là** dans la note,
+  exactement comme l'index inverse. S'ils se séparent, une citation ouvre la
+  bonne note au mauvais endroit, et rien ne le signale.
+- **Un seul carnet dans la page.** `main.js` le fabrique, `definirCarnetPartage`
+  le pose, `views/carnet.js` vient le chercher. `etat.carnetPlace` dit où il est
+  (`null`, `'volet'`, `'vue'`) ; on le **déplace**, on n'en crée jamais un
+  second — ce serait deux brouillons qui s'écrasent.
+- **On n'écrase jamais un texte en cours de frappe.** Le carnet se recharge à
+  chaque rechargement de vue (les noms affichés viennent des fiches) ; si cela
+  tombe pendant qu'on tape, seul le catalogue est repris — voir
+  `enCoursDeFrappe` dans `appliquer`.
+- **`replaceChildren` n'est pas `h()`** : il convertit un enfant `null` ou
+  `false` en **texte**. D'où `poser()` dans `carnet.js` — le sommaire affichait
+  « null » à la première ouverture du volet.
+- **Toute erreur du domaine doit passer par `enErreur`**, sinon elle ressort en
+  500. `ErreurCarnet` y a été ajoutée après coup ; c'est le genre d'oubli que
+  seul le harnais attrape.
+- Le rendu Markdown **échappe d'abord et balise ensuite**, et ses jetons de mise
+  à l'écart (`<c0>`, `<b0>`) ne sont sûrs **que parce que** l'échappement a déjà
+  eu lieu : à ce stade, le seul `<` que le texte puisse porter est un `<` qu'on
+  vient d'écrire soi-même. Ne pas déplacer l'ordre de ces trois lignes.
 
 ## Pour repartir
 

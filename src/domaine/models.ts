@@ -490,6 +490,14 @@ export class Dataset {
   joueurs: Objet[] = [];
   personnes: Personne[] = [];
   relations: Relation[] = [];
+  /**
+   * Les notes de la table : des chapitres, et du Markdown qui cite les fiches.
+   *
+   * `null` tant que personne n'a rien écrit — et le document ne porte alors
+   * aucune clé `carnet`. Voir `carnet.ts` : une sauvegarde qui ne s'en sert pas
+   * doit ressortir exactement comme elle est entrée.
+   */
+  carnet: Objet | null = null;
 
   /** Construit une fois par requête, et réutilisé : c'est du CPU en moins. */
   private _index: Map<string, Personne> | null = null;
@@ -592,6 +600,7 @@ export class Dataset {
     jeu.relations = (Array.isArray(donnees.relations) ? donnees.relations : [])
       .filter(estObjet)
       .map((r) => Relation.depuisDict(r));
+    jeu.carnet = estObjet(donnees.carnet) ? { ...donnees.carnet } : null;
     return jeu;
   }
 
@@ -606,6 +615,9 @@ export class Dataset {
       joueurs: this.joueurs,
       personnes: this.personnes.map((p) => p.versDict()),
       relations: this.relations.map((r) => r.versDict()),
+      // En dernier, et seulement s'il porte quelque chose : un monde sans
+      // carnet ressort octet pour octet comme il est entré.
+      ...(this.carnet ? { carnet: this.carnet } : {}),
     };
   }
 

@@ -39,6 +39,7 @@ import {
 } from './exports';
 import { archiver, type Entree } from './zip';
 import { contenuDepart } from '../depart/contenu';
+import * as carnet from './carnet';
 import * as filtres from './filtres';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
@@ -87,6 +88,8 @@ const SURFACE = [
   '/listes/*',
   '/filtres',
   '/filtres/*',
+  '/carnet',
+  '/carnet/*',
   '/lieux',
   '/export/*',
 ];
@@ -155,7 +158,11 @@ async function enregistrer(c: Contexte, courant: Monde): Promise<void> {
  * version locale.
  */
 function enErreur(c: Contexte, erreur: unknown): Response {
-  if (erreur instanceof ErreurReferentiel || erreur instanceof ErreurPortrait) {
+  if (
+    erreur instanceof ErreurReferentiel ||
+    erreur instanceof ErreurPortrait ||
+    erreur instanceof carnet.ErreurCarnet
+  ) {
     return c.json({ erreur: erreur.message }, 400);
   }
   if (erreur instanceof ErreurPlafond) {
@@ -522,6 +529,11 @@ routesDomaine.get('/personnes/:id', async (c) => {
       lireBool(params, 'secrets', false)
     ),
     joueurs: dataset.joueurs,
+    // Ce que le carnet dit d'elle. C'est du calcul sur du texte déjà chargé,
+    // et le compte doit s'afficher **avec** la fiche : un onglet « Cité dans
+    // le carnet » qui met une seconde à annoncer son nombre invite à le
+    // déplier pour rien.
+    citations: carnet.citations(dataset, 'p', personneId),
   });
 });
 
@@ -1155,6 +1167,198 @@ routesDomaine.delete('/filtres/:id', async (c) => {
   delete courant.dataset.filtres[identifiant];
   await enregistrer(c, courant);
   return c.json({ supprime: identifiant });
+});
+
+/* --------------------------------------------------------------------------
+ * Carnet
+ *
+ * Une seule adresse pour tout lire (`GET /carnet`) : l'éditeur a besoin des
+ * chapitres, des notes **et** du catalogue des cibles en même temps — sans le
+ * catalogue, le « / » ne proposerait rien. Trois appels pour ouvrir un carnet,
+ * c'était trois occasions d'en afficher un morceau.
+ * -------------------------------------------------------------------------- */
+
+function vueDuCarnet(dataset: Dataset): Objet {
+  const contenu = carnet.lireCarnet(dataset);
+  return {
+    chapitres: contenu.chapitres.map((chapitre) => ({
+      id: chapitre.id,
+      titre: chapitre.titre,
+      resume: chapitre.resume,
+    })),
+    notes: contenu.notes.map((note) => ({
+      id: note.id,
+      chapitre: note.chapitre,
+      titre: note.titre,
+      corps: note.corps,
+    })),
+    catalogue: carnet.catalogue(dataset),
+  };
+}
+
+routesDomaine.get('/carnet', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+  return c.json(vueDuCarnet(courant.dataset));
+});
+
+/** Qui parle de cette fiche, où, et combien de fois. */
+routesDomaine.get('/carnet/citations', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const genre = c.req.query('genre') ?? 'p';
+  const identifiant = c.req.query('id') ?? '';
+  if (!(carnet.GENRES as readonly string[]).includes(genre)) {
+    return c.json({ erreur: `genre inconnu : ${genre}` }, 400);
+  }
+  if (!identifiant) return c.json({ erreur: 'il faut préciser ?id=' }, 400);
+
+  return c.json(carnet.citations(courant.dataset, genre, identifiant));
+});
+
+routesDomaine.post('/carnet/chapitres', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const chapitre: carnet.Chapitre = {
+    id: idsLibres(
+      contenu.chapitres.map((entree) => entree.id),
+      slugifier(String(corps.id || corps.titre || ''), 'chapitre')
+    ),
+    titre: '',
+    resume: '',
+    extra: {},
+  };
+  carnet.appliquerChapitre(chapitre, corps);
+  contenu.chapitres.push(chapitre);
+  carnet.ecrireCarnet(courant.dataset, contenu);
+  await enregistrer(c, courant);
+  return c.json({ chapitre }, 201);
+});
+
+routesDomaine.patch('/carnet/chapitres/:id', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const identifiant = c.req.param('id');
+  const chapitre = contenu.chapitres.find((entree) => entree.id === identifiant);
+  if (!chapitre) return absent(c, `chapitre inconnu : ${identifiant}`);
+
+  carnet.appliquerChapitre(chapitre, corps);
+  carnet.ecrireCarnet(courant.dataset, contenu);
+  await enregistrer(c, courant);
+  return c.json({ chapitre });
+});
+
+/**
+ * Le chapitre s'en va, **ses notes restent**.
+ *
+ * Elles se retrouvent hors chapitre, en haut du sommaire, là où on les voit.
+ * Emporter dix séances de jeu parce qu'on renonce à un découpage serait le
+ * genre de suppression qu'on ne découvre que trop tard.
+ */
+routesDomaine.delete('/carnet/chapitres/:id', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const identifiant = c.req.param('id');
+  const chapitre = contenu.chapitres.find((entree) => entree.id === identifiant);
+  if (!chapitre) return absent(c, `chapitre inconnu : ${identifiant}`);
+
+  contenu.chapitres = contenu.chapitres.filter((entree) => entree.id !== identifiant);
+  let liberees = 0;
+  for (const note of contenu.notes) {
+    if (note.chapitre === identifiant) {
+      note.chapitre = '';
+      liberees += 1;
+    }
+  }
+  carnet.ecrireCarnet(courant.dataset, contenu);
+  await enregistrer(c, courant);
+  return c.json({ supprime: identifiant, titre: chapitre.titre, notes: liberees });
+});
+
+routesDomaine.post('/carnet/notes', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const note: carnet.Note = {
+    id: idsLibres(
+      contenu.notes.map((entree) => entree.id),
+      slugifier(String(corps.id || corps.titre || ''), 'note')
+    ),
+    chapitre: '',
+    titre: '',
+    corps: '',
+    extra: {},
+  };
+
+  try {
+    carnet.appliquerNote(note, corps);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+  // Un chapitre qui n'existe pas laisse la note hors chapitre plutôt que de
+  // la ranger dans un tiroir qu'on ne peut pas ouvrir.
+  if (!contenu.chapitres.some((entree) => entree.id === note.chapitre)) note.chapitre = '';
+
+  contenu.notes.push(note);
+  carnet.ecrireCarnet(courant.dataset, contenu);
+  try {
+    await enregistrer(c, courant);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+  return c.json({ note }, 201);
+});
+
+routesDomaine.patch('/carnet/notes/:id', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const identifiant = c.req.param('id');
+  const note = contenu.notes.find((entree) => entree.id === identifiant);
+  if (!note) return absent(c, `note inconnue : ${identifiant}`);
+
+  const avant = JSON.stringify(note);
+  try {
+    carnet.appliquerNote(note, corps);
+    if (note.chapitre && !contenu.chapitres.some((entree) => entree.id === note.chapitre)) {
+      note.chapitre = '';
+    }
+    if (JSON.stringify(note) !== avant) {
+      carnet.ecrireCarnet(courant.dataset, contenu);
+      await enregistrer(c, courant);
+    }
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+  return c.json({ note });
+});
+
+routesDomaine.delete('/carnet/notes/:id', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const identifiant = c.req.param('id');
+  const note = contenu.notes.find((entree) => entree.id === identifiant);
+  if (!note) return absent(c, `note inconnue : ${identifiant}`);
+
+  contenu.notes = contenu.notes.filter((entree) => entree.id !== identifiant);
+  carnet.ecrireCarnet(courant.dataset, contenu);
+  await enregistrer(c, courant);
+  return c.json({ supprime: identifiant, titre: note.titre });
 });
 
 /* --------------------------------------------------------------------------

@@ -1426,6 +1426,116 @@ code - GET /js/telephone.js > /dev/null
 verifier "le tiroir s'ouvre sans se refermer" oui "$(contient 'export function derouler')"
 
 # ---------------------------------------------------------------------------
+# Lot 15 : le carnet
+#
+# Trois promesses, et ce sont elles qu'on verifie ici :
+#
+# - **econome** : un monde qui ne s'en sert pas ne porte pas la clef `carnet`,
+#   et un carnet vide s'efface du document au lieu d'y laisser une coquille ;
+# - **ancre** : le compte des apparitions cote serveur et la numerotation des
+#   pastilles cote navigateur disent la meme chose — sinon une citation ouvre
+#   la bonne note au mauvais endroit ;
+# - **atteignable** : l'administrateur et l'intendant y arrivent par la
+#   procuration, comme pour tout le reste du domaine.
+# ---------------------------------------------------------------------------
+
+echo "-- 15.A le carnet ne pese rien tant qu'il est vide"
+code "$BOCAL_A" GET /api/sauvegardes > /dev/null
+verifier "un monde sans carnet n'en porte pas la clef" non "$(code "$BOCAL_A" GET /api/dataset > /dev/null; contient '"carnet"')"
+verifier "le carnet s'ouvre quand meme" 200 "$(code "$BOCAL_A" GET /api/carnet)"
+verifier "  vide" 0 "$(lire notes.length)"
+verifier "  mais avec de quoi citer" oui "$(contient '"catalogue"')"
+
+echo "-- 15.A des chapitres, des notes, des balises"
+verifier "un profil a citer" 201 "$(code "$BOCAL_A" POST /api/personnes '{"prenom":"Eddard","nom":"Stark"}')"
+CITE="$(lire personne.id)"
+verifier "un chapitre se cree" 201 "$(code "$BOCAL_A" POST /api/carnet/chapitres '{"titre":"Acte I"}')"
+CHAPITRE="$(lire chapitre.id)"
+verifier "  son id se lit" acte-i "$CHAPITRE"
+cat > "$DOSSIER/note.json" <<JSON
+{"titre":"Seance 1","chapitre":"$CHAPITRE",
+ "corps":"Au tournoi, @p:$CITE parle a @m:autre.\nPuis @p:$CITE repart seul."}
+JSON
+verifier "une note se cree" 201 "$(fichier "$BOCAL_A" POST /api/carnet/notes "$DOSSIER/note.json")"
+NOTE="$(lire note.id)"
+verifier "  rangee dans son chapitre" "$CHAPITRE" "$(lire note.chapitre)"
+verifier "un chapitre inconnu laisse la note hors chapitre" 201 "$(code "$BOCAL_A" POST /api/carnet/notes '{"titre":"Egaree","chapitre":"nulle-part"}')"
+verifier "  et ne l'egare pas" "" "$(lire note.chapitre)"
+EGAREE="$(lire note.id)"
+
+echo "-- 15.A qui parle de qui"
+verifier "la fiche sait qu'on parle d'elle" 200 "$(code "$BOCAL_A" GET /api/personnes/$CITE)"
+verifier "  deux fois" 2 "$(lire citations.total)"
+verifier "  dans une note" 1 "$(lire citations.par_note.length)"
+verifier "  d'un chapitre" 1 "$(lire citations.par_chapitre.length)"
+verifier "  et l'extrait donne le nom, pas l'identifiant" oui "$(contient 'Eddard Stark')"
+verifier "la route dediee dit la meme chose" 2 "$(code "$BOCAL_A" GET "/api/carnet/citations?genre=p&id=$CITE" > /dev/null; lire total)"
+verifier "  la deuxieme apparition porte le rang 2" 2 "$(lire par_note.0.extraits.1.rang)"
+verifier "un genre inconnu est refuse" 400 "$(code "$BOCAL_A" GET '/api/carnet/citations?genre=x&id=y')"
+verifier "une cible disparue n'invente pas de nom" "" "$(code "$BOCAL_A" GET '/api/carnet/citations?genre=p&id=fantome' > /dev/null; lire libelle)"
+
+echo "-- 15.A une balise dans du code ne cite personne"
+cat > "$DOSSIER/note.json" <<'JSON'
+{"corps":"Pour citer quelqu'un, on ecrit `@p:REMPLACER` dans le texte."}
+JSON
+node -e "
+  const fs=require('fs');
+  const p='$DOSSIER/note.json';
+  fs.writeFileSync(p, fs.readFileSync(p,'utf8').replace('REMPLACER','$CITE'));
+"
+verifier "la note ne parle que de la syntaxe" 200 "$(fichier "$BOCAL_A" PATCH /api/carnet/notes/$NOTE "$DOSSIER/note.json")"
+verifier "  et personne n'y est cite" 0 "$(code "$BOCAL_A" GET "/api/carnet/citations?genre=p&id=$CITE" > /dev/null; lire total)"
+
+echo "-- 15.A ce qu'on ne peut pas ecrire"
+node -e "
+  const fs=require('fs');
+  fs.writeFileSync('$DOSSIER/enorme.json', JSON.stringify({corps:'x'.repeat(200001)}));
+"
+verifier "une note demesuree est refusee" 400 "$(fichier "$BOCAL_A" PATCH /api/carnet/notes/$NOTE "$DOSSIER/enorme.json")"
+verifier "  en le disant en francais" oui "$(contient 'Coupez-la en deux')"
+verifier "une note inconnue reste inconnue" 404 "$(code "$BOCAL_A" PATCH /api/carnet/notes/jamais-vue '{"titre":"x"}')"
+
+echo "-- 15.A retirer un chapitre ne perd pas ses notes"
+verifier "le chapitre s'en va" 200 "$(code "$BOCAL_A" DELETE /api/carnet/chapitres/$CHAPITRE)"
+verifier "  en disant combien de notes il liberait" 1 "$(lire notes)"
+verifier "la note est toujours la" oui "$(code "$BOCAL_A" GET /api/carnet > /dev/null; contient "$NOTE")"
+verifier "  et plus aucun chapitre ne subsiste" 0 "$(lire chapitres.length)"
+
+echo "-- 15.A un carnet vide s'efface du document"
+verifier "la premiere note s'en va" 200 "$(code "$BOCAL_A" DELETE /api/carnet/notes/$NOTE)"
+verifier "la seconde aussi" 200 "$(code "$BOCAL_A" DELETE /api/carnet/notes/$EGAREE)"
+verifier "  et le document ne garde pas la clef" non "$(code "$BOCAL_A" GET /api/dataset > /dev/null; contient '"carnet"')"
+
+echo "-- 15.E l'administrateur atteint le carnet des autres"
+# A a ete rendu a son rang par les sections precedentes : on le renomme, comme
+# le font 11.A et 12.C. C'est le seul pouvoir que ce fichier s'accorde en SQL.
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+verifier "par procuration, il l'ouvre" 200 "$(code "$BOCAL_A" GET /api/admin/arbres/$SAUVEGARDE_INVITE/carnet)"
+verifier "  et il y ecrit" 201 "$(code "$BOCAL_A" POST /api/admin/arbres/$SAUVEGARDE_INVITE/carnet/notes '{"titre":"Note du MJ","corps":"Vu en table."}')"
+verifier "  le proprietaire la retrouve chez lui" oui "$(code "$BOCAL_I" GET /api/carnet > /dev/null; contient 'Note du MJ')"
+verifier "un simple membre n'a pas cette porte" 403 "$(code "$BOCAL_B" GET /api/admin/arbres/$SAUVEGARDE_INVITE/carnet)"
+
+echo "-- 15.E le carnet ressort avec le reste"
+verifier "les tableaux ont leur feuille" oui "$(code "$BOCAL_I" GET /api/vue/tableau > /dev/null; contient 'Carnet')"
+verifier "  avec le texte tel qu'il a ete tape" oui "$(contient 'Vu en table.')"
+verifier "le CSV du carnet se telecharge" 200 "$(code "$BOCAL_I" GET '/api/export/csv?table=carnet')"
+
+echo "-- 15.B et 15.C ce que la page en dit"
+code - GET / > /dev/null
+verifier "le carnet a son bouton dans la barre basse" oui "$(contient 'btn-carnet')"
+verifier "  et son volet, a cote du plan" oui "$(contient 'volet-carnet')"
+code - GET /js/carnet.js > /dev/null
+verifier "il n'y a qu'un carnet dans la page" oui "$(contient 'export function carnetPartage')"
+verifier "  la completion « / » y est" oui "$(contient 'function examinerDeclencheur')"
+verifier "  bornee par genre, sans remplissage" oui "$(contient 'function sousQuota')"
+verifier "  et un texte en cours de frappe n'est jamais ecrase" oui "$(contient 'enCoursDeFrappe')"
+code - GET /js/markdown.js > /dev/null
+verifier "le rendu echappe avant de baliser" oui "$(contient 'texte = echapper(source)')"
+verifier "  et refuse les adresses qui ne sont pas http(s)" oui "$(contient 'javascript:')"
+code - GET /js/views/carnet.js > /dev/null
+verifier "la vue reprend l'exemplaire existant" oui "$(contient 'carnetPartage()')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

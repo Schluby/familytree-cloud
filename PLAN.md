@@ -1508,3 +1508,134 @@ dedans, ce qui remplissait une place de trop dans le test des plafonds et
 faisait passer la démonstration neuve en tête de liste après une inscription.
 D'où trois aides — `siennes`, `sienne`, `demo_id` — qui disent en un mot ce que
 « ses sauvegardes » veut maintenant dire.
+
+---
+
+# Lot 15 — Le carnet  ☑
+
+*Demandé le 15/08/2026.* « Une nouvelle vue qui va permettre aux joueurs de
+prendre des notes, avec une mise en page économe donc probablement en .md, et
+qui leur permettra de baliser leurs notes avec des profils : en cliquant sur un
+profil, ils voient quelles notes y font référence. »
+
+## Ce que le carnet est
+
+Des **notes en Markdown**, rangées en **chapitres**, qui **citent** les fiches du
+monde. Trois mots, et chacun porte une décision.
+
+**Markdown**, parce que c'est ce que « économe » veut dire ici. Mesuré sur une
+note de séance de 2 945 signes et quinze citations :
+
+| | octets |
+|---|---|
+| la note, telle qu'elle est stockée | **3 061** |
+| la même note rendue en HTML | 11 965 |
+
+Un modèle de document riche coûterait **quatre fois** le texte, pour un texte
+qu'on relit et qu'on ne remet presque jamais en forme. Ce qui est enregistré est
+donc exactement ce qui a été tapé — 1,04 octet par signe, dont 116 de garniture
+pour la note entière. Le plafond de 2 Mo d'une sauvegarde tient environ **680**
+notes de cette taille.
+
+**Chapitres**, parce que c'est la division qui a été demandée, et la seule : les
+séances, les joueurs impliqués, les lieux ne sont pas quatre classements
+parallèles à tenir à jour, ce sont des **citations** dans le texte.
+
+**Citations**, sous la forme `@p:jon-snow` — un genre (`p` profil, `m` maison,
+`j` joueur, `l` lien) et un identifiant :
+
+- **elle survit à un renommage.** Ce qui est écrit est l'identifiant ; le nom
+  est lu dans la fiche à l'affichage. Renommer « Jon Snow » change toutes les
+  notes d'un coup, sans en réécrire une seule ;
+- **elle ne se répète pas.** Un nom recopié dans chaque citation, c'est le nom
+  payé autant de fois qu'il est cité ;
+- **elle se relit.** L'identifiant est le nom aplati, donc la source reste
+  lisible pendant qu'on tape.
+
+## 15.A — Le carnet dans le document
+
+`carnet` est une clef de plus dans le document de la sauvegarde — pas une table,
+pas un service. Elle passe donc par `monde()` et `ecrireDocument`, hérite des
+plafonds, des exports, de l'archive, et **de la procuration** : l'administrateur
+et l'intendant atteignent les notes par le même chemin que le reste.
+
+- ☑ **La clef n'existe pas quand le carnet est vide** — supprimer la dernière
+  note l'efface du document. Un monde qui ne s'en sert pas ressort octet pour
+  octet comme il est entré, et `outils/comparer.mjs` reste muet.
+- ☑ **Une balise dans un bloc de code ne cite personne** : le code est neutralisé
+  par des espaces, ce qui laisse les positions intactes pour découper les
+  extraits. L'index et l'affichage disent ainsi la même chose.
+- ☑ **Retirer un chapitre ne perd pas ses notes** : elles passent hors chapitre.
+- ☑ **Supprimer un profil ne réécrit pas les notes**. Elles gardent ce qu'elles
+  disaient ; la pastille devient barrée et ne mène plus nulle part.
+- ☑ 200 000 signes par note, refusés en français au-delà.
+
+## 15.B — L'éditeur
+
+Une barre d'outils qui **écrit du Markdown dans le texte** — titres, gras,
+italique, barré, code, listes, citation, tableau, filet, lien. Pas un traitement
+de texte déguisé : le fichier reste lisible tel quel, et c'est ce qui permet d'en
+garder mille.
+
+Le rendu (`public/js/markdown.js`) est écrit ici, et pas emprunté : la politique
+de sécurité de la page interdit tout script venu d'un autre hôte, et un rendu
+maison **échappe d'abord et balise ensuite**. Pas d'images — `![](data:…)` serait
+la porte par laquelle une note de séance pèserait deux mégaoctets.
+
+**Le « / »** propose profils, maisons, joueurs et liens, sous le curseur. Deux
+choses réglées à la mesure :
+
+- le « / » ne déclenche que s'il est en début de ligne ou précédé d'une espace,
+  sinon « et/ou » et « 12/03 » ouvraient une liste à chaque frappe ;
+- les propositions sont **bornées par genre**. Le nom d'un lien est fabriqué à
+  partir de ses deux extrémités : sans quota, taper « /ed » remontait Eddard
+  Stark puis cinq « Eddard Stark → … », six liens sur huit propositions. Les
+  places restées libres **ne sont pas remplies** — une liste de quatre
+  propositions justes vaut mieux qu'une de huit dont la moitié est du
+  remplissage.
+
+## 15.C — Les deux places, un seul carnet
+
+Le carnet s'ouvre **en volet à côté du plan** (bouton « ✎ » de la barre basse) ou
+**en pleine scène** comme n'importe quelle vue. Le « ⇄ » de son en-tête le
+**déplace** : il n'y en a jamais deux dans la page — ce serait deux brouillons
+sur le même texte. C'est aussi ce qui rend l'ancre honnête : une citation ouverte
+depuis une fiche atterrit dans le carnet qu'on est en train d'écrire, pas dans
+une copie de son dernier état enregistré.
+
+Au téléphone, le volet devient une feuille plein écran, et le sommaire un calque
+qu'on appelle du « ☰ ».
+
+## 15.D — Les deux sens de lecture
+
+- **De la fiche vers la note** : un onglet dépliable « Cité dans le carnet »,
+  replié par défaut mais **avec le nombre dans son titre** — sinon il faudrait
+  l'ouvrir sur chaque profil pour savoir s'il a quelque chose à montrer.
+  Groupé par chapitre, dans l'ordre du carnet, avec les extraits cliquables.
+  Cliquer descend jusqu'au passage exact, **sans fermer la vue en cours**.
+- **De la note vers la fiche** : une pastille ouvre le profil dans le panneau de
+  droite, ou l'éditeur de la maison, du joueur, du lien — **sans quitter les
+  notes**.
+
+L'ancre tient à une convention à respecter des deux côtés : `data-rang` compte
+les apparitions **de cette cible-là** dans la note, exactement comme l'index
+inverse du serveur. Si les deux comptes se séparent, une citation ouvre la bonne
+note au mauvais endroit.
+
+## Mesures
+
+| | |
+|---|---|
+| note de séance, 2 945 signes | **3 061 octets** stockés |
+| la même en HTML | 11 965 octets (**×4,1**) |
+| notes de cette taille sous le plafond de 2 Mo | ~680 |
+| barre basse à 375 px, avant | 402 px pour 354 disponibles (**48 de trop**) |
+| après (« ✎ » en pastille, curseur de zoom 68 → 60 px) | **354 / 354** |
+| propositions pour « /ed », avant / après quota | 8 dont 6 liens / **4** |
+
+## Vérification
+
+**598/598 en local** (550 avant le lot). Deux défauts trouvés par le harnais et
+non par la lecture : `ErreurCarnet` n'était pas traduite par `enErreur` et
+sortait en 500 au lieu de 400, et le sommaire affichait « null » — `h()` ignore
+un enfant absent, `replaceChildren` le convertit en texte.

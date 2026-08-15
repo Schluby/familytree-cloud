@@ -10,6 +10,7 @@
  * est un simple conteneur OPC, et le projet tient à ne dépendre de rien.
  */
 
+import * as carnet from './carnet';
 import * as humeur from './humeur';
 import { appliquerSurcharges, calculerGenerations } from './genealogie';
 import { Dataset, Objet, Personne } from './models';
@@ -252,7 +253,38 @@ export function tables(dataset: Dataset, secrets = true): Table[] {
     }
   }
 
-  return [personnes, liens, maisons, types, regards];
+  // Le carnet sort avec le reste : c'est du texte que quelqu'un a écrit à la
+  // main, et il n'y a pas de raison qu'il soit le seul à ne pas pouvoir
+  // ressortir. Le corps part **en Markdown**, tel quel — c'est ce qui a été
+  // tapé, et le rendre en texte plat perdrait les titres et les tableaux.
+  const contenu = carnet.lireCarnet(dataset);
+  const titreChapitre = new Map(contenu.chapitres.map((c) => [c.id, c.titre]));
+  const notes: Table = {
+    id: 'carnet',
+    titre: 'Carnet',
+    colonnes: [
+      col('chapitre', 'Chapitre'),
+      col('titre', 'Note'),
+      col('signes', 'Signes', 'nombre'),
+      col('cites', 'Cités'),
+      col('corps', 'Texte (Markdown)'),
+    ],
+    lignes: contenu.notes.map((note) => [
+      titreChapitre.get(note.chapitre) ?? '',
+      note.titre,
+      note.corps.length,
+      [
+        ...new Set(
+          carnet
+            .balisesDe(note.corps)
+            .map((balise) => carnet.libelleDe(dataset, balise.genre, balise.id) ?? balise.id)
+        ),
+      ].join(' · '),
+      note.corps,
+    ]),
+  };
+
+  return [personnes, liens, maisons, types, regards, notes];
 }
 
 export function table(dataset: Dataset, tableId: string, secrets = true): Table | null {
