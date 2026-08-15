@@ -1675,6 +1675,159 @@ code - GET /js/panel.js > /dev/null
 verifier "  et la fiche pose bien cette classe la" oui "$(contient "class: 'joueur-ligne'")"
 
 # ---------------------------------------------------------------------------
+# Lot 17 : le plan collectif — les mondes de plusieurs membres superposes
+#
+# Ce que cette section protege, dans l'ordre ou ca casserait :
+#
+#  1. La porte. `/api/admin/collectif/*` est de la surface d'administration :
+#     memes gardes, meme perimetre, meme 404 pour ce qui n'est pas a soi.
+#  2. Le rapprochement. Deux ecritures d'une meme personne ne font qu'une
+#     carte ; deux personnes qui se ressemblent en font deux. C'est la
+#     difference entre un outil et un piege, et le seuil seul ne suffit pas —
+#     d'ou les verdicts, qui sont gardes.
+#  3. La resolution par grappe. Un lot qui vise « grappe:x » doit ecrire chez
+#     chacun sous SON identifiant, sinon il n'ecrit que chez ceux qui n'ont
+#     rien renomme — c'est-a-dire la ou il ne sert a rien.
+# ---------------------------------------------------------------------------
+
+# Combien de cartes portent ce libelle dans le dernier plan recu.
+cartes_du_plan() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    process.stdout.write(String((d.noeuds||[]).filter(n=>n.label.includes('$1')).length));
+  " 2>/dev/null
+}
+
+# Combien d'ecritures la carte de ce libelle reunit.
+ecritures_du_plan() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    const n=(d.noeuds||[]).find(x=>x.label.includes('$1'));
+    process.stdout.write(String(n ? n.ecritures.length : 0));
+  " 2>/dev/null
+}
+
+# La cle de grappe d'une carte : c'est par elle qu'un lot la vise.
+cle_du_plan() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    const n=(d.noeuds||[]).find(x=>x.label.includes('$1'));
+    process.stdout.write(n ? n.id : '');
+  " 2>/dev/null
+}
+
+echo "-- 17 le plan collectif est ferme comme le reste"
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+verifier "sans session, le plan est refuse" 401 "$(code - POST /api/admin/collectif/plan '{}')"
+verifier "un membre est refuse" 403 "$(code "$BOCAL_I" POST /api/admin/collectif/plan '{}')"
+verifier "  et les verdicts d'identite aussi" 403 "$(code "$BOCAL_I" POST /api/admin/collectif/identites '{}')"
+verifier "sans compte selectionne" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/plan '{"comptes":[]}')"
+verifier "aucune sauvegarde a superposer" 404 "$(code "$BOCAL_A" POST /api/admin/collectif/plan '{"comptes":["inexistant"]}')"
+TROP_PLAN="$(node -e "process.stdout.write(JSON.stringify({comptes:Array.from({length:13},(_,i)=>'c'+i)}))")"
+verifier "plus de douze comptes superposes" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "$TROP_PLAN")"
+verifier "  et il dit pourquoi" oui "$(contient 'plus rien')"
+
+echo "-- 17.A deux ecritures d'une meme personne ne font qu'une carte"
+code "$BOCAL_B" GET /api/sauvegardes > /dev/null
+ARBRE_B="$(sienne)"
+# Le meme nom, deux identifiants : c'est ce qu'une table produit en trois
+# seances, et ce que le rapprochement existe pour demeler.
+code "$BOCAL_A" POST /api/admin/arbres/$ARBRE_B/personnes '{"prenom":"Alys","nom":"Karstark"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/arbres/$SAUVEGARDE_INVITE/personnes '{"prenom":"Alys","nom":"Karstark","id":"dame-de-karhold"}' > /dev/null
+
+PLAN_DEUX="{\"comptes\":[\"$ID_COMPTE_B\",\"$ID_INVITE\"],\"seuil\":0.82}"
+verifier "le plan repond" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX")"
+verifier "  il superpose deux membres" 2 "$(lire comptes.length)"
+verifier "  il annonce ses catalogues" oui "$(contient 'catalogues')"
+verifier "  les deux ecritures ne font qu'une carte" 1 "$(cartes_du_plan 'Alys Karstark')"
+verifier "  et cette carte les nomme toutes les deux" 2 "$(ecritures_du_plan 'Alys Karstark')"
+
+echo "-- 17.A un verdict tranche ce que le seuil ne peut pas"
+verifier "verdict inconnu" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/identites "{\"gauche\":\"$ID_COMPTE_B/alys-karstark\",\"droite\":\"$ID_INVITE/dame-de-karhold\",\"verdict\":\"peut-etre\"}")"
+verifier "reference mal formee" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/identites '{"gauche":"sans-barre","droite":"x/y","verdict":"meme"}')"
+verifier "  la meme fiche des deux cotes" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/identites "{\"gauche\":\"$ID_COMPTE_B/alys-karstark\",\"droite\":\"$ID_COMPTE_B/alys-karstark\",\"verdict\":\"meme\"}")"
+verifier "ce ne sont pas les memes" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/identites "{\"gauche\":\"$ID_COMPTE_B/alys-karstark\",\"droite\":\"$ID_INVITE/dame-de-karhold\",\"verdict\":\"distincte\"}")"
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+verifier "  le plan les separe, malgre le nom identique" 2 "$(cartes_du_plan 'Alys Karstark')"
+verifier "on oublie le verdict" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/identites "{\"gauche\":\"$ID_COMPTE_B/alys-karstark\",\"droite\":\"$ID_INVITE/dame-de-karhold\",\"verdict\":\"oublier\"}")"
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+verifier "  et elles se rejoignent de nouveau" 1 "$(cartes_du_plan 'Alys Karstark')"
+
+echo "-- 17.A ce que le rapprochement refuse de deviner"
+# Deux membres d'une meme maison. La premiere mesure les reunissait a 0,88 —
+# le nom de famille ecrasait le prenom. Le mot le plus eloigne decide, donc
+# « tywin » contre « tyrion » (0,67) les tient separes.
+code "$BOCAL_A" POST /api/admin/arbres/$ARBRE_B/personnes '{"prenom":"Tywin","nom":"Lannistre"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/arbres/$SAUVEGARDE_INVITE/personnes '{"prenom":"Tyrion","nom":"Lannistre"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+verifier "Tywin reste Tywin" 1 "$(cartes_du_plan 'Tywin Lannistre')"
+verifier "  et Tyrion reste Tyrion" 1 "$(cartes_du_plan 'Tyrion Lannistre')"
+verifier "  chacun chez un seul membre" 1 "$(ecritures_du_plan 'Tywin Lannistre')"
+
+# Une faute de frappe, elle, se rattrape : un mot proche dans chaque position.
+code "$BOCAL_A" POST /api/admin/arbres/$ARBRE_B/personnes '{"prenom":"Wylla","nom":"Manderly"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/arbres/$SAUVEGARDE_INVITE/personnes '{"prenom":"Wyla","nom":"Manderly"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+verifier "une faute de frappe se rattrape" 2 "$(ecritures_du_plan 'Manderly')"
+verifier "  mais pas au seuil le plus severe" 1 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "{\"comptes\":[\"$ID_COMPTE_B\",\"$ID_INVITE\"],\"seuil\":1}" > /dev/null; ecritures_du_plan 'Manderly')"
+
+echo "-- 17.A deux fiches d'un meme compte ne se rejoignent jamais seules"
+# Le piege du monde livre : « Brandon Stark » y designe deux personnages. Un
+# compte est l'autorite sur son propre monde — s'il a deux fiches, il en veut
+# deux, et aucun seuil ne doit en decider autrement.
+code "$BOCAL_A" POST /api/admin/arbres/$ARBRE_B/personnes '{"prenom":"Osric","nom":"Dustin","id":"osric-le-vieux"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/arbres/$ARBRE_B/personnes '{"prenom":"Osric","nom":"Dustin","id":"osric-le-jeune"}' > /dev/null
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+verifier "les deux Osric d'un meme compte restent deux" 2 "$(cartes_du_plan 'Osric Dustin')"
+
+echo "-- 17.E un lot vise une grappe, chacun y lit son identifiant"
+code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_DEUX" > /dev/null
+CLE_ALYS="$(cle_du_plan 'Alys Karstark')"
+CLE_WYLLA="$(cle_du_plan 'Manderly')"
+verifier "la carte porte une cle qui existe vraiment" oui "$(porte "$CLE_ALYS" 'karstark')"
+LOT_GRAPPE="{\"comptes\":[\"$ID_COMPTE_B\",\"$ID_INVITE\"],\"portee\":\"active\",\"seuil\":0.82,\"operation\":{\"type\":\"relation\",\"source\":\"grappe:$CLE_ALYS\",\"cible\":\"grappe:$CLE_WYLLA\",\"type_lien\":\"ami\",\"label\":\"dames du Nord\"}}"
+verifier "l'apercu resout les deux bouts" 200 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "$LOT_GRAPPE")"
+verifier "  chez les deux membres" 2 "$(lire resume.creees)"
+verifier "  sans aucun refus" 0 "$(lire resume.refusees)"
+verifier "le lot passe" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_GRAPPE")"
+verifier "  et rejoue, il ne double rien" 2 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_GRAPPE" > /dev/null; lire resume.inchangees)"
+# La preuve que la resolution a bien eu lieu : chez l'invite, la fiche s'appelle
+# `dame-de-karhold`, et c'est ce nom-la qui doit se trouver dans son lien.
+verifier "chez l'invite, le lien part de SON identifiant" oui "$(code "$BOCAL_I" GET /api/relations > /dev/null; contient 'dame-de-karhold')"
+
+echo "-- 17.E une grappe absente refuse cette sauvegarde-la, pas le lot"
+LOT_ABSENT="{\"comptes\":[\"$ID_COMPTE_B\",\"$ID_INVITE\"],\"portee\":\"active\",\"seuil\":0.82,\"operation\":{\"type\":\"relation\",\"source\":\"grappe:$CLE_ALYS\",\"cible\":\"grappe:fantome-absolu\",\"type_lien\":\"ami\"}}"
+verifier "le lot repond quand meme" 200 "$(code "$BOCAL_A" POST /api/admin/lots/apercu "$LOT_ABSENT")"
+verifier "  et refuse les deux sauvegardes" 2 "$(lire resume.refusees)"
+verifier "  en nommant la grappe introuvable" oui "$(contient 'fantome-absolu')"
+
+echo "-- 17 hors perimetre, un plan ne montre rien"
+verifier "B est nomme intendant" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_COMPTE_B/role '{"role":"intendant"}')"
+verifier "il ne superpose pas le souverain" 404 "$(code "$BOCAL_B" POST /api/admin/collectif/plan "{\"comptes\":[\"$ID_COMPTE_A\"]}")"
+verifier "  ni ne tranche sur ses fiches" 404 "$(code "$BOCAL_B" POST /api/admin/collectif/identites "{\"gauche\":\"$ID_COMPTE_A/eddard-stark\",\"droite\":\"$ID_COMPTE_B/alys-karstark\",\"verdict\":\"meme\"}")"
+verifier "  et le refus ne dit pas que le compte existe" oui "$(contient 'inconnue')"
+sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
+
+echo "-- 17.C la page du plan, et ce dont elle depend"
+verifier "la page est servie" 200 "$(code - GET /collectif)"
+verifier "  avec la feuille de l'application, pas celle de l'admin" oui "$(contient '/css/app.css')"
+verifier "  et d3, que le moteur de cartes exige" oui "$(contient 'd3.v7.min.js')"
+verifier "  ses deux tiroirs ont leur bouton" oui "$(contient 'btn-panneau')"
+code - GET /js/collectif.js > /dev/null
+verifier "le script reemploie le moteur de l'application" oui "$(contient "from './views/cartes.js'")"
+verifier "  et n'ecrit que par les lots" oui "$(contient 'collectif-gestes.js')"
+verifier "  la presence passe par le crochet des filtres" oui "$(contient "filtre:presence")"
+code - GET /js/collectif-gestes.js > /dev/null
+verifier "un geste passe par l'apercu" oui "$(contient '/api/admin/lots/apercu')"
+verifier "  puis par l'application" oui "$(contient '/api/admin/lots/appliquer')"
+verifier "  et par aucune autre porte" non "$(contient '/api/personnes')"
+code - GET /admin > /dev/null
+verifier "l'administration mene au plan" oui "$(contient '/collectif.html')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

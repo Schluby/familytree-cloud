@@ -47,17 +47,27 @@ import {
   type Perimetre,
   type VariablesAdmin,
 } from './intergiciel';
+import { construirePlan, tableDesGrappes, MAX_COMPTES_PLAN } from './collectif';
+import {
+  compteDeLaReference,
+  poserVerdict,
+  referenceValide,
+  seuilValide,
+  verdictsDe,
+} from './identites';
 import { dernieres, journaliser } from './journal';
 import {
   MAX_COMPTES,
   MAX_SAUVEGARDES,
   appliquerLot,
+  nommeUneGrappe,
   panorama,
   rapprochement,
   resoudreCibles,
   TYPES_OPERATION,
   type Cible,
   type Portee,
+  type Resolution,
 } from './lots';
 import { parProcuration } from './procuration';
 
@@ -566,7 +576,7 @@ function auPerimetre(ids: string[], perimetre: Perimetre): string[] {
 /** La sélection, validée, résolue en sauvegardes. */
 async function preparerLot(
   c: Contexte
-): Promise<{ cibles: Cible[]; operation: Objet } | Response> {
+): Promise<{ cibles: Cible[]; operation: Objet; resolution: Resolution | null } | Response> {
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
 
   const demandes = nommes(corps.comptes);
@@ -604,7 +614,19 @@ async function preparerLot(
     );
   }
 
-  return { cibles, operation };
+  // Le lot peut viser des **grappes** plutôt que des identifiants (lot 17.E) :
+  // c'est ce que fait le plan collectif, où « Eddard Stark » n'a pas le même
+  // identifiant chez tout le monde. La table est recalculée ici plutôt que reçue
+  // du navigateur : elle décide de ce qui sera écrit et chez qui, et une table
+  // fournie par le client serait une façon de désigner n'importe quelle fiche.
+  const resolution = nommeUneGrappe(operation)
+    ? tableDesGrappes(cibles, {
+        seuil: seuilValide(corps.seuil),
+        verdicts: await verdictsDe(c.env.DB, comptes),
+      })
+    : null;
+
+  return { cibles, operation, resolution };
 }
 
 /**
@@ -638,7 +660,16 @@ routesAdmin.post('/lots/panorama', async (c) => {
 routesAdmin.post('/lots/apercu', async (c) => {
   const pret = await preparerLot(c);
   if (pret instanceof Response) return pret;
-  return c.json(await appliquerLot(c.env.DB, c.get('compte').id, pret.cibles, pret.operation, true));
+  return c.json(
+    await appliquerLot(
+      c.env.DB,
+      c.get('compte').id,
+      pret.cibles,
+      pret.operation,
+      true,
+      pret.resolution
+    )
+  );
 });
 
 /** L'application. La seule route de cette famille qui touche aux données. */
@@ -646,8 +677,107 @@ routesAdmin.post('/lots/appliquer', async (c) => {
   const pret = await preparerLot(c);
   if (pret instanceof Response) return pret;
   return c.json(
-    await appliquerLot(c.env.DB, c.get('compte').id, pret.cibles, pret.operation, false)
+    await appliquerLot(
+      c.env.DB,
+      c.get('compte').id,
+      pret.cibles,
+      pret.operation,
+      false,
+      pret.resolution
+    )
   );
+});
+
+/* --------------------------------------------------------------------------
+ * Le plan collectif (lot 17)
+ *
+ * Ce que l'administration ne savait pas faire : montrer **la table**, et non
+ * des tableaux qui la décrivent. Une seule route de lecture, qui superpose les
+ * mondes des comptes sélectionnés, et une route pour trancher l'identité des
+ * fiches. Les gestes, eux, repassent par les lots — il n'y a pas ici un second
+ * chemin d'écriture.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Les mondes d'une sélection, superposés en un seul plan.
+ *
+ * **Portée « active » toujours**, et ce n'est pas une simplification : un compte
+ * qui a trois campagnes n'a pas trois versions du même monde, il en a trois
+ * différents. Les empiler ferait un plan qui ne correspond à aucune table.
+ */
+routesAdmin.post('/collectif/plan', async (c) => {
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+  const demandes = nommes(corps.comptes);
+  if (!demandes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  if (demandes.length > MAX_COMPTES_PLAN) {
+    return c.json(
+      {
+        erreur: `un plan superpose au plus ${MAX_COMPTES_PLAN} comptes`,
+        indice: 'au-delà, plus rien ne s’y lit — restreignez la sélection',
+      },
+      400
+    );
+  }
+
+  const comptes = auPerimetre(demandes, c.get('perimetre'));
+  const cibles = await resoudreCibles(c.env.DB, comptes, 'active');
+  if (!cibles.length) {
+    return c.json({ erreur: 'aucune sauvegarde à superposer pour cette sélection' }, 404);
+  }
+
+  const seuil = seuilValide(corps.seuil);
+  const plan = construirePlan(cibles, {
+    seuil,
+    verdicts: await verdictsDe(c.env.DB, comptes),
+  });
+
+  // Ouvrir le plan, c'est lire les arbres des autres. Le registre le dit, comme
+  // pour « Consulter » — une trace par compte regardé.
+  for (const cible of cibles) {
+    await journaliser(c.env.DB, c.get('compte').id, 'consultation', cible.utilisateurId, cible.fiche.id);
+  }
+
+  return c.json(plan);
+});
+
+/**
+ * Trancher : « c'est la même personne », « ce n'est pas la même », ou l'oubli.
+ *
+ * Les deux références sont contrôlées **une par une** contre le périmètre. Sans
+ * ce contrôle, la route deviendrait un moyen de savoir si un compte existe : il
+ * suffirait de poser un verdict et de regarder s'il est accepté.
+ */
+routesAdmin.post('/collectif/identites', async (c) => {
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+  const gauche = referenceValide(corps.gauche);
+  const droite = referenceValide(corps.droite);
+  if (!gauche || !droite || gauche === droite) {
+    return c.json(
+      { erreur: 'deux références de fiche sont attendues, sous la forme « compte/fiche »' },
+      400
+    );
+  }
+
+  const verdict = String(corps.verdict ?? '');
+  if (!['meme', 'distincte', 'oublier'].includes(verdict)) {
+    return c.json({ erreur: `verdict inconnu : « ${verdict} » (meme, distincte, oublier)` }, 400);
+  }
+
+  const perimetre = c.get('perimetre');
+  for (const ref of [gauche, droite]) {
+    if (!dansLePerimetre(perimetre, compteDeLaReference(ref))) {
+      return c.json({ erreur: 'fiche inconnue' }, 404);
+    }
+  }
+
+  await poserVerdict(c.env.DB, gauche, droite, verdict as 'meme' | 'distincte' | 'oublier', c.get('compte').id);
+  await journaliser(
+    c.env.DB,
+    c.get('compte').id,
+    'identite',
+    compteDeLaReference(gauche)
+  );
+  return c.json({ ok: true, gauche, droite, verdict });
 });
 
 /* --------------------------------------------------------------------------

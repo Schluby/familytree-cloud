@@ -2123,3 +2123,124 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   .cn-suggestions li { min-height: 40px; align-items: center; }
   .cn-chapitre-choix { min-height: 36px; }
 }
+
+/* ==========================================================================
+   Le plan collectif (lot 17)
+
+   La page `/collectif.html` réemploie tout ce qui précède — `.plan`, `.carte`,
+   `.rail`, `.legende`, `.menu-contextuel`. Ne sont ajoutés ici que les objets
+   qui n'existaient pas : le rail des membres, le panneau « qui l'a », et le
+   panneau de geste.
+
+   **Aucune ombre floue de plus sur les cartes.** Le lot 16.I a ramené le plan
+   de 665 couches floues à 309 pour qu'il cesse de ramer ; marquer les
+   divergences par un halo aurait rendu tout ce travail. Un trait, donc, et une
+   pastille — les deux se peignent sans flou.
+   ========================================================================== */
+
+.liste-membres { list-style: none; margin: 0; padding: 0; }
+.membre {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 6px; border-radius: 6px; font-size: 11.5px;
+}
+.membre:hover { background: var(--fond-3); }
+.membre input { margin: 0; flex: 0 0 auto; }
+.membre-pastille { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+.membre-nom {
+  flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--texte); font: inherit;
+}
+.membre-nom:hover { color: var(--accent); }
+.membre-compte {
+  color: var(--texte-faible); font-size: 10.5px; font-variant-numeric: tabular-nums;
+}
+
+/* Ce que la superposition révèle, dit sur la carte elle-même. */
+.carte.partielle { border-style: dashed; }
+.carte.desaccord .carte-nom::after {
+  content: ' ⚖'; color: var(--texte-faible); font-size: 10px;
+}
+
+/* Le panneau de droite : qui a quoi. */
+.pn-titre { font-size: 13px; font-weight: 600; }
+.pn-aide { margin: 0 0 9px; font-size: 11.5px; color: var(--texte-faible); line-height: 1.5; }
+.pn-sous-titre {
+  margin: 14px 0 6px; font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--texte-faible);
+}
+.pn-porteurs { list-style: none; margin: 0 0 10px; padding: 0; }
+.pn-porteurs li {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--bord);
+}
+.pn-porteur-qui { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pn-porteurs code { font-size: 10px; color: var(--texte-faible); }
+.pn-autre { font-size: 10px; color: var(--accent); }
+
+.pn-candidat {
+  border: 1px solid var(--bord); border-radius: 8px;
+  padding: 8px 9px; margin-bottom: 8px; background: var(--fond-3);
+}
+.pn-candidat-noms {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 11.5px; margin-bottom: 3px;
+}
+.pn-score {
+  font-size: 10px; padding: 1px 5px; border-radius: 999px;
+  background: var(--fond-2); border: 1px solid var(--bord);
+  font-variant-numeric: tabular-nums;
+}
+.pn-candidat-qui { font-size: 10px; color: var(--texte-faible); }
+.pn-candidat-verdict { font-size: 10.5px; color: var(--accent); margin-top: 3px; }
+.pn-candidat-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+
+/* Le panneau de geste : un lot, posé depuis le plan. */
+.flottant.flottant-geste { width: 372px; }
+.gc-portee { display: block; font-size: 10.5px; color: var(--texte-faible); margin-top: 2px; }
+.gc-bascule { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.gc-rapport { border-top: 1px solid var(--bord); padding-top: 9px; }
+.gc-lignes { list-style: none; margin: 0; padding: 0; max-height: 30vh; overflow: auto; }
+.gc-lignes li {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--bord);
+}
+.gc-qui { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gc-etat { font-size: 10px; padding: 1px 5px; border-radius: 999px; border: 1px solid var(--bord); }
+.gc-quoi { flex-basis: 100%; font-size: 10px; color: var(--texte-faible); }
+.gc-cree .gc-etat { color: #2f7d52; border-color: #a8d3ba; }
+.gc-mis_a_jour .gc-etat { color: #2f6f9e; border-color: #a9c9e0; }
+.gc-inchange .gc-etat { color: var(--texte-faible); }
+.gc-refuse .gc-etat { color: #b03a2e; border-color: #e0b0a9; }
+body.sombre .gc-cree .gc-etat { color: #7fd6b2; border-color: #2b5a49; }
+body.sombre .gc-mis_a_jour .gc-etat { color: #8fc0e8; border-color: #2c4356; }
+body.sombre .gc-refuse .gc-etat { color: #e0a196; border-color: #5b3636; }
+
+/* Le curseur de seuil : une ligne, pas une grille de formulaire. */
+#bloc-rapprochement .option { gap: 9px; }
+#bloc-rapprochement input[type="range"] { flex: 1; min-width: 0; }
+#seuil-valeur { font-variant-numeric: tabular-nums; font-size: 11px; }
+
+/* Les deux tiroirs du plan collectif.
+ *
+ * L'application les ouvre depuis sa barre basse et son `telephone.js`, qui
+ * déplacent les commandes dans le rail. Cette page-là n'a ni l'un ni l'autre :
+ * ses deux boutons restent donc dans la barre du haut, à toutes les largeurs,
+ * et c'est ce que ces trois règles disent. Sans elles, sous 760 px, le rail
+ * était traduit hors de l'écran **sans plus rien pour l'y ramener** — le même
+ * défaut que le lot 11.C avait réparé dans l'application. */
+body.collectif #btn-panneau { display: none; }
+@media (max-width: 860px) {
+  body.collectif #btn-panneau { display: inline-flex; }
+}
+@media (max-width: 760px) {
+  body.collectif #btn-rail { display: inline-flex; }
+}
+
+/* Les blocs du plan collectif portent des identifiants à eux —
+   `#bloc-types-collectif`, `#bloc-maisons-collectif`, `#releve-plan` — et non
+   ceux du rail de l'application. Ce n'est pas une coquetterie : sous 760 px,
+   `#bloc-maisons { order: 1 }` et `#bloc-liens { order: 2 }` remontent ces deux
+   blocs en tête du tiroir. C'est le bon ordre pour l'arbre d'une personne, et
+   le mauvais pour un plan collectif, où l'on cherche d'abord ses membres — vu
+   à l'essai, la légende des maisons passait devant la liste des joueurs. */

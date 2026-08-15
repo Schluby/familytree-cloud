@@ -35,7 +35,14 @@ export type Action =
    * les laisser hors du registre les rendrait invisibles.
    */
   | 'role'
-  | 'tutelle';
+  | 'tutelle'
+  /**
+   * Lot 17.A : l'intendant tranche que deux fiches de deux comptes sont — ou ne
+   * sont pas — la même personne. Le verdict ne touche à aucune donnée, mais il
+   * décide de ce que les lots suivants écriront et chez qui : le laisser hors
+   * du registre rendrait inexplicable une écriture faite « chez tout le monde ».
+   */
+  | 'identite';
 
 export async function journaliser(
   base: D1Database,

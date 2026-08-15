@@ -217,6 +217,66 @@ offrir le service au premier passant.
 > des gens qu'on ne connaît pas. Le construire sans le dire serait de la
 > surveillance déguisée.
 
+## Le plan collectif : reconnaître une personne à travers des comptes cloisonnés
+
+Le lot 17 pose une question que rien dans l'architecture n'avait eu à trancher :
+**quand deux comptes parlent-ils de la même personne ?**
+
+Le cloisonnement rend la question inévitable. Chaque compte a son document, ses
+identifiants, sa liberté de renommer. Six joueurs partis du même Westeros
+finissent avec six `eddard-stark`… jusqu'au jour où l'un accole un titre au nom,
+et où deux fiches cessent de se reconnaître. Tant qu'elles ne se reconnaissent
+pas, un maître de jeu ne peut pas poser « le même lien chez tout le monde » : il
+n'y a pas de « même », il n'y a que six fiches sans rapport.
+
+**On a choisi de reconstituer l'identité à la lecture, pas de l'imposer à
+l'écriture.** L'autre voie existait : donner à chaque personne un identifiant
+partagé entre les comptes, posé à la création. Elle a été écartée pour trois
+raisons.
+
+- Elle **casse le cloisonnement**. Un identifiant commun est une clé étrangère
+  entre deux documents qui ne doivent rien savoir l'un de l'autre.
+- Elle **arrive trop tard**. Les mondes existent déjà, avec leurs divergences.
+  Un identifiant partagé ne rattrape pas ce qui a divergé avant lui.
+- Elle **suppose une autorité** qui n'existe pas. Personne ne décide, à la
+  création d'une fiche, qu'elle est « la même » que celle du voisin.
+
+Le rapprochement à la lecture, lui, ne demande rien à personne et se corrige.
+D'où la **grappe** : un regroupement calculé à chaque requête à partir de trois
+signaux (identifiant, nom normalisé, ressemblance au-dessus d'un seuil réglable)
+et de **verdicts humains persistés**, qui l'emportent sur les trois.
+
+### Ce que cette architecture assume
+
+**Le calcul est refait à chaque plan.** C'est un choix : une table de
+correspondance stockée deviendrait fausse dès qu'un joueur renomme une fiche, et
+il faudrait une invalidation dont personne ne veut. Ce qui est stocké, ce sont
+seulement les **verdicts** — la part que le calcul ne saura jamais deviner.
+
+**Le seuil est un réglage d'affichage, pas une donnée.** Le déplacer ne modifie
+aucun document. C'est ce qui permet de le manipuler sans crainte, et c'est
+pourquoi les verdicts, eux, doivent survivre au curseur.
+
+**Une grappe rapproche, elle ne fusionne pas.** Elle ne supprime aucun doublon
+et ne rebranche aucun lien. La fusion vraie reste hors du système, parce qu'elle
+est destructive à travers plusieurs comptes ; le jour où elle se fera, elle
+aura son propre lot et son propre aperçu.
+
+**Et le doute penche toujours du côté de la séparation.** Deux fiches d'un même
+compte ne se rejoignent jamais automatiquement, quelle que soit leur
+ressemblance : un compte est l'autorité sur son propre monde. Réunir deux
+personnes à tort coûte plus cher que de laisser deux cartes côte à côte — la
+première erreur écrit chez quelqu'un, la seconde se voit et se corrige d'un clic.
+
+### Conséquence sur les lots
+
+Un lot pouvait jusqu'ici poser le même identifiant partout. Ce n'est plus vrai
+dès qu'on vise une personne plutôt qu'une clé. Une opération peut donc nommer
+une grappe — `"source": "grappe:eddard-stark"` — que **chaque sauvegarde résout
+vers son propre identifiant**. La table de correspondance est recalculée côté
+serveur et jamais reçue du navigateur : elle décide de ce qui sera écrit et chez
+qui.
+
 ## Le stockage
 
 ```

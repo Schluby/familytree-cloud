@@ -880,5 +880,143 @@ export const TRADUCTIONS = {
     "Note ajoutée. {} citation(s) rattachée(s), {} laissée(s) en clair.": "Note added. {} mention(s) reconnected, {} left as plain text.",
     "Note ajoutée à votre carnet.": "Note added to your notebook.",
     "Note refusée.": "Note refused.",
+
+    // ----------------------------------------------------------------
+    // Le plan collectif (lot 17). Le vocabulaire du lot mérite d'être fixé
+    // ici une fois pour toutes : une **grappe** est un `cluster`, un
+    // **membre** un `member` (et non `user` — c'est quelqu'un d'une table),
+    // et « superposer » se dit `overlay`, qui garde l'idée des calques.
+    "FamilyTree — plan collectif": "FamilyTree — collective plan",
+    "Plan collectif": "Collective plan",
+    "Le plan collectif": "The collective plan",
+    "Le plan de la table": "The table’s plan",
+    "Le plan": "The plan",
+    "Membres": "Members",
+    "Montrer": "Show",
+    "Rapprochement": "Matching",
+    "Ce qu’on montre": "What is shown",
+    "Tout": "All",
+    "Erreur": "Error",
+    "Mes arbres": "My trees",
+
+    // Ce que l'administration annonce, avant qu'on n'y aille.
+    "Les mondes de vos membres superposés en un seul sociogramme.":
+      "Your members’ worlds overlaid into a single sociogram.",
+    "Qui a quelle fiche, quels liens sont chez tout le monde, et lesquels manquent. Un clic droit y crée un profil ou pose un lien chez plusieurs membres à la fois.":
+      "Who has which profile, which links everyone has, and which are missing. A right click there creates a profile or lays a link across several members at once.",
+    "◫ Ouvrir le plan collectif": "◫ Open the collective plan",
+    "Il ne superpose que la sauvegarde ouverte de chacun : un compte qui a trois campagnes n’a pas trois versions du même monde. Comme partout ici, rien ne s’écrit sans un aperçu, et chaque écriture laisse une trace au journal.":
+      "It overlays only the save each of them has open: an account with three campaigns does not have three versions of the same world. As everywhere here, nothing is written without a preview, and every write leaves a trace in the log.",
+
+    // La barre du haut et les deux tiroirs.
+    "↻ Relire": "↻ Reread",
+    "Relire les arbres des membres sélectionnés": "Reread the selected members’ trees",
+    "Revenir à l’administration": "Back to administration",
+    "Revenir à mes arbres": "Back to my trees",
+    "Afficher/masquer les membres et les filtres": "Show/hide members and filters",
+    "Afficher/masquer le détail": "Show/hide the detail",
+    "{} à portée": "{} within reach",
+    "Vous êtes intendant.": "You are a steward.",
+
+    // Le rail : ce qu'on montre, et qui.
+    "Présence chez les membres": "Presence across members",
+    "Ce que tout le monde a": "What everyone has",
+    "Ce qui n’est pas partout": "What is not everywhere",
+    "En présence, une carte verte est chez tout le monde et une carte rouge chez un seul.":
+      "In presence mode, a green card is with everyone and a red card with a single member.",
+    "La case montre ou masque ce qu’un membre a ; le nom n’isole que lui.":
+      "The box shows or hides what a member has; the name isolates them alone.",
+    "Remettre tout le monde à l’écran": "Bring everyone back on screen",
+    "Montrer ce que {} a": "Show what {} has",
+    "N’afficher que ce que {} a — « {} »": "Show only what {} has — \"{}\"",
+    "{} membre(s) superposé(s) · {} fiches ramenées à {}":
+      "{} member(s) overlaid · {} profiles reduced to {}",
+    "{} paire(s) à trancher.": "{} pair(s) to settle.",
+    "{} paire(s) à trancher — relevé tronqué, trop de noms à comparer.":
+      "{} pair(s) to settle — survey truncated, too many names to compare.",
+    "{} fiches écrites par {} membre(s) se ramènent à {} personne(s).":
+      "{} profiles written by {} member(s) come down to {} person(s).",
+    "{} sont chez tout le monde.": "{} are with everyone.",
+    "Cliquez une carte pour voir qui l’a, et poser un geste chez ceux qui ne l’ont pas.":
+      "Click a card to see who has it, and act on those who do not.",
+    "{} membre(s) sur {} ont cette personne.": "{} of {} member(s) have this person.",
+    "Chez {} membre(s) sur {}.": "With {} of {} member(s).",
+    "{} fiches": "{} profiles",
+    "{} fiches, {} liens": "{} profiles, {} links",
+    "⚙ Qui superposer…": "⚙ Who to overlay…",
+    "Changer les comptes superposés sur ce plan": "Change which accounts this plan overlays",
+    "Cocher relit les arbres. Douze comptes au plus.": "Ticking rereads the trees. Twelve accounts at most.",
+    "Aucun membre superposé. Choisissez qui regarder.": "No member overlaid. Choose who to look at.",
+    "Chargement des arbres…": "Loading the trees…",
+    "Lecture des arbres…": "Reading the trees…",
+    "Lecture…": "Reading…",
+    "Un clic isole un type, les suivants l’élargissent.": "One click isolates a type, the next ones widen it.",
+    "Clic droit dans le vide :": "Right click on empty space:",
+    "créer un profil chez les membres cochés.": "create a profile for the ticked members.",
+    "Sur une carte ou un lien, le même clic droit le modifie partout à la fois.":
+      "On a card or a link, the same right click changes it everywhere at once.",
+
+    // Le rapprochement, et les verdicts.
+    "Deux fiches deviennent une carte quand elles se ressemblent assez.":
+      "Two profiles become one card when they are alike enough.",
+    "Rien n’est écrit — seul l’affichage change.": "Nothing is written — only the display changes.",
+    "⚖ À trancher…": "⚖ To settle…",
+    "À trancher": "To settle",
+    "Les paires qui se ressemblent sans avoir été réunies": "The pairs that look alike without having been merged",
+    "Ces fiches se ressemblent sans avoir été réunies. Deux écritures d’une même personne, ou deux personnes qui portent le même nom : seul vous pouvez le dire.":
+      "These profiles look alike without having been merged. Two spellings of one person, or two people with the same name: only you can tell.",
+    "Deux fiches de {} — elles ne se rejoindront pas d’elles-mêmes.":
+      "Two profiles from {} — they will not merge on their own.",
+    "C’est la même": "Same person",
+    "Ce sont deux personnes": "Two different people",
+    "Oublier": "Forget",
+    "Rendre cette paire au calcul automatique": "Hand this pair back to the automatic matching",
+    "Vous avez dit : c’est la même.": "You said: same person.",
+    "Vous avez dit : ce ne sont pas les mêmes.": "You said: not the same person.",
+    "⚖ Séparer deux écritures…": "⚖ Split two spellings…",
+    "Dire que deux de ces fiches ne sont pas la même personne":
+      "Declare that two of these profiles are not the same person",
+    "« {} » réunit {} écritures :\\n\\n": "\"{}\" gathers {} spellings:\\n\\n",
+    "Deux numéros différents sont attendus.": "Two different numbers are expected.",
+
+    // Le panneau de droite : qui a quoi.
+    "Qui l’a, qui ne l’a pas": "Who has it, who does not",
+    "Isoler son réseau": "Isolate their network",
+    "— écritures différentes": "— different spellings",
+    "Chez {} membre(s) sur {}{}": "With {} of {} member(s){}",
+    "Type « {} » — chez {} sur {}": "Type \"{}\" — with {} of {}",
+    "{} carte(s) sur {}, {} lien(s) sur {}. {} personne(s) chez tout le monde, {} écrite(s) différemment.":
+      "{} card(s) of {}, {} link(s) of {}. {} person(s) with everyone, {} written differently.",
+
+    // Les gestes : un lot, posé depuis le plan.
+    "✎ Modifier chez tous": "✎ Change for everyone",
+    "Modifier chez tous…": "Change for everyone…",
+    "✎ Modifier ce lien chez tous": "✎ Change this link for everyone",
+    "Modifier « {} »": "Change \"{}\"",
+    "chez tous": "for everyone",
+    "＋ Créer chez les {} qui ne l’ont pas": "＋ Create for the {} who lack it",
+    "Créer chez les {} qui ne l’ont pas…": "Create for the {} who lack it…",
+    "⚯ Poser chez les {} qui ne l’ont pas": "⚯ Lay it for the {} who lack it",
+    "Poser chez les {} qui ne l’ont pas…": "Lay it for the {} who lack it…",
+    "⚯ Poser un lien depuis cette fiche": "⚯ Lay a link from this profile",
+    "Poser un lien depuis ici…": "Lay a link from here…",
+    "⚯ Poser le lien": "⚯ Lay the link",
+    "Lien {} → {}": "Link {} → {}",
+    "Lien depuis {}": "Link from {}",
+    "Fiche d’arrivée": "Target profile",
+    "La fiche sera créée dans l’arbre de chaque membre visé. Un membre qui l’a déjà la verra mise à jour, pas dupliquée.":
+      "The profile will be created in each targeted member’s tree. A member who already has it will see it updated, not duplicated.",
+    "Les champs laissés vides ne sont pas envoyés : ils restent tels quels chez chacun.":
+      "Fields left empty are not sent: they stay as they are for each member.",
+    "Les deux fiches sont désignées par leur grappe : chaque arbre y retrouve la sienne, même si le joueur l’a renommée.":
+      "Both profiles are named by their cluster: each tree finds its own, even if the player renamed it.",
+    "Faites un aperçu — rien ne s’écrit avant.": "Run a preview — nothing is written before that.",
+    "Aperçu relu : vous pouvez appliquer.": "Preview read: you can apply.",
+    "Rien ne changerait : c’est déjà en place partout.": "Nothing would change: it is already in place everywhere.",
+    "Le geste a changé depuis l’aperçu. Refaites un aperçu.": "The action changed since the preview. Run a preview again.",
+    "{} arbre(s) — {} à créer, {} à mettre à jour, {} déjà en place, {} refusé(s).":
+      "{} tree(s) — {} to create, {} to update, {} already in place, {} refused.",
+    "{} création(s), {} mise(s) à jour": "{} creation(s), {} update(s)",
+    ", {} refus": ", {} refused",
   },
 };

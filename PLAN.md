@@ -1878,3 +1878,160 @@ détail ci-dessus qui couvre l'autre régime. Les deux se complètent, aucun ne
 remplace l'autre. **Canvas ou WebGL est écarté** : on perdrait le texte
 sélectionnable, l'accessibilité, les infobulles et le menu contextuel, pour un
 gain qui ne devient décisif qu'à plusieurs milliers de nœuds.
+
+---
+
+# Lot 17 — Le plan collectif  ☑
+
+Demandé le 15/08/2026 : « je souhaite m'échapper un peu de la vue
+administrateur qu'on a pour faire un truc qui soit pilotable directement en
+mode sociogramme et pas juste en mode tableur ».
+
+## Ce que l'administration ne savait pas faire
+
+Elle disait tout d'une table **en tableaux** : combien de fiches chacun a,
+quelles maisons sont communes, quels noms reviennent en double. Elle ne montrait
+jamais **la table** — le réseau que les joueurs ont dessiné, et l'endroit précis
+où leurs versions divergent. Un maître de jeu ne pilote pas six colonnes de
+chiffres.
+
+`/collectif.html` superpose les mondes des membres en **un seul sociogramme**,
+avec la feuille de style de l'application et non celle de la console. Le moteur
+de rendu n'a pas changé d'une ligne : c'est `views/cartes.js`, nourri d'un
+payload `{noeuds, aretes}` fabriqué côté serveur. **C'est la contrainte qui a
+guidé tout le reste** — le plan collectif n'est pas un second moteur de dessin.
+
+## 17.A — Les grappes : reconnaître une personne à travers les comptes
+
+Un nœud du plan n'est pas une fiche mais une **grappe** : l'identité
+reconstituée d'une personne, avec toutes les écritures que les comptes en ont
+faites. Quatre façons de rapprocher, et une de séparer :
+
+1. **L'identifiant** — deux `eddard-stark` viennent du même monde de départ.
+2. **Le nom normalisé** — « Jon Snow » et « jon  snow ».
+3. **La ressemblance**, au-dessus d'un seuil que l'intendant règle au curseur.
+4. **Le verdict manuel**, qui l'emporte : « c'est la même » là où rien ne le
+   disait, « ce ne sont pas les mêmes » là où tout semblait le dire. Gardé en
+   base (`identites`), donc il survit à un changement de seuil.
+
+**Et une règle qui a réglé le piège du monde livré : deux fiches d'un même
+compte ne se rejoignent jamais toutes seules.** Un compte est l'autorité sur son
+propre monde ; s'il a deux fiches, il en veut deux. Dans Westeros, « Brandon
+Stark » désigne deux personnages — le frère d'Eddard et son fils Bran — sous le
+même nom complet, chez tout le monde. Aucun seuil ne les distinguera jamais ;
+cette règle-là, si.
+
+### La mesure de ressemblance, refaite après l'essai
+
+La première version comparait les noms **entiers** par distance d'édition et
+gardait la mesure la plus favorable. Mesuré le 15/08/2026 sur le Westeros livré,
+à un seuil de 0,82, elle réunissait :
+
+| Ce qu'elle fusionnait à tort | Pourquoi |
+| --- | --- |
+| **Aerys, Daenerys et Viserys Targaryen** en une personne | 3 lettres d'écart sur 18 → 0,83 |
+| **Tywin et Tyrion Lannister** | 2 lettres sur 16 → 0,88 |
+
+**Le nom de famille écrasait le prénom**, qui est pourtant tout ce qui distingue
+deux membres d'une maison. La version retenue compare **mot à mot** et garde le
+**pire appariement** : deux noms sont aussi proches que leur mot le plus
+éloigné. « aerys » contre « daenerys » rend 0,63, « tywin » contre « tyrion »
+0,67 — les deux restent séparés. Les mots en trop coûtent 12 % chacun, ce qui
+laisse passer « Petyr Baelish » et « Petyr Baelish Littlefinger ».
+
+Un second réglage est venu de l'essai : le dénominateur d'une comparaison de
+mots a un **plancher à six lettres**. Sans lui, une faute de frappe coûte 1/4
+dans « Wyla » et 1/8 dans « Daenerys » — le même accident, deux fois plus cher
+sur un prénom court. Le prix se dit : « Ned » et « Ted » se rapprochent aussi.
+C'est un échange assumé, la faute de frappe étant bien plus fréquente à une
+table qui part du même monde, et le verdict « ce ne sont pas les mêmes » réglant
+le second cas en un clic.
+
+## 17.B et 17.C — Le plan, et ce qu'il montre
+
+Chaque nœud et chaque lien portent **qui les a** et **qui ne les a pas**. C'est
+la seule information qu'un plan individuel ne pouvait pas donner :
+
+- la **couleur de présence** — vert chez tout le monde, rouge chez un seul —
+  passe par `couleurPar: 'filtre:presence'`, le crochet que le moteur offrait
+  déjà aux filtres sur mesure ; aucun mode nouveau à lui apprendre ;
+- un **trait pointillé** marque une carte que tout le monde n'a pas, une pastille
+  ⚖ celles qu'on n'écrit pas pareil. Ni halo ni ombre : le lot 16.I venait de
+  diviser par deux les couches floues du plan, et les rendre ici l'aurait annulé ;
+- la place des **notes** de la carte est empruntée pour dire l'état collectif —
+  « absente chez untel », « deux écritures ». Les notes diffèrent d'un compte à
+  l'autre, en montrer une seule mentirait sur les cinq autres.
+
+**Deux filtres qu'il faut distinguer** : *superposer* (quels comptes on lit —
+une requête) et *montrer* (ce qu'on affiche parmi ce qui est chargé —
+instantané). Les confondre obligerait à relire six arbres pour masquer une
+couleur.
+
+## 17.D et 17.E — Agir depuis le plan
+
+Clic droit dans le vide : un profil chez tous les membres cochés. Sur une carte
+ou un lien : le modifier partout. **Tout passe par les lots** — donc par
+`aperçu` puis `appliquer`, donc par le point d'écriture unique. Il n'y a pas ici
+un second chemin d'écriture, et `collectif-gestes.js` ne connaît aucune route
+que la page d'administration n'utilise déjà.
+
+Restait le vrai obstacle : **un lot pose le même identifiant partout**, ce qui
+cesse d'être vrai dès qu'un joueur a renommé sa fiche — c'est-à-dire exactement
+là où le plan collectif sert. Une opération peut donc nommer une **grappe** :
+
+    { "type": "relation",
+      "source": "grappe:eddard-stark",
+      "cible":  "grappe:samwell-tarly" }
+
+Chaque sauvegarde résout la grappe vers **son** identifiant. Vérifié à
+l'essai : le lien est né `eddard-stark-ami-samwell-tarly` chez trois membres et
+`eddard-stark-ami-samwel-tarly` chez le quatrième, qui avait écrit son nom avec
+une lettre en moins. Une grappe sans écriture chez un compte refuse **cette
+sauvegarde-là**, pas le lot.
+
+Deuxième correctif au passage : `appliquerRelation` repêche désormais **le lien
+qui relie déjà ces deux fiches sous ce type-là**, même écrit dans l'autre sens.
+Sans ça, « modifier ce lien partout » en fabriquait un second à côté chez tous
+ceux qui l'avaient posé eux-mêmes — deux traits pour une amitié, et la
+modification appliquée au mauvais. Le sens ne s'ignore que sur un lien qui n'en
+a pas, et **on ne retourne pas le trait de son propriétaire** : quand le
+repêchage a lieu à l'envers, `source` et `cible` sont retirés du patch.
+
+## Mesures
+
+Sur quatre comptes partis du même Westeros, dont trois avaient divergé
+(un renommage, un doublon avec faute de frappe, une suppression) :
+
+| | |
+| --- | --- |
+| Fiches lues | **268** |
+| Cartes du plan | **69** |
+| Personnes chez tout le monde | 67 |
+| Écrites différemment | 2 |
+| Paires proposées à l'arbitrage | **3** (contre 67 avec la première mesure) |
+
+## Vérification
+
+**705/705** au harnais. Le lot ajoute 42 vérifications : la porte (401/403/404
+et périmètre), le rapprochement (fusion, séparation par verdict, retour au
+calcul automatique, faux positifs refusés, deux fiches d'un même compte), la
+résolution par grappe (aperçu, application, rejeu sans doublon, refus nommé), et
+ce dont la page dépend (feuille de l'application, d3, le moteur de cartes, et
+aucune porte d'écriture qui ne soit un lot).
+
+`outils/table-essai.sh` monte une table jetable dans la base locale — un maître
+de jeu et trois joueurs partis du même Westeros, qu'on fait diverger exprès —
+pour regarder le plan avec de vraies divergences plutôt qu'avec quatre mondes
+identiques.
+
+## Ce qui n'est pas fait, et pourquoi
+
+- **La fusion vraie** — supprimer un doublon et rebrancher ses liens — reste
+  hors du lot. Une grappe *rapproche* pour l'affichage et pour viser ; elle
+  n'efface rien chez personne. C'est une opération destructive à travers
+  plusieurs comptes, elle mérite son propre lot et son propre aperçu.
+- **Le plan ne superpose que la sauvegarde ouverte** de chacun. Un compte qui a
+  trois campagnes n'a pas trois versions du même monde : les empiler ferait un
+  plan qui ne correspond à aucune table.
+- **Le fenêtrage du plan** reste dû au-delà de ~300 fiches (voir 16.I). Un plan
+  collectif à douze membres est le premier endroit qui y touchera.

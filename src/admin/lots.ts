@@ -31,6 +31,10 @@ import { normaliser as normaliserPortrait } from '../domaine/portraits';
 import * as referentiels from '../domaine/referentiels';
 import { ErreurReferentiel } from '../domaine/referentiels';
 import { ErreurPlafond, ecrireDocument, type Fiche } from '../sauvegardes/depot';
+// Le nom normalisé vit dans `identites.ts` depuis le lot 17.A : c'est le module
+// qui répond à « est-ce la même personne ? », et ce relevé-ci n'en est que le
+// premier client. Deux copies auraient divergé au premier réglage.
+import { normaliserNom } from './identites';
 import { journaliser } from './journal';
 
 /**
@@ -47,6 +51,76 @@ export const MAX_SAUVEGARDES = 100;
 export const MAX_COMPTES = 200;
 
 export type Portee = 'toutes' | 'active';
+
+/* --------------------------------------------------------------------------
+ * Viser une personne que tout le monde n'appelle pas pareil (lot 17.E)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Le préfixe qui dit « ceci n'est pas un identifiant, c'est une grappe ».
+ *
+ * **Ce que ça répare.** Un lot pose le même identifiant partout, ce qui est
+ * exactement ce qu'il faut tant que les comptes partent du même monde. Dès
+ * qu'un joueur a renommé sa fiche, ce n'est plus vrai : `POST /lots` avec
+ * `source: 'eddard-stark'` ne trouve rien chez celui qui l'a appelée
+ * `ned-stark`, et le lien n'est posé que chez les autres — sans que personne ne
+ * s'en aperçoive, puisque le refus se lit ligne par ligne dans le rapport.
+ *
+ * Avec `source: 'grappe:eddard-stark'`, la sauvegarde résout elle-même vers
+ * l'identifiant qu'elle connaît. La grappe est nommée par sa clé — un
+ * identifiant qui existe réellement chez au moins un compte, ce qui rend le
+ * message d'erreur lisible quand la résolution échoue.
+ */
+export const PREFIXE_GRAPPE = 'grappe:';
+
+/**
+ * Clé de grappe → sauvegarde → identifiant de la fiche dans cette sauvegarde.
+ *
+ * Clé par **sauvegarde** et non par compte : un compte peut en avoir plusieurs,
+ * et un lot de portée « toutes » les vise toutes. Indexer par compte y rendrait
+ * la correspondance ambiguë, et l'ambiguïté se réglerait en écrivant dans le
+ * mauvais arbre.
+ */
+export type Resolution = Map<string, Map<string, string>>;
+
+/** Les champs d'une opération qui désignent une fiche. */
+const CHAMPS_FICHE = ['id', 'source', 'cible'] as const;
+
+/** Cette opération vise-t-elle des grappes plutôt que des identifiants ? */
+export function nommeUneGrappe(operation: Objet): boolean {
+  return CHAMPS_FICHE.some((champ) => String(operation[champ] ?? '').startsWith(PREFIXE_GRAPPE));
+}
+
+/**
+ * L'opération telle que **cette sauvegarde-là** doit la lire.
+ *
+ * Une grappe qui n'a pas d'écriture chez ce compte fait échouer la sauvegarde,
+ * pas le lot : les autres passent, et le rapport dit laquelle a manqué et
+ * pourquoi. C'est le cas courant — poser un lien entre deux personnages là où
+ * un joueur n'en a créé qu'un.
+ */
+function resoudre(operation: Objet, sauvegardeId: string, resolution: Resolution | null): Objet {
+  if (!nommeUneGrappe(operation)) return operation;
+  if (!resolution) {
+    throw new ErreurReferentiel(
+      "cette opération nomme une grappe, mais le lot n'a pas de table de correspondance"
+    );
+  }
+
+  const resolue: Objet = { ...operation };
+  for (const champ of CHAMPS_FICHE) {
+    const valeur = String(operation[champ] ?? '');
+    if (!valeur.startsWith(PREFIXE_GRAPPE)) continue;
+
+    const cle = valeur.slice(PREFIXE_GRAPPE.length);
+    const local = resolution.get(cle)?.get(sauvegardeId);
+    if (!local) {
+      throw new ErreurReferentiel(`« ${cle} » n'a pas de fiche correspondante dans cet arbre`);
+    }
+    resolue[champ] = local;
+  }
+  return resolue;
+}
 
 /** Une sauvegarde visée, avec ce qu'il faut pour l'écrire au nom des siens. */
 export interface Cible {
@@ -351,17 +425,54 @@ function appliquerRelation(dataset: Dataset, operation: Objet, identifiant: stri
     delete donnees.type_lien;
   }
 
-  const existante = dataset.relation(identifiant);
+  const source = String(donnees.source ?? '');
+  const cible = String(donnees.cible ?? '');
+
+  // D'abord l'identifiant calculé, puis **le lien qui relie déjà ces deux
+  // fiches sous ce type-là**.
+  //
+  // Ce second essai date du lot 17.E, et il compte : l'identifiant d'un lien
+  // dépend de l'ordre dans lequel son auteur l'a posé, si bien qu'un lot
+  // « modifier ce lien partout » en fabriquait un second à côté chez tous ceux
+  // qui l'avaient écrit dans l'autre sens. Deux traits pour une amitié, et la
+  // modification appliquée au mauvais.
+  //
+  // Deux garde-fous. Le repêchage n'a lieu que si l'opération **nomme** le
+  // type — sans lui, il faudrait accepter n'importe quel lien entre ces deux
+  // fiches, et deux personnes sont souvent reliées deux fois. Et le sens ne
+  // s'ignore que sur un lien qui n'en a pas : « A parent de B » n'est pas
+  // « B parent de A ».
+  const typeVise = String(donnees.type ?? '');
+  const existante =
+    dataset.relation(identifiant) ??
+    (source && cible && typeVise
+      ? dataset.relations.find(
+          (relation) =>
+            relation.type === typeVise &&
+            ((relation.source === source && relation.cible === cible) ||
+              (!dataset.estDirigee(relation) &&
+                relation.source === cible &&
+                relation.cible === source))
+        ) ?? null
+      : null);
+
   if (existante) {
+    // Retrouvé à l'envers ? On ne retourne pas le trait de son propriétaire.
+    // Le sens d'un lien non orienté est cosmétique, mais c'est **son** choix, et
+    // le lot n'est pas venu pour ça : il vient poser un libellé, une date, une
+    // pastille. Rien ne justifie de réécrire au passage ce qu'on n'a pas demandé.
+    const aLEnvers = existante.source === cible && existante.cible === source;
+    if (aLEnvers) {
+      delete donnees.source;
+      delete donnees.cible;
+    }
     const change = existante.appliquerPatch(donnees).length > 0;
-    return { etat: change ? 'mis_a_jour' : 'inchange', quoi: `lien « ${identifiant} »` };
+    return { etat: change ? 'mis_a_jour' : 'inchange', quoi: `lien « ${existante.id} »` };
   }
 
   // Un lien ne se pose qu'entre deux fiches présentes *dans cette
   // sauvegarde-là* : les comptes partent du même monde, mais rien ne les
   // empêche d'y avoir supprimé quelqu'un.
-  const source = String(donnees.source ?? '');
-  const cible = String(donnees.cible ?? '');
   if (!dataset.personne(source)) {
     throw new ErreurReferentiel(`la fiche « ${source} » n'existe pas dans cette sauvegarde`);
   }
@@ -394,9 +505,14 @@ export async function appliquerLot(
   adminId: string,
   cibles: Cible[],
   operation: Objet,
-  simulation: boolean
+  simulation: boolean,
+  resolution: Resolution | null = null
 ): Promise<Resultat> {
-  const identifiant = identifiantDuLot(operation);
+  // L'identifiant est calculé **une fois** — c'est ce qui rend le lot rejouable
+  // — sauf quand l'opération nomme une grappe : là il dépend forcément de la
+  // sauvegarde, puisque c'est précisément ce que la grappe sert à retrouver.
+  const parGrappe = nommeUneGrappe(operation);
+  const identifiantCommun = parGrappe ? '' : identifiantDuLot(operation);
   const details: Detail[] = [];
   const comptes = new Set<string>();
 
@@ -421,7 +537,9 @@ export async function appliquerLot(
 
     try {
       const dataset = Dataset.depuisDict(JSON.parse(cible.donnees) as Objet);
-      const effet = appliquerOperation(dataset, operation, identifiant);
+      const locale = resoudre(operation, cible.fiche.id, resolution);
+      const identifiant = parGrappe ? identifiantDuLot(locale) : identifiantCommun;
+      const effet = appliquerOperation(dataset, locale, identifiant);
 
       if (effet.etat !== 'inchange' && !simulation) {
         dataset.oublierIndex();
@@ -623,25 +741,6 @@ export interface Rapprochement {
   alignees: number;
   /** Présentes chez un seul compte : rien à rapprocher. */
   propres: number;
-}
-
-/**
- * Le nom réduit à ce qui permet de reconnaître quelqu'un.
- *
- * Accents dépliés, casse effacée, ponctuation retirée, espaces resserrés.
- * « Jon Snow », « jon snow » et « Jon  Snow » se rejoignent ; « Jon Snow » et
- * « Jon Snow le Bâtard » restent séparés — et c'est voulu. Un rapprochement
- * approximatif qui réunit deux personnages différents coûte plus cher que celui
- * qu'il fait gagner : c'est une fiche écrasée dans l'arbre de quelqu'un.
- */
-function normaliserNom(texte: string): string {
-  return texte
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /**

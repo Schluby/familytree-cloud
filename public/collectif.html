@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FamilyTree — plan collectif</title>
+  <!-- La feuille de l'application, et non celle de l'administration : cette
+       page est un plan, pas une console. C'est tout le point du lot 17 — sortir
+       du tableur pour piloter là où l'on regarde. Elle apporte au passage
+       `.plan`, `.carte` et `.menu-contextuel`, que le moteur de rendu exige. -->
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚔</text></svg>">
+</head>
+<!-- `collectif` : cette page n'a ni barre basse ni `telephone.js`, donc ses deux
+     tiroirs s'ouvrent depuis la barre du haut, là où l'application retire ces
+     boutons. La classe sert d'ancre à ces quelques exceptions dans `app.css`. -->
+<body class="collectif">
+  <div class="application">
+
+    <!-- Ce bandeau ne se referme pas, comme celui de la procuration : on écrit
+         chez plusieurs personnes à la fois, et l'oublier une seconde suffit. -->
+    <div class="bandeau-procuration" id="bandeau"></div>
+
+    <header class="barre-haut">
+      <div class="marque">
+        <span class="marque-icone">⚔</span>
+        <div>
+          <div class="marque-titre">Plan collectif</div>
+          <div class="marque-univers" id="univers">…</div>
+        </div>
+      </div>
+
+      <div class="fil-ariane">
+        <span class="fil-vue" id="fil-etat">Chargement…</span>
+      </div>
+
+      <!-- Les deux réglages d'affichage vivent dans le rail, avec les autres
+           filtres, et non ici. La barre du haut d'un écran étroit perd ses
+           `.champ` (l'application les descend dans le tiroir par
+           `telephone.js`, que cette page ne charge pas) : les y laisser aurait
+           fait disparaître « Couleur » et « Montrer » sous 760 px, sans que
+           rien ne le dise. -->
+      <div class="barre-controles">
+        <button id="btn-recharger" class="bouton" title="Relire les arbres des membres sélectionnés">↻ Relire</button>
+        <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
+        <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
+        <button id="btn-langue" class="bouton bouton-icone" title="Langue / Language"><span class="ico">🌐</span><span class="lib">Langue</span></button>
+        <span class="groupe-compte">
+          <span class="compte" id="compte" title="Compte connecté">…</span>
+          <a class="bouton bouton-icone" href="/admin.html" title="Revenir à l’administration"><span class="ico">⚙</span><span class="lib">Administration</span></a>
+          <a class="bouton bouton-icone" href="/" title="Revenir à mes arbres"><span class="ico">⌂</span><span class="lib">Mes arbres</span></a>
+        </span>
+        <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer les membres et les filtres">☰</button>
+        <button id="btn-panneau" class="bouton bouton-icone" title="Afficher/masquer le détail">👥</button>
+      </div>
+    </header>
+
+    <div class="corps">
+
+      <aside class="rail" id="rail">
+
+        <section class="rail-bloc">
+          <h2>Ce qu’on montre</h2>
+          <label class="option">
+            <span>Couleur</span>
+            <select id="selecteur-couleur">
+              <option value="presence">Présence chez les membres</option>
+              <option value="maison">Maison</option>
+              <option value="statut">Statut</option>
+              <option value="generation">Génération</option>
+            </select>
+          </label>
+          <label class="option">
+            <span>Montrer</span>
+            <select id="selecteur-montrer">
+              <option value="tout">Tout</option>
+              <option value="commun">Ce que tout le monde a</option>
+              <option value="divergent">Ce qui n’est pas partout</option>
+            </select>
+          </label>
+          <!-- Une phrase entière par paragraphe, sans gras au milieu : le
+               dictionnaire du lot 16.G traduit des nœuds de texte, et une
+               phrase coupée en trois par des `<b>` se traduit en trois
+               morceaux qui ne se recollent bien dans aucune autre langue. -->
+          <p class="rail-aide">
+            En présence, une carte verte est chez tout le monde et une carte
+            rouge chez un seul.
+          </p>
+        </section>
+
+        <!-- Les membres. C'est le bloc qui commande tout le reste : la
+             sélection décide de ce qu'on lit, de ce qu'on montre et de chez qui
+             un geste écrira. Deux cases par membre, et ce n'est pas un doublon :
+             « lire » relit les arbres (une requête), « montrer » filtre ce qui
+             est déjà à l'écran (instantané). Les confondre obligerait à
+             recharger six arbres pour masquer une couleur. -->
+        <section class="rail-bloc" id="bloc-membres">
+          <div class="rail-bloc-entete">
+            <h2>Membres</h2>
+            <button class="bouton bouton-plat" id="btn-tout-montrer" type="button" title="Remettre tout le monde à l’écran">Tout</button>
+          </div>
+          <p class="rail-aide">
+            La case montre ou masque ce qu’un membre a ; le nom n’isole que lui.
+          </p>
+          <ul class="liste-membres" id="liste-membres"></ul>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-choisir-membres" type="button"
+                    title="Changer les comptes superposés sur ce plan">⚙ Qui superposer…</button>
+          </div>
+        </section>
+
+        <!-- Le rapprochement. Le curseur ne change pas les données : il change
+             ce qu'on considère être la même personne, donc le nombre de cartes.
+             Les verdicts, eux, sont gardés. -->
+        <section class="rail-bloc" id="bloc-rapprochement">
+          <h2>Rapprochement</h2>
+          <p class="rail-aide">
+            Deux fiches deviennent une carte quand elles se ressemblent assez.
+          </p>
+          <p class="rail-aide"><b>Rien n’est écrit — seul l’affichage change.</b></p>
+          <label class="option">
+            <input type="range" id="seuil" min="50" max="100" step="1" value="82">
+            <span id="seuil-valeur">0,82</span>
+          </label>
+          <p class="rail-aide" id="resume-rapprochement"></p>
+          <div class="rail-actions">
+            <button class="bouton bouton-plat" id="btn-candidats" type="button"
+                    title="Les paires qui se ressemblent sans avoir été réunies">⚖ À trancher…</button>
+          </div>
+        </section>
+
+        <section class="rail-bloc" id="bloc-types-collectif">
+          <h2>Liens</h2>
+          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent.</p>
+          <ul class="legende" id="types-collectif"></ul>
+        </section>
+
+        <section class="rail-bloc" id="bloc-maisons-collectif">
+          <h2>Maisons</h2>
+          <ul class="legende" id="maisons-collectif"></ul>
+        </section>
+
+        <section class="rail-bloc">
+          <h2>Le plan</h2>
+          <p class="rail-aide" id="releve-plan"></p>
+          <p class="rail-aide"><b>Clic droit dans le vide :</b> créer un profil chez les membres cochés.</p>
+          <p class="rail-aide">Sur une carte ou un lien, le même clic droit le modifie partout à la fois.</p>
+        </section>
+      </aside>
+
+      <main class="scene" id="scene">
+        <div class="scene-vide" id="scene-message">Chargement des arbres…</div>
+      </main>
+
+      <aside class="panneau" id="panneau">
+        <div class="pn-entete">
+          <span class="pn-titre" id="panneau-titre">Le plan collectif</span>
+        </div>
+        <div class="pn-vue" id="panneau-corps"></div>
+      </aside>
+
+    </div>
+  </div>
+
+  <script src="/vendor/d3.v7.min.js"></script>
+  <script type="module" src="/js/collectif.js"></script>
+</body>
+</html>

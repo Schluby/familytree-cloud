@@ -6,10 +6,17 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 16** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 15/08/2026. En
+**Les sept lots du plan sont livrés, puis les lots 8 à 17** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 16/08/2026. En
 ligne sur https://familytree.schlub-perso.workers.dev et sur
 https://myschlub.com (**le même Worker**, pas un second déploiement).
+
+Le lot 17 ouvre une **seconde page d'administration**, `/collectif.html` : les
+mondes des membres superposés en un seul sociogramme, où l'on pilote par clic
+droit au lieu de remplir des tableaux. Il apporte la migration `0010`
+(`identites`) et une notion nouvelle, la **grappe**. Voir « Le plan collectif
+(lot 17) » plus bas — surtout la partie sur ce que le rapprochement refuse de
+deviner.
 
 Le lot 15 ajoute le **carnet** : des notes en Markdown, rangées en chapitres,
 qui citent les fiches du monde et savent dire à chaque fiche où l'on parle
@@ -778,6 +785,83 @@ en page (1,63 ms pour déplacer 67 cartes).
   la peinture ni le nombre d'images par seconde. On mesure des compteurs
   (ombres, filtres, nœuds rendus) et des durées de style ou de mise en page ; le
   reste se raisonne, et se confirme sur une vraie machine.
+
+## Le plan collectif (lot 17)
+
+Une **seconde page d'administration**, `/collectif.html`, où les mondes des
+membres sont superposés en un seul sociogramme. Elle sert le maître de jeu, pas
+l'administrateur d'instance : `/admin.html` reste ce qu'il est, avec ses
+tableaux, parce qu'administrer des comptes est un autre métier.
+
+### Ce qu'il faut savoir avant d'y toucher
+
+- **Le moteur de dessin n'a pas été touché.** `views/cartes.js` reçoit un
+  payload `{noeuds, aretes}` comme d'habitude ; c'est `src/admin/collectif.ts`
+  qui le fabrique. **Si vous ajoutez un champ au moteur, il vaut pour les deux
+  pages** — vérifiez le plan collectif aussi.
+- **Un nœud est une grappe, pas une fiche.** Son `id` est l'identifiant que le
+  plus de comptes portent ; il existe donc vraiment chez au moins l'un d'eux, et
+  c'est ce qui permet à un lot de le viser.
+- **La place des `notes` de la carte est empruntée** pour dire l'état collectif.
+  Ne cherchez pas les notes du personnage sur ce plan : elles diffèrent d'un
+  compte à l'autre, et en montrer une seule mentirait sur les autres.
+- **`/api/admin/collectif/*` est de la surface d'administration.** Mêmes gardes,
+  même périmètre, même 404 pour ce qui n'est pas à soi. Une route ajoutée là
+  doit appeler `dansLePerimetre` — le périmètre ne s'applique pas tout seul.
+
+### Ce que le rapprochement refuse de deviner, et pourquoi
+
+Trois règles ont été écrites **après** avoir vu la première version se tromper,
+et il ne faut pas les défaire sans mesurer :
+
+1. **La ressemblance se mesure mot à mot, et c'est le pire appariement qui
+   décide.** Comparer les noms entiers laisse le nom de famille écraser le
+   prénom : la première version réunissait Aerys, Daenerys et Viserys Targaryen
+   en une seule personne, et Tywin avec Tyrion.
+2. **Le dénominateur d'une comparaison de mots a un plancher à six lettres.**
+   Sinon une faute de frappe coûte deux fois plus cher sur un prénom court que
+   sur un long, ce qui n'a aucun sens.
+3. **Deux fiches d'un même compte ne se rejoignent jamais automatiquement.** Un
+   compte est l'autorité sur son propre monde. C'est cette règle — et non le
+   seuil — qui règle le cas des deux « Brandon Stark » du monde livré.
+
+Les **verdicts manuels** (`identites`) l'emportent sur les trois, dans les deux
+sens. Ils survivent au curseur de seuil : c'est tout leur intérêt.
+
+### Viser une grappe dans un lot
+
+`{ "source": "grappe:eddard-stark" }` — chaque sauvegarde résout la clé vers
+**son** identifiant local. Trois choses à retenir :
+
+- La table de correspondance est **recalculée côté serveur**, jamais reçue du
+  navigateur : elle décide de ce qui sera écrit et chez qui.
+- Elle est indexée **par sauvegarde**, pas par compte : un compte peut en avoir
+  plusieurs, et un lot de portée « toutes » les vise toutes.
+- L'identifiant du lot cesse d'être calculé une seule fois : avec des grappes il
+  dépend forcément de la sauvegarde. `nommeUneGrappe(operation)` fait
+  l'aiguillage dans `appliquerLot`.
+
+### Deux pièges de l'interface
+
+- **Les identifiants des blocs du rail ne sont pas ceux de l'application.**
+  `#bloc-maisons` et `#bloc-liens` portent un `order` dans la feuille de style
+  sous 760 px, qui remonterait ces deux blocs en tête du tiroir — le bon ordre
+  pour l'arbre d'une personne, le mauvais pour un plan collectif. D'où
+  `#bloc-maisons-collectif`, `#bloc-types-collectif`, `#releve-plan`.
+- **Cette page ne charge pas `telephone.js`.** Ses deux tiroirs s'ouvrent depuis
+  la barre du haut, à toutes les largeurs, par `#btn-rail` et `#btn-panneau` ;
+  `body.collectif` sert d'ancre aux trois règles qui l'autorisent. Sans elles,
+  sous 760 px, le rail était hors de l'écran **sans plus rien pour l'y ramener**
+  — exactement le défaut que le lot 11.C avait réparé dans l'application.
+
+### Pour regarder le plan avec de vraies divergences
+
+    bash outils/table-essai.sh
+
+Monte dans la base **locale** un maître de jeu et trois joueurs partis du même
+Westeros, puis fait diverger leurs mondes : un renommage, un doublon avec faute
+de frappe, une suppression et un lien en plus. Quatre mondes identiques ne
+montrent rien de ce que cette page sert à voir.
 
 ## Pour repartir
 
