@@ -155,8 +155,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
         : [
             h('p', {
               class: 'vide mz-vide',
-              texte:
-                'Rien d’écrit pour l’instant. « ＋ Événement » pour raconter une bataille, une trahison, un mariage — les personnes citées deviennent cliquables.',
+              texte: 'Rien d’écrit pour l’instant.',
             }),
           ]),
       ...ecrits.map((entree, index) => carteEvenement(maison, entree, index)),
@@ -165,8 +164,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
             h('h3', { class: 'mz-sous-titre', texte: 'Ce que portent ses membres' }),
             h('p', {
               class: 'mz-aide',
-              texte:
-                'Les liens rangés dans « Événements passés » qui touchent quelqu’un de la maison. Ils s’éditent sur le plan, pas ici.',
+              texte: 'Ils s’éditent sur le plan, pas ici.',
             }),
             ...lies.map((lien) => carteEvenementLie(lien)),
           ]
@@ -243,7 +241,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       ligne('✦ Héritier', maison.heritiers, 'personne de désigné'),
       h('p', {
         class: 'mz-aide',
-        texte: `${maison.membres.length} membre${maison.membres.length > 1 ? 's' : ''} — le rang se pose sur la fiche d’une personne, ou d’un appui long sur sa carte.`,
+        texte: `${maison.membres.length} membre${maison.membres.length > 1 ? 's' : ''}`,
       }),
     ]);
   }
@@ -283,11 +281,6 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
     return h('section', { class: 'mz-bloc' }, [
       h('h3', { texte: 'Caractéristiques' }),
       h('div', { class: 'mz-caracs' }, lignes),
-      h('p', {
-        class: 'mz-aide',
-        texte:
-          'Les sept ressources du JDR Le Trône de Fer. Laisser vide ce que la table n’utilise pas : une case vide n’est pas un zéro.',
-      }),
     ]);
   }
 
@@ -323,7 +316,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
         : [
             h('p', {
               class: 'mz-aide',
-              texte: 'Aucun : vassalité, alliance, rivalité — les types sont ceux des liens entre personnes.',
+              texte: 'Aucun lien avec une autre maison.',
             }),
           ]),
     ]);

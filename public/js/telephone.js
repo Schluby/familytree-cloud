@@ -82,6 +82,11 @@ const A_DESCENDRE = [
       '#lien-document',
       '#btn-annee',
       '#btn-theme',
+      '#btn-langue',
+      // `#btn-raccourcis` descend comme le reste, mais il parle surtout d'un
+      // clavier : au doigt, il ne reste que le clic droit et l'appui long. Il
+      // vient donc en fin de bloc, avec la visite guidée.
+      '#btn-raccourcis',
       '#btn-tutoriel',
     ],
   },

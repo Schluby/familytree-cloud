@@ -8,6 +8,9 @@
  */
 
 import { appeler, deriverCle } from './identite.js';
+import { installerLangue } from './langue.js';
+
+installerLangue();
 
 const $ = (id) => document.getElementById(id);
 

@@ -304,6 +304,40 @@ connaît pas cette clef**. Un document qui ferait l'aller-retour par elle perdra
 son carnet — `Dataset.versDict` n'écrit que les clefs qu'il connaît, des deux
 côtés.
 
+### Une note offerte attend en base — décidé le 15/08/2026
+
+Le carnet vit dans le document, mais **une note qu'on propose à quelqu'un
+n'appartient encore à personne** : ni à celui qui l'envoie, qui garde la sienne,
+ni à celui qui la reçoit, qui n'a rien accepté. La ranger dans l'un des deux
+documents serait décider à sa place. D'où `notes_offertes` (migration `0009`),
+une table d'attente entre les deux, et la seule chose du carnet qui ne soit pas
+dans le document.
+
+Deux conséquences assumées :
+
+- **Le texte est recopié, pas référencé.** Une offre est une copie datée : ce
+  qui a été proposé est ce qui sera reçu. Pointer vers la note d'origine aurait
+  fait qu'une correction de l'expéditeur change ce que l'autre a accepté, et
+  qu'une suppression laisse un trou.
+- **Les identifiants ne traversent pas.** `@p:eddard-stark` ne vaut que dans le
+  monde qui l'a fabriqué. La note voyage donc avec un **glossaire** — le nom que
+  l'expéditeur donnait à chaque cible — et l'acceptation reconstruit les balises
+  pour le monde d'accueil. Ce qui ne se retrouve pas devient du texte : **jamais
+  une citation qui pointe à côté**, c'est la règle qui a décidé du reste.
+
+### Les deux langues se posent devant le DOM — décidé le 15/08/2026
+
+L'interface est traduite **à l'affichage**, par un dictionnaire qui parcourt les
+nœuds de texte et les attributs visibles, et non par un `t('…')` autour de
+chaque chaîne du code. Le raisonnement tient en une propriété : **ce qui n'est
+pas au dictionnaire ne bouge pas**, donc les données de l'utilisateur — noms de
+personnages, maisons, notes de la table — ne peuvent pas être traduites par
+accident, et personne n'a à penser à les marquer.
+
+Le prix, dit d'avance : une phrase ajoutée demain reste en français jusqu'à ce
+qu'on l'ajoute au dictionnaire (`node outils/relever-textes.mjs --manquants` la
+signale), et changer de langue recharge la page.
+
 ## Faisabilité — les chiffres
 
 Mesurés sur la vraie campagne (72 fiches, 178 liens) et sur l'application qui

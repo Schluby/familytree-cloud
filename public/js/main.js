@@ -27,6 +27,10 @@ import {
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
 import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
 import { creerCarnet } from './carnet.js';
+import { creerRaccourcis } from './raccourcis.js';
+import { creerOffres } from './offres.js';
+import { installerLangue } from './langue.js';
+import { creerChoixLangue } from './choix-langue.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -45,7 +49,6 @@ const elements = {
   btnTypeHistorique: document.getElementById('btn-type-historique'),
   basculeRevolus: document.getElementById('bascule-revolus'),
   btnNouvelleMaison: document.getElementById('btn-nouvelle-maison'),
-  blocEdition: document.getElementById('bloc-edition'),
   groupeCadrage: document.getElementById('groupe-cadrage'),
   selecteurCouleur: document.getElementById('selecteur-couleur'),
   selecteurGroupe: document.getElementById('selecteur-groupe'),
@@ -73,6 +76,8 @@ const elements = {
   btnAjuster: document.getElementById('btn-ajuster'),
   btnFocus: document.getElementById('btn-focus'),
   btnTheme: document.getElementById('btn-theme'),
+  btnRaccourcis: document.getElementById('btn-raccourcis'),
+  btnLangue: document.getElementById('btn-langue'),
   zoomCurseur: document.getElementById('zoom-curseur'),
   zoomMoins: document.getElementById('zoom-moins'),
   zoomPlus: document.getElementById('zoom-plus'),
@@ -218,6 +223,25 @@ const carnet = creerCarnet({
   surEcriture: () => {
     marquerEssaiModifie();
     marquerDemoModifiee();
+    rafraichirCitations();
+  },
+  surEnvoi: (note, ancre) => offres.proposerEnvoi(note, ancre),
+});
+
+/**
+ * Les notes qu'on nous propose (lot 16.E).
+ *
+ * `verifier` est appelé une fois, au démarrage, et après chaque acceptation :
+ * une boîte de réception n'a pas besoin d'être sondée en boucle, et une note
+ * qui arrive pendant la partie attendra le prochain chargement — c'est du
+ * courrier, pas une alerte.
+ */
+const offres = creerOffres({
+  surEtat: (message) => astuce(message),
+  surAcceptation: async () => {
+    marquerEssaiModifie();
+    marquerDemoModifiee();
+    await carnet.charger();
     rafraichirCitations();
   },
 });
@@ -389,6 +413,9 @@ const formulairePersonne = creerFormulairePersonne({
 // --------------------------------------------------------------- amorçage
 
 async function demarrer() {
+  // Avant tout affichage : la traversée traduit ce que le HTML porte déjà, et
+  // l'observateur qu'elle installe reprend tout ce qui sera dessiné ensuite.
+  installerLangue();
   appliquerTheme(localStorage.getItem('familytree-theme') || 'clair');
   message('Chargement…');
   // Le compte d'abord : c'est lui qui dit si la session tient encore, et un
@@ -449,9 +476,26 @@ async function demarrer() {
     await chargerUnivers();
     await choisirVue(etat.vues[0]?.id);
     proposerLeTutoriel();
+    // Le courrier après l'arbre : une proposition de note qui s'ouvrirait sur
+    // un écran vide n'aurait nulle part où atterrir, et la visite guidée passe
+    // avant — c'est elle qui a une place à montrer.
+    proposerLesNotesRecues();
   } catch (erreur) {
     message(`Impossible de contacter l'API : ${erreur.message}`);
   }
+}
+
+/**
+ * Les notes qu'on nous a proposées (lot 16.E).
+ *
+ * Ni en procuration ni sur un arbre partagé : dans les deux cas on regarde le
+ * monde de quelqu'un d'autre, et « accepter » y écrirait une note chez lui au
+ * nom d'une offre faite à nous. Et pas pendant la visite guidée, qui a déjà
+ * l'écran.
+ */
+function proposerLesNotesRecues() {
+  if (PROCURATION || PARTAGE) return;
+  offres.verifier({ montrer: !document.querySelector('.tuto') });
 }
 
 /**
@@ -1166,7 +1210,8 @@ function majCapacites(vue) {
   const capacites = new Set(vue?.capacites || []);
   elements.blocLiens.hidden = !capacites.has('legende');
   elements.blocMaisons.hidden = !capacites.has('legende');
-  elements.blocEdition.hidden = !capacites.has('edition');
+  // La capacité « edition » ne cache plus de bloc du rail depuis que les gestes
+  // sont dans le dépliant ⌨ : celui-ci se lit depuis n'importe quelle vue.
   elements.groupeCadrage.hidden = !capacites.has('zoom');
 }
 
@@ -2691,6 +2736,12 @@ elements.btnFocus.addEventListener('click', () => {
 elements.btnTheme.addEventListener('click', () =>
   appliquerTheme(document.body.classList.contains('sombre') ? 'clair' : 'sombre')
 );
+const raccourcis = creerRaccourcis();
+elements.btnRaccourcis.addEventListener('click', () =>
+  raccourcis.basculer(elements.btnRaccourcis)
+);
+const choixLangue = creerChoixLangue();
+elements.btnLangue.addEventListener('click', () => choixLangue.basculer(elements.btnLangue));
 elements.zoomMoins.addEventListener('click', () => etat.moteur?.zoomer(0.75));
 elements.zoomPlus.addEventListener('click', () => etat.moteur?.zoomer(1.35));
 elements.zoomCurseur.addEventListener('input', (evenement) =>
@@ -2856,9 +2907,12 @@ function dessinerBlocDemonstration() {
 
   const aide = bloc.querySelector('.rail-aide');
   if (aide) {
+    // Le bandeau du haut dit déjà ce qu'est la démonstration, et il ne se
+    // ferme pas : le répéter ici en quatre lignes ne servait qu'à pousser les
+    // sauvegardes hors de l'écran.
     aide.textContent = etat.demo
-      ? 'Un monde d’exemple, le même pour tout le monde. Essayez tout ce que vous voulez dedans : rien n’y est conservé — il repart à zéro à votre prochaine connexion. Ce que vous voulez garder se construit dans une sauvegarde à vous, juste en dessous.'
-      : 'Vous l’avez retirée. C’est un monde d’exemple où rien n’est conservé — de quoi essayer un geste sans risque, ou refaire la visite guidée.';
+      ? 'Rien n’y est conservé — elle repart à zéro à votre prochaine connexion.'
+      : 'Vous l’avez retirée.';
   }
   if (elements.btnDemoCopier) elements.btnDemoCopier.hidden = !etat.demo;
   if (elements.btnDemoReinitialiser) {

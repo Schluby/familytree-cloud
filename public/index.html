@@ -73,6 +73,11 @@
         <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
         <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
+        <!-- La langue (lot 16.G) et les raccourcis (lot 16.D) : deux dépliants
+             qu'on ouvre une fois et qu'on referme. Ils vivent près du thème,
+             avec les autres réglages de confort, et non parmi les outils. -->
+        <button id="btn-langue" class="bouton bouton-icone" title="Langue / Language"><span class="ico">🌐</span><span class="lib">Langue</span></button>
+        <button id="btn-raccourcis" class="bouton bouton-icone" title="Raccourcis clavier"><span class="ico">⌨</span><span class="lib">Raccourcis clavier</span></button>
         <!-- La visite guidée, relançable à tout moment (lot 14.C). Une icône et
              rien d'autre : elle ne sert qu'une fois par personne, et prendre la
              place d'un bouton de travail pour ça serait mal la placer. -->
@@ -138,12 +143,7 @@
                pas la même chose selon qu'on a encore la démonstration ou qu'on
                l'a retirée. Celui-ci est ce qu'on lit avant la première
                réponse du serveur. -->
-          <p class="rail-aide">
-            Un monde d’exemple, le même pour tout le monde. Essayez tout ce que
-            vous voulez dedans : <b>rien n’y est conservé</b> — il repart à zéro
-            à votre prochaine connexion. Ce que vous voulez garder se construit
-            dans une sauvegarde à vous, juste en dessous.
-          </p>
+          <p class="rail-aide"><b>Rien n’y est conservé</b> — il repart à zéro à votre prochaine connexion.</p>
           <ul class="liste-sauvegardes" id="liste-demonstration"></ul>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-demo-copier"
@@ -155,7 +155,7 @@
 
         <section class="rail-bloc">
           <h2>Sauvegardes</h2>
-          <p class="rail-aide">Tout ce que vous modifiez est écrit dans la sauvegarde active, tout de suite. Clic droit ou appui long : renommer, dupliquer, télécharger, <b>partager en lecture</b>.</p>
+          <p class="rail-aide">Clic droit ou appui long : renommer, dupliquer, télécharger, <b>partager en lecture</b>.</p>
           <ul class="liste-sauvegardes" id="liste-sauvegardes"></ul>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-nouvelle-sauvegarde" title="Créer une sauvegarde">＋ Nouvelle</button>
@@ -170,10 +170,7 @@
              faire. Masqué tant que personne ne vous a rien ouvert. -->
         <section class="rail-bloc" id="bloc-partages" hidden>
           <h2>Partagés avec moi</h2>
-          <p class="rail-aide">
-            Des arbres que d’autres comptes vous ont ouverts. Vous les voyez
-            tels qu’ils les modifient, en lecture seule.
-          </p>
+          <p class="rail-aide">Ouverts par d’autres comptes, en lecture seule.</p>
           <ul class="liste-sauvegardes" id="liste-partages"></ul>
         </section>
 
@@ -184,7 +181,7 @@
 
         <section class="rail-bloc bloc-joueurs" id="bloc-joueurs">
           <h2>Joueurs</h2>
-          <p class="rail-aide">Cliquer un joueur : les cartes prennent la couleur de son humeur et la liste de droite s’édite d’un clic. Clic droit : modifier.</p>
+          <p class="rail-aide">Un clic passe le plan dans son regard. Clic droit : modifier.</p>
           <ul class="liste-joueurs" id="liste-joueurs"></ul>
           <div class="rail-actions">
             <button class="bouton bouton-plat" id="btn-nouveau-joueur" title="Ajouter un joueur">＋ Nouveau joueur</button>
@@ -193,7 +190,7 @@
 
         <section class="rail-bloc" id="bloc-liens">
           <h2>Liens</h2>
-          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit ou appui long : nom, couleur, trait, sens.</p>
+          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : modifier.</p>
           <ul class="legende" id="legende-types"></ul>
           <!-- Les liens révolus (ancien vassal, serment rompu) restent dessinés,
                en pointillé serré. Cet interrupteur ne garde que le présent. -->
@@ -227,20 +224,9 @@
           <div class="options" id="options-vue"></div>
         </section>
 
-        <section class="rail-bloc" id="bloc-edition">
-          <h2>Édition</h2>
-          <ul class="rail-astuces">
-            <li><b>Clic droit</b> — ou <b>appui long</b> au doigt — sur une fiche : ouvrir, relier, supprimer.</li>
-            <li><b>Clic droit</b> ou <b>appui long</b> dans le vide : nouveau profil.</li>
-            <li><b>＋ Profil</b>, en bas de l’écran : créer quelqu’un sans viser.</li>
-            <li><b>Relier à…</b> puis un simple clic (ou une touche) sur l’autre fiche.</li>
-            <li><b>Poignée ＋</b> sous une fiche : glisser vers une autre pour créer un lien.</li>
-            <li><b>Maj + clic</b> sur deux fiches : les relier sans quitter la vue.</li>
-            <li><b>Ctrl + glisser</b> une fiche : la repositionner à la main.</li>
-            <li><b>Clic</b> sur un lien : changer son type et son humeur.</li>
-          </ul>
-          <p class="rail-aide astuce-telephone">Au doigt, l’<b>appui long</b> remplace le clic droit : il ouvre le même menu sur une fiche, sur un lien ou dans le vide. Seuls le glisser d’une fiche et la poignée ＋ demandent une souris.</p>
-        </section>
+        <!-- Le bloc « Édition » est parti dans le dépliant ⌨ de la barre du
+             haut (lot 16.D) : ces gestes se cherchent une fois, et occupaient
+             un écran entier du rail à chaque partie. -->
 
         <section class="rail-bloc">
           <h2>Sélection</h2>

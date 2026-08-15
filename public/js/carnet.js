@@ -477,6 +477,15 @@ export function creerCarnet(contexte = {}) {
           optionChapitre(chapitre.id, chapitre.titre || chapitre.id, courante.chapitre)
         ),
       ]),
+      // Proposer sa note reste possible en lecture seule : on ne modifie rien
+      // ici, on en offre une copie à quelqu'un d'autre.
+      h('button', {
+        class: 'bouton bouton-icone',
+        type: 'button',
+        texte: '✉',
+        title: 'Proposer cette note à un autre compte',
+        onclick: (evenement) => contexte.surEnvoi?.(courante, evenement.currentTarget),
+      }),
       !lectureSeule() &&
         h('button', {
           class: 'bouton bouton-icone cn-danger',

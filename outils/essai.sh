@@ -1547,6 +1547,103 @@ verifier "  et plus de fichier de vue a desaccorder" oui "$(contient '<!DOCTYPE 
 # `.joueur` nue rattrapait donc les cartes du plan et ecrasait les 34 px
 # reserves au portrait : le rond des initiales retombait sur le nom. Les lignes
 # de joueur de la fiche s'appellent `.joueur-ligne` pour que ca n'arrive plus.
+# ---------------------------------------------------------------------------
+# Lot 16 : offrir une note a un autre compte
+#
+# Deux promesses :
+#
+# - **rien n'arrive sans un oui** : une note offerte n'existe nulle part dans
+#   le carnet du destinataire tant qu'il n'a pas accepte, et refuser ne laisse
+#   rien derriere ;
+# - **les balises retrouvent leurs fiches** : `@p:<id de chez moi>` devient
+#   `@p:<id de chez lui>` quand les noms se correspondent, et redevient du
+#   texte quand rien ne correspond — jamais une citation qui pointe a cote.
+# ---------------------------------------------------------------------------
+
+echo "-- 16.E ce qu'on offre, et a qui"
+# A travaille sur la sauvegarde qu'il avait deja au lot 15 : le carnet y a ete
+# vide, mais le monde est le sien et ses profils y sont.
+verifier "un profil dont l'identifiant ne dira rien a B" 201 "$(code "$BOCAL_A" POST /api/personnes '{"prenom":"Ned","nom":"Stark"}')"
+PORTE="$(lire personne.id)"
+verifier "  son identifiant vient de son nom d'alors" ned-stark "$PORTE"
+verifier "  on le renomme, l'identifiant ne bouge pas" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$PORTE '{"prenom":"Eddard"}')"
+verifier "un profil que B n'aura jamais" 201 "$(code "$BOCAL_A" POST /api/personnes '{"prenom":"Melisandre","nom":"Asshai"}')"
+INCONNUE="$(lire personne.id)"
+cat > "$DOSSIER/offre.json" <<JSON
+{"titre":"Seance partagee",
+ "corps":"@p:$PORTE tient le Nord. @p:$INCONNUE veille au feu.\nEt @p:$PORTE repart."}
+JSON
+verifier "la note a offrir se cree" 201 "$(fichier "$BOCAL_A" POST /api/carnet/notes "$DOSSIER/offre.json")"
+OFFERTE="$(lire note.id)"
+
+verifier "sans destinataire, refus" 400 "$(code "$BOCAL_A" POST /api/carnet/notes/$OFFERTE/envoyer '{"destinataires":[]}')"
+verifier "une note inconnue ne s'offre pas" 404 "$(code "$BOCAL_A" POST /api/carnet/notes/jamais-vue/envoyer "{\"destinataires\":[\"$EMAIL_B\"]}")"
+verifier "A l'offre a B" 200 "$(code "$BOCAL_A" POST /api/carnet/notes/$OFFERTE/envoyer "{\"destinataires\":[\"$EMAIL_B\",\"personne@nulle-part.test\",\"$EMAIL_A\"]}")"
+verifier "  B la recoit" 1 "$(lire envoyes.length)"
+verifier "  l'adresse sans compte est nommee, pas avalee" oui "$(contient 'personne@nulle-part.test')"
+verifier "  et on ne s'envoie rien a soi-meme" oui "$(contient "$EMAIL_A")"
+
+echo "-- 16.E rien n'arrive sans un oui"
+verifier "B voit ce qui l'attend" 200 "$(code "$BOCAL_B" GET /api/carnet/recus)"
+verifier "  une note" 1 "$(lire recus.length)"
+RECU="$(lire recus.0.id)"
+verifier "  qui dit d'ou elle vient" "$EMAIL_A" "$(lire recus.0.de)"
+verifier "  et combien de fiches elle cite" 2 "$(lire recus.0.cites)"
+verifier "  son carnet n'a rien recu pour autant" non "$(code "$BOCAL_B" GET /api/carnet > /dev/null; contient 'Seance partagee')"
+verifier "A ne voit pas la boite de B" 0 "$(code "$BOCAL_A" GET /api/carnet/recus > /dev/null; lire recus.length)"
+verifier "et n'accepte pas a sa place" 404 "$(code "$BOCAL_A" POST /api/carnet/recus/$RECU/accepter)"
+
+echo "-- 16.F les balises retrouvent leurs fiches"
+verifier "B a son propre Eddard, sous un autre identifiant" 201 "$(code "$BOCAL_B" POST /api/personnes '{"prenom":"Eddard","nom":"Stark"}')"
+CHEZ_B="$(lire personne.id)"
+verifier "  et ce n'est pas celui de A" eddard-stark "$CHEZ_B"
+verifier "B accepte" 201 "$(code "$BOCAL_B" POST /api/carnet/recus/$RECU/accepter)"
+verifier "  deux citations rattachees" 2 "$(lire rattachement.rattachees)"
+verifier "  une laissee en clair" 1 "$(lire rattachement.en_clair)"
+verifier "  la balise pointe vers la fiche de B" oui "$(contient "@p:$CHEZ_B")"
+verifier "  et plus vers celle de A" non "$(contient "@p:$PORTE")"
+verifier "  l'introuvable est devenue un nom lisible" oui "$(contient '@Melisandre Asshai')"
+verifier "la fiche de B sait qu'on parle d'elle" 2 "$(code "$BOCAL_B" GET /api/personnes/$CHEZ_B > /dev/null; lire citations.total)"
+verifier "l'offre a quitte la boite" 0 "$(code "$BOCAL_B" GET /api/carnet/recus > /dev/null; lire recus.length)"
+verifier "  et ne s'accepte pas deux fois" 404 "$(code "$BOCAL_B" POST /api/carnet/recus/$RECU/accepter)"
+verifier "A garde la sienne, intacte" oui "$(code "$BOCAL_A" GET /api/carnet > /dev/null; contient "@p:$PORTE")"
+
+echo "-- 16.E refuser ne laisse rien"
+verifier "A la propose de nouveau" 200 "$(code "$BOCAL_A" POST /api/carnet/notes/$OFFERTE/envoyer "{\"destinataires\":[\"$EMAIL_B\"]}")"
+code "$BOCAL_B" GET /api/carnet/recus > /dev/null
+RECU2="$(lire recus.0.id)"
+verifier "B refuse" 200 "$(code "$BOCAL_B" DELETE /api/carnet/recus/$RECU2)"
+verifier "  la boite est vide" 0 "$(code "$BOCAL_B" GET /api/carnet/recus > /dev/null; lire recus.length)"
+verifier "  et son carnet n'a pas grossi" 1 "$(code "$BOCAL_B" GET /api/carnet > /dev/null; lire notes.length)"
+verifier "un refus deja fait reste introuvable" 404 "$(code "$BOCAL_B" DELETE /api/carnet/recus/$RECU2)"
+
+echo "-- 16.A a 16.D ce que la page en dit"
+code - GET /js/panel.js > /dev/null
+verifier "« Importance » a quitte la fiche" non "$(contient 'taille du nœud')"
+verifier "l'humeur envers les joueurs se replie" oui "$(contient 'pn-repliable pn-joueurs')"
+verifier "  et retient le choix" oui "$(contient 'familytree-fiche-joueurs')"
+code - GET /js/raccourcis.js > /dev/null
+verifier "les raccourcis ont leur depliant" oui "$(contient 'Aller à la recherche')"
+code - GET / > /dev/null
+verifier "  son bouton est dans la barre du haut" oui "$(contient 'btn-raccourcis')"
+verifier "  et le bloc « Édition » a quitte le rail" non "$(contient 'rail-astuces')"
+verifier "la langue a son bouton" oui "$(contient 'btn-langue')"
+code - GET /js/views/maisons.js > /dev/null
+verifier "le laius des sept ressources est parti" non "$(contient 'sept ressources du JDR')"
+
+echo "-- 16.G les deux langues"
+code - GET /js/langue.js > /dev/null
+verifier "la traduction se pose devant le DOM" oui "$(contient 'function traduireSousArbre')"
+verifier "  les motifs se compilent ancres" oui "$(contient 'function compilerMotif')"
+# Un `<textarea>` porte ce que quelqu'un a tape. `FILTER_REJECT` ecarte son
+# sous-arbre entier ; `FILTER_SKIP` descendrait dedans.
+verifier "  et la saisie de quelqu'un est ecartee, sous-arbre compris" oui "$(contient 'FILTER_REJECT')"
+code - GET /js/traductions.js > /dev/null
+verifier "le dictionnaire est servi" oui "$(contient 'TRADUCTIONS')"
+# Le releve dit ce qui manque : zero, ou le lot n'est pas fini.
+MANQUANTS="$(node outils/relever-textes.mjs --manquants 2>&1 >/dev/null | sed 's/[^0-9].*//')"
+verifier "aucune chaine sans traduction" 0 "$MANQUANTS"
+
 echo "-- la carte jouee garde la place de son portrait"
 code - GET /css/app.css > /dev/null
 verifier "aucune regle ne s'appelle « .joueur » tout court" non "$(contient '.joueur {')"

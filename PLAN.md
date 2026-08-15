@@ -1690,3 +1690,135 @@ La leçon est la même que d'habitude sous une autre forme : **un état porté e
 classe nue partage l'espace de noms de toute l'application.** Les états des
 cartes (`morte`, `satellite`, `rang`, `focus`…) sont des mots courants ; aucun
 composant ne doit prendre l'un d'eux comme nom propre.
+
+# Lot 16 — la fiche allégée, les notes qui circulent, et l'anglais
+
+Sept demandes du 15/08/2026, dans le même message.
+
+## 16.A — « Importance » quitte la fiche
+
+Le champ promettait de piloter la taille des nœuds. Il ne pilotait plus rien :
+depuis que les cartes partagent un gabarit commun, `views/cartes.js` ne lit
+jamais `importance`. Un réglage qui ne fait rien est pire qu'un réglage absent.
+
+La **donnée**, elle, reste : elle est dans les documents existants, dans les
+exports, et dans le catalogue des variables filtrables. Ce qui disparaît est le
+seul endroit d'où on pouvait la changer — conséquence à assumer, dite ici pour
+qu'on ne la redécouvre pas : **`importance` garde désormais la valeur qu'elle
+avait**, et un filtre bâti dessus ne verra plus jamais rien bouger.
+
+## 16.B — L'humeur envers les joueurs se replie
+
+Quatre joueurs, c'est quatre curseurs et quatre commentaires : cinq cent
+quarante pixels, la moitié de la fiche, pour une section qu'on ne remplit pas à
+chaque profil. Elle devient un `<details>`, et le motif est **généralisé** :
+`.pn-repliable` sert aux citations du carnet comme à l'humeur, plutôt que d'être
+recopié. Le résumé du titre dit ce qu'il y a dessous (« 3 / 4 notés »), pour ne
+pas avoir à déplier pour le savoir.
+
+Ouvert par défaut — c'est ce que faisait la fiche avant — et le choix se retient
+**d'une session à l'autre** : c'est une préférence de lecture, pas un état de
+navigation.
+
+## 16.C — Ce qui ne s'apprend pas ne se lit pas
+
+Élagage des paragraphes permanents. La règle appliquée : **on garde ce qui
+annonce une conséquence, on retire ce qui décrit ce qu'on voit.**
+
+Partis : « Les sept ressources du JDR Le Trône de Fer… » (l'exemple donné),
+le laïus de la démonstration recopié sous le bandeau qui le dit déjà, « Tout ce
+que vous modifiez est écrit tout de suite » (l'indicateur d'écriture le dit),
+l'explication du portrait (l'infobulle de la pastille la dit), le mode d'emploi
+du rang sous la liste des membres, et le bloc « Édition » du rail — parti dans
+le dépliant ⌨.
+
+Restés : les comptes (« 3 personnes dans cette maison »), les conséquences
+d'une suppression, et l'aide de l'âge **quand elle est actionnable** — c'est-à-
+dire uniquement quand l'année de campagne manque et que le champ est désactivé.
+Le reste est passé en infobulle, sur le champ concerné.
+
+## 16.D — Les raccourcis dans la barre du haut
+
+Un dépliant ⌨, trois groupes : partout, sur le plan, dans le carnet.
+`public/js/raccourcis.js` **ne définit aucun raccourci** — il ne fait que dire
+ceux que `main.js` et `views/cartes.js` câblent. C'est écrit en tête du fichier :
+si l'un change, cette liste ment jusqu'à ce qu'on la corrige.
+
+## 16.E et 16.F — Une note s'offre à un autre compte
+
+Voir `REPRISE.md`, section « Offrir une note (lot 16) », pour les invariants.
+Ce qui a décidé de la forme :
+
+- **Rien n'arrive sans un oui.** Poser du texte dans le carnet de quelqu'un
+  sans qu'il l'ait accepté, ce n'est plus partager. D'où une table d'attente
+  (`0009`), et non une écriture directe.
+- **Une offre est une copie datée.** L'expéditeur garde sa note et peut la
+  corriger sans changer ce que l'autre a reçu.
+- **Les balises doivent survivre au voyage.** `@p:eddard-stark` ne veut rien
+  dire chez quelqu'un d'autre : la note part avec un **glossaire** — le nom que
+  l'expéditeur donnait à chaque cible — et l'acceptation retrouve les fiches du
+  destinataire par identifiant, puis par nom aplati, puis par ressemblance
+  (Jaccard sur les mots, seuil 0,5). Ce qui ne se retrouve pas devient
+  `@Eddard Stark` : du texte lisible, plutôt qu'une citation qui pointe à côté.
+
+Mesuré par le harnais sur un cas réel : une note citant deux fiches, envoyée
+d'un monde à l'autre, ressort avec **2 citations rattachées** — dont une par le
+nom, l'identifiant étant différent des deux côtés — et **1 laissée en clair**.
+
+## 16.G — Français / English
+
+L'application compte quatorze mille lignes de JavaScript écrites en français.
+La façon canonique — un `t('…')` autour de chaque chaîne — voulait dire toucher
+huit cents endroits dans du code qui marche, pour un bénéfice nul tant que la
+seconde langue n'existe pas, et un oubli laisse une phrase en français sans que
+rien ne le signale.
+
+Le choix retenu : **un dictionnaire posé devant le DOM**. On parcourt les nœuds
+de texte et les attributs qui s'affichent, et on remplace ce qu'on reconnaît.
+Le raisonnement complet est en tête de `public/js/langue.js` ; la propriété qui
+a emporté la décision est que **ce qui n'est pas au dictionnaire ne bouge
+pas** — donc les noms de personnages, les maisons et les notes de la table ne
+peuvent pas être traduits par accident, sans que personne ait à penser à les
+marquer.
+
+Le relevé est outillé : `node outils/relever-textes.mjs` rend les chaînes
+visibles, `--manquants` celles qui n'ont pas encore de traduction. La
+traduction elle-même a été produite par un sous-agent (Sonnet 5), avec le
+glossaire du projet — carnet, fiche, maison, humeur, lien.
+
+**Le relevé s'est étoffé en marchant, et chaque élargissement a été payé par un
+défaut trouvé à l'écran.** 643 chaînes au premier passage ; 847 à l'arrivée. Ce
+qui manquait :
+
+- les deux branches d'un **ternaire** (`dirige ? 'orienté' : 'réciproque'`) —
+  des mots interpolés au milieu d'une phrase, qui ne s'affichent jamais seuls ;
+- les libellés passés en **argument** et non en propriété
+  (`champTexte('generation', 'Génération (vide = calculée)')`) ;
+- les phrases écrites en **plusieurs morceaux collés** par des `+`, qui n'en
+  font qu'une à l'écran — d'où une ligne de plafonds à moitié traduite ;
+- ce que le **serveur** envoie : nom et description des vues, intitulés des
+  tableaux.
+
+Trois défauts trouvés en regardant l'application, et non en lisant le code :
+
+1. **« Space » pour « Lieu ».** `Lieu` → `Place`, puis l'observateur relit ce
+   qu'il vient d'écrire : « Place » est *aussi* un mot français, traduit
+   ailleurs par « Space ». Un drapeau posé le temps de la boucle n'y suffit
+   pas — les mutations arrivent en microtâche. Réparé par une mémoire, nœud par
+   nœud, de la valeur écrite.
+2. **« 16 link(s) direct(s) ».** Le motif `{} lien{}` se compile en
+   `/^(.*) lien(.*)$/`. Il traduisait à moitié cette ligne-là — et il aurait
+   réécrit « il a rompu le lien avec son père » **dans une note de la table**.
+   Un motif qui flotte entre deux trous exige maintenant douze signes de
+   littéral ; un motif ancré par du texte reste permis.
+3. **« Sans compte ici : … »** en français au milieu d'un panneau anglais : un
+   gabarit passé en argument libre, hors de portée du relevé.
+
+D'où la mise en garde, écrite dans `REPRISE.md` : **`0 sans traduction` ne veut
+pas dire « tout est traduit »**. Le relevé connaît les formes usuelles, pas
+toutes. La vérification qui compte est de regarder l'application en anglais.
+
+Ce que ça ne fait pas, et il faut le savoir : **une phrase ajoutée demain reste
+en français** jusqu'à ce qu'on l'ajoute au dictionnaire, et le changement de
+langue **recharge la page** (retraduire de l'anglais vers le français ne serait
+pas une opération sûre).

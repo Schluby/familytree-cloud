@@ -48,6 +48,14 @@ export function creerPanneau(element, rappels = {}) {
    * le refermer à chaque profil lui ferait refaire le geste vingt fois.
    */
   let citationsOuvertes = false;
+  /**
+   * L'humeur envers les joueurs, elle, se retient **d'une session à l'autre** :
+   * une table qui ne note pas les humeurs ne veut pas les replier à chaque
+   * ouverture, et une table qui les note veut les avoir sous la main. Ouvert
+   * par défaut — c'est ce que faisait la fiche avant qu'on puisse la replier.
+   */
+  const MEMOIRE_JOUEURS = 'familytree-fiche-joueurs';
+  let joueursOuverts = localStorage.getItem(MEMOIRE_JOUEURS) !== '0';
 
   function definirEtat(texte, classe = '') {
     if (elementEtat) {
@@ -122,7 +130,7 @@ export function creerPanneau(element, rappels = {}) {
   function sectionCitations() {
     const citations = donnees.citations || { total: 0, par_note: [], par_chapitre: [] };
     const bloc = h('details', {
-      class: 'pn-section pn-citations',
+      class: 'pn-section pn-repliable pn-citations',
       open: citationsOuvertes,
       ontoggle: (evenement) => {
         citationsOuvertes = evenement.target.open;
@@ -137,9 +145,9 @@ export function creerPanneau(element, rappels = {}) {
 
     bloc.append(
       h('summary', {}, [
-        h('span', { class: 'pn-citations-titre' }, [
+        h('span', { class: 'pn-repli-titre' }, [
           h('span', { texte: 'Cité dans le carnet' }),
-          h('span', { class: 'pn-citations-nombre', texte: resume }),
+          h('span', { class: 'pn-repli-nombre', texte: resume }),
         ]),
       ]),
       ...(citations.total ? corpsCitations(citations) : [aucuneCitation()])
@@ -150,10 +158,7 @@ export function creerPanneau(element, rappels = {}) {
   function aucuneCitation() {
     return h('p', {
       class: 'echelle-aide',
-      texte:
-        'Personne ne parle encore de cette fiche. Dans le carnet (✎ en bas de ' +
-        'l’écran), tapez « / » puis son nom pour la citer — les passages ' +
-        'apparaîtront ici.',
+      texte: 'Dans le carnet (✎), tapez « / » puis son nom pour la citer.',
     });
   }
 
@@ -182,7 +187,7 @@ export function creerPanneau(element, rappels = {}) {
       h('div', { class: 'pn-cit-note-titre' }, [
         h('span', { texte: entree.titre || 'Note sans titre' }),
         h('span', {
-          class: 'pn-citations-nombre',
+          class: 'pn-repli-nombre',
           texte: `${entree.occurrences}×`,
         }),
       ]),
@@ -427,6 +432,11 @@ export function creerPanneau(element, rappels = {}) {
     const champAge = h('input', {
       type: 'number',
       placeholder: utilisable() ? '17' : '—',
+      // L'explication vit ici, sur le champ, plutôt qu'en paragraphe sous la
+      // grille : elle ne se lit qu'au moment où on s'en sert.
+      title: utilisable()
+        ? `Calculé sur ${reference()}. Saisir l’un remplit l’autre, et avancer la date de campagne vieillit tout le monde d’un coup.`
+        : 'Il faut une année de campagne pour calculer un âge.',
       value: ageDe(brouillon.naissance, reference()) ?? '',
       oninput: (evenement) => {
         const age = Number.parseInt(evenement.target.value, 10);
@@ -477,12 +487,15 @@ export function creerPanneau(element, rappels = {}) {
     ]);
   }
 
+  /**
+   * Une seule chose mérite un paragraphe : le champ « Âge » est désactivé et
+   * il faut dire pourquoi. Quand il marche, il se passe d'explication — son
+   * infobulle dit sur quelle année il compte.
+   */
   function aideAge() {
     const annee = referentiels.meta?.annee_courante;
-    if (anneeDe(annee) === null) {
-      return 'Âge : réglez d’abord l’année de la campagne (📅 dans la barre du haut) — sans elle, seule l’année de naissance se saisit.';
-    }
-    return `Âge : calculé sur ${annee}, l’année courante de la campagne. Saisir l’un remplit l’autre, et avancer la date vieillit tout le monde d’un coup.`;
+    if (anneeDe(annee) !== null) return '';
+    return 'Âge : réglez d’abord l’année de la campagne (📅 dans la barre du haut) — sans elle, seule l’année de naissance se saisit.';
   }
 
   function champSelection(cle, libelle, options) {
@@ -521,22 +534,15 @@ export function creerPanneau(element, rappels = {}) {
         // contredire : vide, elle reste calculée ; remplie, elle gagne.
         champTexte('generation', 'Génération (vide = calculée)', { type: 'number' }),
         champLieu(),
-        champSelection(
-          'importance',
-          'Importance (taille du nœud)',
-          [1, 2, 3, 4, 5].map((n) => ({ id: n, label: `${n}` }))
-        ),
         champListe('titres', 'Titres'),
         champRang(),
         champListe('tags', 'Tags'),
       ]),
-      h('p', { class: 'echelle-aide', texte: aideAge() }),
-      h('p', {
-        class: 'echelle-aide',
-        texte: donnees.photo
-          ? 'Portrait : cliquez la pastille pour changer l’adresse de l’image.'
-          : 'Portrait : cliquez la pastille et indiquez l’adresse d’une image (https://…). Les images ne sont pas hébergées ici, seule leur adresse est gardée.',
-      }),
+      // Ne reste que ce qui ne se devine pas : sans année de campagne, le champ
+      // « Âge » ne peut rien calculer, et il faut le dire. Le reste — comment
+      // marche un portrait, ce qu'est un âge déduit — se lit dans l'infobulle
+      // du champ concerné, à l'endroit et au moment où on s'en sert.
+      aideAge() && h('p', { class: 'echelle-aide', texte: aideAge() }),
     ]);
   }
 
@@ -581,14 +587,39 @@ export function creerPanneau(element, rappels = {}) {
       ]);
     });
 
-    return h('div', { class: 'pn-section' }, [
-      h('h3', { texte: 'Humeur envers les joueurs' }),
+    // Quatre joueurs, c'est quatre curseurs et quatre commentaires : la moitié
+    // de la fiche. Repliable, donc — et le résumé dit dans le titre s'il y a
+    // quelque chose dessous, pour ne pas avoir à déplier pour le savoir.
+    const notes = joueurs.filter(
+      (joueur) => personne.relations_joueurs?.[joueur.id]?.note != null
+    ).length;
+
+    const bloc = h('details', {
+      class: 'pn-section pn-repliable pn-joueurs',
+      open: joueursOuverts,
+      ontoggle: (evenement) => {
+        joueursOuverts = evenement.target.open;
+        localStorage.setItem(MEMOIRE_JOUEURS, joueursOuverts ? '1' : '0');
+      },
+    });
+
+    bloc.append(
+      h('summary', {}, [
+        h('span', { class: 'pn-repli-titre' }, [
+          h('span', { texte: 'Humeur envers les joueurs' }),
+          h('span', {
+            class: 'pn-repli-nombre',
+            texte: notes ? `${notes} / ${joueurs.length} notés` : 'aucune',
+          }),
+        ]),
+      ]),
       h('p', {
         class: 'echelle-aide',
-        texte: '1 affectueux · 4 indifférent · 7 malveillant — MD/MP à appliquer aux jets.',
+        texte: '1 affectueux · 4 indifférent · 7 malveillant.',
       }),
-      ...lignes,
-    ]);
+      ...lignes
+    );
+    return bloc;
   }
 
   function sectionNotes() {
@@ -635,7 +666,7 @@ export function creerPanneau(element, rappels = {}) {
    * pause de frappe coûterait un aller-retour pour rien.)
    */
   const CHAMPS_VISIBLES = new Set([
-    'prenom', 'nom', 'surnom', 'maison', 'statut', 'importance', 'couleur',
+    'prenom', 'nom', 'surnom', 'maison', 'statut', 'couleur',
     'tags', 'relations_joueurs', 'avatar', 'naissance', 'deces',
   ]);
 

@@ -216,13 +216,6 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 }
 .axe-puce.sur-mesure::before { content: '⚙ '; opacity: .7; }
 .rail-aide { font-size: 10.5px; color: var(--texte-faible); margin: -2px 0 7px; }
-.rail-astuces { list-style: none; margin: 0; padding: 0; }
-.rail-astuces li {
-  font-size: 10.5px; color: var(--texte-faible); line-height: 1.45;
-  padding: 3px 0 3px 9px; border-left: 2px solid var(--bord);
-  margin-bottom: 3px;
-}
-.rail-astuces b { color: var(--texte-doux); font-weight: 600; }
 
 .liste-vues { list-style: none; margin: 0; padding: 0; }
 .liste-vues li {
@@ -882,6 +875,71 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .fl-etat { flex: 1; font-size: 11px; color: var(--texte-faible); text-align: right; }
 .fl-etat.erreur { color: #c0392b; }
 .fl-aide { margin: 0; font-size: 11px; color: var(--texte-faible); line-height: 1.45; }
+
+/* ------------------------------------------------ raccourcis (lot 16.D) */
+
+.flottant.flottant-raccourcis { width: 342px; }
+.rc-groupe { display: flex; flex-direction: column; gap: 4px; }
+.rc-titre {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texte-faible); margin-bottom: 2px;
+}
+/* Les touches d'abord, à largeur fixe : l'œil descend une colonne de touches
+   et s'arrête sur la bonne, au lieu de relire chaque phrase. */
+.rc-ligne { display: flex; align-items: baseline; gap: 9px; font-size: 11.5px; }
+.rc-touches { flex: 0 0 106px; display: flex; flex-wrap: wrap; gap: 3px; }
+.rc-quoi { flex: 1; color: var(--texte-doux); line-height: 1.4; }
+.rc-touches kbd {
+  font: inherit; font-size: 10.5px; line-height: 1.5;
+  padding: 1px 5px; border-radius: 5px;
+  background: var(--fond-3); border: 1px solid var(--bord);
+  border-bottom-width: 2px; color: var(--texte);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------- langue (lot 16.G) */
+
+.flottant.flottant-langue { width: 188px; }
+.flottant-langue .fl-corps { padding: 5px; gap: 2px; }
+.lg-choix {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--texte);
+  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.lg-choix:hover { background: var(--fond-3); }
+.lg-drapeau { font-size: 15px; line-height: 1; }
+.lg-nom { flex: 1; }
+.lg-coche { color: var(--accent); width: 12px; }
+.lg-choix.actif .lg-nom { font-weight: 600; }
+
+/* ------------------------------ offrir et recevoir une note (lot 16.E) */
+
+.flottant.flottant-envoi { width: 340px; }
+.of-adresses { resize: vertical; min-height: 54px; line-height: 1.5; }
+
+/* La boîte de réception peut porter plusieurs propositions : elle est plus
+   large que les autres panneaux, et son corps défile. */
+.flottant.flottant-offres { width: 396px; }
+.flottant-offres .fl-corps { max-height: 58vh; gap: 12px; }
+.of-carte {
+  border: 1px solid var(--bord); border-radius: 9px;
+  padding: 10px 11px; background: var(--fond-3);
+  display: flex; flex-direction: column; gap: 5px;
+}
+.of-de { font-size: 11.5px; }
+.of-origine { color: var(--texte-faible); }
+.of-titre { font-size: 12.5px; font-weight: 600; }
+.of-meta { font-size: 10.5px; color: var(--texte-faible); }
+/* L'aperçu est du Markdown brut, volontairement : ce qui compte ici est de
+   reconnaître la note, pas de la lire en beauté avant de l'avoir acceptée. */
+.of-apercu {
+  margin: 2px 0 0; font-size: 11px; line-height: 1.5; color: var(--texte-doux);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  max-height: 92px; overflow: hidden;
+  border-left: 2px solid var(--bord); padding-left: 8px;
+}
+.of-actions { display: flex; gap: 7px; margin-top: 4px; }
 
 /* --------------------------------------------------- éditeur de filtre */
 
@@ -1632,21 +1690,24 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 }
 
 /* citations, dans la fiche d'une personne */
-.pn-citations > summary {
+/* Une section repliable de la fiche : le titre prend la place du `<h3>` et
+   porte le chevron. Deux sections s'en servent — les citations du carnet et
+   l'humeur envers les joueurs — et toute autre qui deviendrait trop longue. */
+.pn-repliable > summary {
   cursor: pointer; list-style: none;
   font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible);
 }
-.pn-citations > summary::-webkit-details-marker { display: none; }
+.pn-repliable > summary::-webkit-details-marker { display: none; }
 /* Le chevron dit d'un coup d'œil qu'il y a quelque chose dessous — et de quel
    côté. Sans lui, un `<summary>` déshabillé de sa flèche n'a plus l'air
    cliquable du tout. */
-.pn-citations > summary::before { content: '▸ '; letter-spacing: 0; }
-.pn-citations[open] > summary::before { content: '▾ '; }
-.pn-citations[open] > summary { margin-bottom: 8px; }
-.pn-citations > summary:hover { color: var(--texte-doux); }
-.pn-citations-titre { display: inline-flex; align-items: baseline; gap: 6px; }
-.pn-citations-nombre {
+.pn-repliable > summary::before { content: '▸ '; letter-spacing: 0; }
+.pn-repliable[open] > summary::before { content: '▾ '; }
+.pn-repliable[open] > summary { margin-bottom: 8px; }
+.pn-repliable > summary:hover { color: var(--texte-doux); }
+.pn-repli-titre { display: inline-flex; align-items: baseline; gap: 6px; }
+.pn-repli-nombre {
   font-size: 10.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
 }
 .pn-cit-chapitre {
@@ -1708,7 +1769,6 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 /* Boutons qui n'existent que sur téléphone : sur écran large, les deux volets
    sont déjà là et n'ont besoin ni d'être ouverts ni d'être fermés. */
 .btn-telephone { display: none; }
-.astuce-telephone { display: none; }
 .btn-fermer-volet { margin-left: auto; align-self: center; margin-right: 6px; }
 
 /* L'en-tête du tiroir de gauche a disparu au lot 13.A, y compris son balisage.
@@ -1739,7 +1799,6 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
  */
 @media (max-width: 760px) {
   .btn-telephone { display: inline-flex; }
-  .astuce-telephone { display: block; }
 
   .barre-haut { gap: 8px; padding: 7px 10px; flex-wrap: nowrap; }
   /* Un plancher, et non `min-width: 0`. Mesuré le 14/08/2026, boutons d'essai
@@ -1809,7 +1868,6 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   #bloc-joueurs { order: 5; }
   .rail > section:has(#liste-sauvegardes) { order: 6; }
   #bloc-partages { order: 7; }
-  #bloc-edition { order: 8; }
   .rail > section:has(#stats) { order: 9; }
   #bloc-compte { order: 10; }
   #bloc-telephone { order: 11; }

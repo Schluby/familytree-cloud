@@ -373,6 +373,20 @@ export const Api = {
   supprimerNote: (id) => requete(`${DOMAINE}/carnet/notes/${id}`, { method: 'DELETE' }),
   /** Qui parle de cette cible, où, et combien de fois. */
   citations: (genre, id) => requete(`${DOMAINE}/carnet/citations${versQuery({ genre, id })}`),
+
+  // ------------------------------------------- offrir une note (lot 16.E)
+  //
+  // Envoyer n'écrit rien chez personne : la note attend que le destinataire
+  // dise oui. Accepter l'écrit dans **la sauvegarde qu'il a ouverte à ce
+  // moment-là**, avec ses balises réécrites pour son monde.
+  envoyerNote: (id, destinataires) =>
+    requete(`${DOMAINE}/carnet/notes/${id}/envoyer`, {
+      method: 'POST',
+      body: JSON.stringify({ destinataires }),
+    }),
+  recus: () => requete(`${DOMAINE}/carnet/recus`),
+  accepterRecu: (id) => requete(`${DOMAINE}/carnet/recus/${id}/accepter`, { method: 'POST' }),
+  refuserRecu: (id) => requete(`${DOMAINE}/carnet/recus/${id}`, { method: 'DELETE' }),
 };
 
 export { versQuery };

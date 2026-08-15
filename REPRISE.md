@@ -6,7 +6,7 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 15** — des tranches qui
+**Les sept lots du plan sont livrés, puis les lots 8 à 16** — des tranches qui
 n'étaient pas au plan d'origine, demandées entre le 10 et le 15/08/2026. En
 ligne sur https://familytree.schlub-perso.workers.dev et sur
 https://myschlub.com (**le même Worker**, pas un second déploiement).
@@ -15,6 +15,12 @@ Le lot 15 ajoute le **carnet** : des notes en Markdown, rangées en chapitres,
 qui citent les fiches du monde et savent dire à chaque fiche où l'on parle
 d'elle. Il n'apporte **aucune migration** — tout vit dans le document de la
 sauvegarde. Voir « Le carnet (lot 15) » plus bas pour les pièges.
+
+Le lot 16 fait deux choses de fond : une note du carnet **s'offre à un autre
+compte** (migration `0009`, la première depuis le lot 14), et l'interface
+existe **en anglais**. Voir « Offrir une note (lot 16) » et « Les deux langues
+(lot 16) » plus bas — la seconde explique pourquoi la traduction est posée
+devant le DOM et non dans le code.
 
 Le lot 9 change quelque chose de plus profond que les précédents : **le service
 n'exige plus de compte pour être essayé.** Un visiteur arrive dans un monde déjà
@@ -667,6 +673,82 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   à l'écart (`<c0>`, `<b0>`) ne sont sûrs **que parce que** l'échappement a déjà
   eu lieu : à ce stade, le seul `<` que le texte puisse porter est un `<` qu'on
   vient d'écrire soi-même. Ne pas déplacer l'ordre de ces trois lignes.
+
+## Offrir une note (lot 16)
+
+Une note s'envoie à d'autres comptes, **par adresse**, et n'entre chez eux
+qu'après un oui. Le socle est `migrations/0009_notes_offertes.sql` et
+`src/domaine/envois.ts` ; les routes sont dans la section « Carnet » de
+`src/domaine/routes.ts`, l'interface dans `public/js/offres.js`.
+
+- **Une offre est une copie datée, pas un lien.** Corriger sa note après coup
+  ne change pas ce que l'autre a reçu, et l'effacer ne lui retire rien. Pointer
+  vers la note d'origine aurait fait le contraire des deux.
+- **Pas de colonne d'état.** La table *est* la boîte de réception : accepter ou
+  refuser supprime la ligne. Ce qu'elle contient est exactement ce qui attend
+  une réponse.
+- **L'ordre compte à l'acceptation** : on écrit la note dans le monde d'abord,
+  on supprime l'offre **ensuite**. Si l'écriture échoue (plafond, note trop
+  longue), l'offre attend toujours.
+- **Les balises sont réécrites pour le monde d'accueil** (`rattacher`), en
+  trois passes : même identifiant, puis même nom aplati, puis nom assez
+  ressemblant (Jaccard sur les mots de plus de deux lettres, seuil 0,5). À
+  défaut, `@p:eddard-stark` devient `@Eddard Stark` — du texte, plus une
+  citation. **Jamais une citation qui pointe à côté** : c'est la règle qui a
+  décidé du reste.
+- La réécriture se fait **de la fin vers le début, sur les positions relevées
+  par `balisesDe`**, et non par un `replace` global : `balisesDe` ignore le
+  code, et une balise montrée dans un bloc de code doit rester mot pour mot.
+- Accepter écrit dans **la sauvegarde ouverte à ce moment-là**. Ni en
+  procuration ni sur un arbre partagé (`proposerLesNotesRecues` s'en abstient) :
+  on y regarde le monde de quelqu'un d'autre.
+
+## Les deux langues (lot 16)
+
+`public/js/langue.js` pose un dictionnaire **devant le DOM** : il parcourt les
+nœuds de texte et les attributs qui s'affichent, et remplace ce qu'il
+reconnaît. Le pourquoi est en tête du fichier ; ce qu'il faut retenir pour ne
+pas se tromper en le modifiant :
+
+- **Ce qui n'est pas au dictionnaire ne bouge pas.** Les noms de personnages,
+  de maisons, les notes de la table ne peuvent donc pas être traduits par
+  accident. C'est une propriété **passive** — personne n'a à penser à marquer
+  ses données, et c'est ce qui rend l'approche tenable.
+- **Les motifs sont ancrés des deux côtés**, et un motif **qui flotte entre
+  deux trous** (`{} lien{}`) est refusé s'il porte moins de douze signes de
+  littéral — il redevient une correspondance exacte. Mesuré : `{} lien{}` se
+  compile en `/^(.*) lien(.*)$/`, qui reconnaît « 16 lien(s) direct(s) » (à
+  moitié traduit, moche) **et** « il a rompu le lien avec son père » dans une
+  note écrite par quelqu'un (réécrit, grave). Un motif ancré par du texte à
+  l'une de ses extrémités (`Né en {}`, `{} / {} notés`) reste sûr et passe.
+- **Ne jamais relire ce qu'on vient d'écrire.** `Lieu` → `Place`, puis
+  l'observateur relit « Place » — mot français lui aussi — et le retraduit en
+  « Space ». Un drapeau posé le temps de la boucle **n'y suffit pas** : les
+  mutations arrivent en microtâche, donc dans un appel ultérieur, quand le
+  drapeau est retombé. C'est `ecritsParNous` (un `WeakMap` de la valeur écrite,
+  par nœud) qui arrête la boucle, et qui laisse quand même retraduire si
+  l'application réécrit le nœud pour de bon.
+- **Le relevé est une aide, pas une preuve.**
+  `node outils/relever-textes.mjs --manquants` lit les sources et connaît les
+  formes usuelles (porteurs, affectations, appels nommés, ternaires, arguments
+  de champs, chaînes collées). Il ne voit **pas** un gabarit passé en argument
+  libre (`dits.push(\`Sans compte ici : ${…}.\`)`) ni un texte construit dans
+  un `innerHTML`. Un « 0 sans traduction » ne veut donc pas dire « tout est
+  traduit » : **la vérification qui compte est de regarder l'application en
+  anglais.** C'est comme ça qu'on a trouvé « Space », « 16 link(s) direct(s) »
+  et « Sans compte ici ». Le fichier `traductions.js` porte des sections
+  commentées pour les entrées posées à la main.
+- On a essayé d'élargir le relevé à « tout gabarit qui ressemble à une
+  phrase » : il ramenait des classes CSS (`bouton {}`), des chemins d'API et
+  des bouts de code. Un relevé qui rend du bruit ne se relit pas, donc ne sert
+  pas — la liste des appels reconnus est restée **nominative**.
+- **Une phrase ajoutée demain reste en français** jusqu'à ce qu'on l'ajoute au
+  dictionnaire, et rien ne le signalera si le relevé ne la voit pas.
+- **Changer de langue recharge la page.** Traduire vers l'anglais se fait sur
+  place ; revenir au français demanderait de retraduire à l'envers, ce qui
+  n'est pas sûr. Le rechargement repart de ce que le code produit.
+- L'observateur **se met en pause pendant qu'il écrit** (`enCours`), sinon ses
+  propres remplacements le rappelleraient en boucle.
 
 ## Pour repartir
 

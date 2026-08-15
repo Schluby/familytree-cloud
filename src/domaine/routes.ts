@@ -26,6 +26,7 @@ import {
   ErreurPlafond,
   ficheDe,
   lireTexte as lireDocument,
+  maintenant,
   sauvegardeActive,
   type Fiche,
 } from '../sauvegardes/depot';
@@ -40,6 +41,7 @@ import {
 import { archiver, type Entree } from './zip';
 import { contenuDepart } from '../depart/contenu';
 import * as carnet from './carnet';
+import { glossaireDe, glossaireDepuisJson, rattacher } from './envois';
 import * as filtres from './filtres';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
@@ -1359,6 +1361,224 @@ routesDomaine.delete('/carnet/notes/:id', async (c) => {
   carnet.ecrireCarnet(courant.dataset, contenu);
   await enregistrer(c, courant);
   return c.json({ supprime: identifiant, titre: note.titre });
+});
+
+/* --------------------------------------------------------------------------
+ * Offrir une note à un autre compte (lot 16.E)
+ *
+ * Envoyer n'écrit rien chez personne : la note attend dans `notes_offertes`
+ * jusqu'à ce que le destinataire dise oui. C'est ce qui distingue un partage
+ * d'une intrusion — on ne pose pas de texte dans le carnet de quelqu'un.
+ *
+ * À l'acceptation, la note entre dans **la sauvegarde ouverte à ce
+ * moment-là**. Pas dans « sa » sauvegarde — il en a plusieurs — mais dans
+ * celle qu'il regarde en acceptant, ce qui est aussi la seule réponse qu'il
+ * puisse prévoir sans qu'on la lui demande.
+ * -------------------------------------------------------------------------- */
+
+/** Ce qu'on accepte de recevoir en une fois. Au-delà, c'est un envoi en nombre. */
+const MAX_DESTINATAIRES = 20;
+/** Ce qui peut attendre dans une boîte avant qu'elle ne déborde. */
+const MAX_RECUS = 200;
+
+interface LigneOfferte {
+  id: string;
+  de_id: string;
+  de_email: string;
+  origine_nom: string;
+  titre: string;
+  corps: string;
+  chapitre_titre: string;
+  glossaire: string;
+  cree_le: number;
+}
+
+/**
+ * Envoyer l'une de mes notes à des comptes, **par adresse**.
+ *
+ * Une adresse inconnue est écartée et nommée, comme pour les lecteurs d'un
+ * arbre (`src/partages/routes.ts`) : c'est moi qui envoie, et je dois savoir
+ * que Jean ne recevra rien. Le même arbitrage y est expliqué en détail.
+ */
+routesDomaine.post('/carnet/notes/:id/envoyer', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const moi = c.get('compte');
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const identifiant = c.req.param('id');
+  const note = contenu.notes.find((entree) => entree.id === identifiant);
+  if (!note) return absent(c, `note inconnue : ${identifiant}`);
+
+  const bruts = Array.isArray(corps.destinataires) ? corps.destinataires : [];
+  const demandes = [
+    ...new Set(bruts.map((v: unknown) => String(v ?? '').trim().toLowerCase()).filter(Boolean)),
+  ];
+  if (!demandes.length) return c.json({ erreur: 'il faut au moins un destinataire' }, 400);
+  if (demandes.length > MAX_DESTINATAIRES) {
+    return c.json({ erreur: `au plus ${MAX_DESTINATAIRES} destinataires à la fois` }, 400);
+  }
+
+  // `id <> ?` : s'envoyer une note à soi-même la dupliquerait dans son propre
+  // carnet par un détour, sans que ce soit ce qu'on voulait dire.
+  const trouves = (
+    await c.env.DB.prepare(
+      `SELECT id, email, email_norm FROM utilisateurs
+        WHERE email_norm IN (${demandes.map(() => '?').join(',')}) AND id <> ?`
+    )
+      .bind(...demandes, moi.id)
+      .all<{ id: string; email: string; email_norm: string }>()
+  ).results;
+
+  const reconnus = new Set(trouves.map((ligne) => ligne.email_norm));
+  const inconnus = demandes.filter((demande) => !reconnus.has(demande));
+
+  const titreChapitre =
+    contenu.chapitres.find((entree) => entree.id === note.chapitre)?.titre ?? '';
+  const glossaire = JSON.stringify(glossaireDe(courant.dataset, note.corps));
+  const instant = maintenant();
+
+  // Une boîte pleine refuse, elle ne fait pas de place : effacer la plus
+  // vieille offre de quelqu'un d'autre serait répondre non à sa place.
+  const debordent: string[] = [];
+  const envois = [];
+  for (const destinataire of trouves) {
+    const compte = await c.env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM notes_offertes WHERE vers_id = ?'
+    )
+      .bind(destinataire.id)
+      .first<{ n: number }>();
+    if ((compte?.n ?? 0) >= MAX_RECUS) {
+      debordent.push(destinataire.email);
+      continue;
+    }
+    envois.push(
+      c.env.DB.prepare(
+        `INSERT INTO notes_offertes
+           (id, de_id, vers_id, origine_nom, titre, corps, chapitre_titre, glossaire, cree_le)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(),
+        moi.id,
+        destinataire.id,
+        courant.fiche.nom,
+        note.titre,
+        note.corps,
+        titreChapitre,
+        glossaire,
+        instant
+      )
+    );
+  }
+  if (envois.length) await c.env.DB.batch(envois);
+
+  return c.json({
+    envoyes: trouves
+      .filter((ligne) => !debordent.includes(ligne.email))
+      .map((ligne) => ligne.email),
+    inconnus,
+    debordent,
+  });
+});
+
+/** Ce qu'on m'a proposé et que je n'ai ni accepté ni refusé. */
+routesDomaine.get('/carnet/recus', async (c) => {
+  const moi = c.get('compte');
+  const { results } = await c.env.DB.prepare(
+    `SELECT o.id, o.de_id, u.email AS de_email, o.origine_nom, o.titre, o.corps,
+            o.chapitre_titre, o.glossaire, o.cree_le
+       FROM notes_offertes o
+       JOIN utilisateurs u ON u.id = o.de_id
+      WHERE o.vers_id = ?
+      ORDER BY o.cree_le DESC`
+  )
+    .bind(moi.id)
+    .all<LigneOfferte>();
+
+  return c.json({
+    recus: results.map((ligne) => ({
+      id: ligne.id,
+      de: ligne.de_email,
+      origine: ligne.origine_nom,
+      titre: ligne.titre,
+      corps: ligne.corps,
+      chapitre_titre: ligne.chapitre_titre,
+      cree_le: ligne.cree_le,
+      signes: ligne.corps.length,
+      cites: glossaireDepuisJson(ligne.glossaire).length,
+    })),
+  });
+});
+
+/**
+ * Oui : la note entre dans mon carnet, ses balises réécrites pour mon monde.
+ *
+ * Le chapitre de l'expéditeur ne suit pas : c'est son découpage, pas le mien.
+ * La note arrive hors chapitre, là où on la voit, et se range d'un geste.
+ */
+routesDomaine.post('/carnet/recus/:id/accepter', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const moi = c.get('compte');
+  const offre = await c.env.DB.prepare(
+    `SELECT o.id, o.de_id, u.email AS de_email, o.origine_nom, o.titre, o.corps,
+            o.chapitre_titre, o.glossaire, o.cree_le
+       FROM notes_offertes o
+       JOIN utilisateurs u ON u.id = o.de_id
+      WHERE o.id = ? AND o.vers_id = ?`
+  )
+    .bind(c.req.param('id'), moi.id)
+    .first<LigneOfferte>();
+  if (!offre) return absent(c, 'cette note ne vous attend pas');
+
+  const { corps, bilan } = rattacher(
+    courant.dataset,
+    offre.corps,
+    glossaireDepuisJson(offre.glossaire)
+  );
+
+  const contenu = carnet.lireCarnet(courant.dataset);
+  const note: carnet.Note = {
+    id: idsLibres(
+      contenu.notes.map((entree) => entree.id),
+      slugifier(offre.titre, 'note')
+    ),
+    chapitre: '',
+    titre: offre.titre,
+    corps,
+    extra: {},
+  };
+
+  try {
+    carnet.appliquerNote(note, { corps });
+    contenu.notes.push(note);
+    carnet.ecrireCarnet(courant.dataset, contenu);
+    await enregistrer(c, courant);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+
+  // Effacée **après** l'écriture : si l'enregistrement échoue (plafond
+  // atteint, note trop longue), l'offre attend toujours et rien n'est perdu.
+  await c.env.DB.prepare('DELETE FROM notes_offertes WHERE id = ?').bind(offre.id).run();
+
+  return c.json({ note, de: offre.de_email, rattachement: bilan }, 201);
+});
+
+/** Non : l'offre disparaît. Rien n'est écrit, et l'expéditeur garde la sienne. */
+routesDomaine.delete('/carnet/recus/:id', async (c) => {
+  const moi = c.get('compte');
+  const offre = await c.env.DB.prepare(
+    'SELECT id, titre FROM notes_offertes WHERE id = ? AND vers_id = ?'
+  )
+    .bind(c.req.param('id'), moi.id)
+    .first<{ id: string; titre: string }>();
+  if (!offre) return absent(c, 'cette note ne vous attend pas');
+
+  await c.env.DB.prepare('DELETE FROM notes_offertes WHERE id = ?').bind(offre.id).run();
+  return c.json({ refuse: offre.id, titre: offre.titre });
 });
 
 /* --------------------------------------------------------------------------
