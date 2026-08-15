@@ -1639,3 +1639,27 @@ note au mauvais endroit.
 non par la lecture : `ErreurCarnet` n'était pas traduite par `enErreur` et
 sortait en 500 au lieu de 400, et le sommaire affichait « null » — `h()` ignore
 un enfant absent, `replaceChildren` le convertit en texte.
+
+## Trouvé en production, le jour même
+
+**« Le carnet n'est pas disponible. »** Signalé par Maxime une heure après le
+déploiement, sur la vue plein écran, quel que soit le monde ouvert.
+
+Rien n'était cassé : son onglet était **ouvert depuis avant le déploiement**. Il
+gardait donc en mémoire l'ancien `main.js`, celui d'avant le lot — tandis que
+l'import dynamique de la vue, lui, allait chercher le fichier neuf sur le
+serveur. Le fichier neuf demandait à `main.js` l'exemplaire du carnet ; l'ancien
+`main.js` n'en avait jamais posé. Deux fichiers de deux versions, et un
+message de repli à la place de la vue.
+
+Le correctif n'est pas de remettre l'accesseur au bon moment, c'est de
+**supprimer la poignée de main** : `public/js/views/carnet.js` est retiré, et
+`main.js` enregistre le rendu **sur l'objet qu'il vient de créer**. Un seul
+fichier, donc une seule version, donc plus de désaccord possible. Le harnais
+vérifie les deux moitiés : `enregistrerRendu('carnet'` est bien dans `main.js`,
+et `/js/views/carnet.js` répond bien **404**.
+
+Ce que ça n'enlève pas : un onglet resté ouvert pendant un déploiement gardera
+toujours l'ancien code. Ce lot-ci ne peut plus tomber dessus ; la leçon
+générale, elle, est qu'un rendu chargé à la demande ne doit jamais **dépendre**
+de ce qu'un autre fichier a fait avant lui.

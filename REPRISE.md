@@ -639,10 +639,20 @@ Ce qui reste « à trancher » et n'a jamais été programmé :
   point : `data-rang` compte les apparitions **de cette cible-là** dans la note,
   exactement comme l'index inverse. S'ils se séparent, une citation ouvre la
   bonne note au mauvais endroit, et rien ne le signale.
-- **Un seul carnet dans la page.** `main.js` le fabrique, `definirCarnetPartage`
-  le pose, `views/carnet.js` vient le chercher. `etat.carnetPlace` dit où il est
-  (`null`, `'volet'`, `'vue'`) ; on le **déplace**, on n'en crée jamais un
-  second — ce serait deux brouillons qui s'écrasent.
+- **Un seul carnet dans la page, et il n'y a pas de `views/carnet.js`.**
+  `main.js` fabrique l'objet **et enregistre son rendu dans la foulée**
+  (`enregistrerRendu('carnet', …)`), sur le même objet, dans le même fichier.
+  C'est la seule vue montée ainsi, et c'est ce qui la met à l'abri d'un
+  désaccord de versions : un fichier de vue séparé allait chercher l'exemplaire
+  par un accesseur partagé, et **un déploiement pendant qu'un onglet est ouvert
+  suffisait à casser la vue** — l'onglet gardait l'ancien `main.js`, qui ne
+  posait rien, l'import dynamique ramenait le fichier de vue neuf, et la vue
+  répondait « Le carnet n'est pas disponible ». Signalé en production le
+  15/08/2026, corrigé le jour même ; deux assertions du harnais tiennent la
+  porte fermée. **Ne pas recréer ce fichier.**
+- `etat.carnetPlace` dit où il se trouve (`null`, `'volet'`, `'vue'`) ; on le
+  **déplace**, on n'en crée jamais un second — ce serait deux brouillons qui
+  s'écrasent.
 - **On n'écrase jamais un texte en cours de frappe.** Le carnet se recharge à
   chaque rechargement de vue (les noms affichés viennent des fiches) ; si cela
   tombe pendant qu'on tape, seul le catalogue est repris — voir

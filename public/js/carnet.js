@@ -55,22 +55,19 @@ function poser(hote, ...enfants) {
 /* --------------------------------------------------------------------------
  * L'exemplaire unique
  *
- * `main.js` fabrique le carnet une fois et le pose ici ; `views/carnet.js` vient
- * le chercher quand la vue s'ouvre, au lieu d'en fabriquer un second. C'est ce
- * qui fait que « déplacer » déplace, et n'ouvre jamais un deuxième brouillon
- * sur le même texte.
+ * Il n'y a **pas** de `views/carnet.js` : `main.js` fabrique le carnet et
+ * enregistre son moteur de rendu dans la foulée, sur le même objet. C'est le
+ * seul rendu du projet qui ne vit pas dans son fichier, et c'est voulu — voir
+ * le commentaire de `enregistrerRendu('carnet', …)` là-bas.
+ *
+ * Le montage précédent (un fichier de vue qui venait chercher l'exemplaire par
+ * un accesseur partagé) a été retiré le 15/08/2026 : il tenait à ce que les
+ * deux fichiers soient de la même version. Un déploiement pendant qu'un onglet
+ * est ouvert suffisait à les désaccorder — l'onglet gardait l'ancien `main.js`,
+ * qui ne posait pas l'exemplaire, et l'import du fichier de vue, lui, allait
+ * chercher le neuf. La vue répondait alors « Le carnet n'est pas disponible »,
+ * sans rien de cassé nulle part.
  * -------------------------------------------------------------------------- */
-
-let partage = null;
-
-export function definirCarnetPartage(instance) {
-  partage = instance;
-  return instance;
-}
-
-export function carnetPartage() {
-  return partage;
-}
 
 export function creerCarnet(contexte = {}) {
   let donnees = { chapitres: [], notes: [], catalogue: [] };

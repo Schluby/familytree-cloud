@@ -1525,15 +1525,23 @@ code - GET / > /dev/null
 verifier "le carnet a son bouton dans la barre basse" oui "$(contient 'btn-carnet')"
 verifier "  et son volet, a cote du plan" oui "$(contient 'volet-carnet')"
 code - GET /js/carnet.js > /dev/null
-verifier "il n'y a qu'un carnet dans la page" oui "$(contient 'export function carnetPartage')"
 verifier "  la completion « / » y est" oui "$(contient 'function examinerDeclencheur')"
 verifier "  bornee par genre, sans remplissage" oui "$(contient 'function sousQuota')"
 verifier "  et un texte en cours de frappe n'est jamais ecrase" oui "$(contient 'enCoursDeFrappe')"
 code - GET /js/markdown.js > /dev/null
 verifier "le rendu echappe avant de baliser" oui "$(contient 'texte = echapper(source)')"
 verifier "  et refuse les adresses qui ne sont pas http(s)" oui "$(contient 'javascript:')"
+# Le rendu du carnet est enregistre dans `main.js`, sur l'objet qu'il vient de
+# creer — et non dans un `views/carnet.js`. Ce fichier a existe une journee : il
+# allait chercher l'exemplaire par un accesseur partage, et un deploiement
+# pendant qu'un onglet etait ouvert desaccordait les deux versions. Ces deux
+# verifications tiennent la porte fermee.
+code - GET /js/main.js > /dev/null
+verifier "il n'y a qu'un carnet, cree et enregistre au meme endroit" oui "$(contient "enregistrerRendu('carnet'")"
+# Pas un 404 : un chemin inconnu retombe sur la page (application monopage).
+# Ce qu'on verifie, c'est qu'il n'y a plus de **module** a cette adresse.
 code - GET /js/views/carnet.js > /dev/null
-verifier "la vue reprend l'exemplaire existant" oui "$(contient 'carnetPartage()')"
+verifier "  et plus de fichier de vue a desaccorder" oui "$(contient '<!DOCTYPE html')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

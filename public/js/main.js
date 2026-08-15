@@ -6,7 +6,7 @@
  */
 
 import { Api, memoriserCompte } from './api.js';
-import { obtenirRendu } from './registry.js';
+import { enregistrerRendu, obtenirRendu } from './registry.js';
 import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
 import { curseurHumeur, definirTable, tableHumeur } from './humeur.js';
@@ -26,7 +26,7 @@ import {
 } from './editeurs.js';
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
 import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
-import { creerCarnet, definirCarnetPartage } from './carnet.js';
+import { creerCarnet } from './carnet.js';
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -198,33 +198,76 @@ const menu = creerMenu();
  * Le carnet de notes — un seul exemplaire pour toute la page.
  *
  * Il n'est pas monté ici : `etat.carnetPlace` dit où il se trouve, et
- * `poserLeCarnet` le déplace. `views/carnet.js` vient chercher **cet**
- * exemplaire quand la vue s'ouvre, au lieu d'en fabriquer un second.
+ * `poserLeCarnetEnVolet` / `choisirVue('carnet')` le déplacent.
  */
-const carnet = definirCarnetPartage(
-  creerCarnet({
-    lectureSeule: () => !!PARTAGE,
-    placeActuelle: () => etat.carnetPlace,
-    // Le seul endroit où l'on écrit longuement de ses propres mots : le
-    // redire ici n'est pas une redite du bandeau du haut, c'est le dire là où
-    // l'on perdrait le plus.
-    // Court exprès : le bandeau du haut porte déjà le bouton qui **agit**
-    // (« en faire mon monde »). Ici on avertit, on ne refait pas l'appel —
-    // deux lignes dans un volet de 400 px, c'est de la place prise au texte.
-    avertissement: () =>
-      demonstrationOuverte() ? 'Démonstration — ces notes ne sont pas conservées.' : '',
-    surBalise: (genre, id, evenement) => ouvrirLaCible(genre, id, evenement),
-    surDeplacement: () => deplacerLeCarnet(),
-    surFermeture: () => rangerLeCarnet(),
-    // Une note écrite compte comme une écriture : le bandeau d'essai et celui
-    // de la démonstration doivent le savoir, il y a maintenant à perdre.
-    surEcriture: () => {
-      marquerEssaiModifie();
-      marquerDemoModifiee();
-      rafraichirCitations();
+const carnet = creerCarnet({
+  lectureSeule: () => !!PARTAGE,
+  placeActuelle: () => etat.carnetPlace,
+  // Le seul endroit où l'on écrit longuement de ses propres mots : le dire ici
+  // n'est pas une redite du bandeau du haut, c'est le dire là où l'on perdrait
+  // le plus. Court exprès — le bandeau porte déjà le bouton qui **agit**
+  // (« en faire mon monde »), et deux lignes dans un volet de 400 px, c'est de
+  // la place prise au texte.
+  avertissement: () =>
+    demonstrationOuverte() ? 'Démonstration — ces notes ne sont pas conservées.' : '',
+  surBalise: (genre, id, evenement) => ouvrirLaCible(genre, id, evenement),
+  surDeplacement: () => deplacerLeCarnet(),
+  surFermeture: () => rangerLeCarnet(),
+  // Une note écrite compte comme une écriture : le bandeau d'essai et celui de
+  // la démonstration doivent le savoir, il y a maintenant à perdre.
+  surEcriture: () => {
+    marquerEssaiModifie();
+    marquerDemoModifiee();
+    rafraichirCitations();
+  },
+});
+
+/**
+ * Le moteur de rendu du carnet est enregistré **ici**, et non dans un
+ * `views/carnet.js` comme les trois autres.
+ *
+ * C'est la seule entorse au montage habituel (une vue serveur, un fichier de
+ * rendu, rien d'autre à toucher), et elle a une raison précise : le carnet
+ * n'est pas seulement une vue, c'est un composant qui vit **aussi** en volet.
+ * Il n'en existe qu'un dans la page, et le rendu ne fait que le poser dans la
+ * scène.
+ *
+ * **Le montage précédent était fragile, et ça s'est vu en production le
+ * 15/08/2026.** Le fichier de vue allait chercher l'exemplaire par un
+ * accesseur partagé que `main.js` devait avoir rempli avant lui. Un
+ * déploiement pendant qu'un onglet était ouvert suffisait à désaccorder les
+ * deux : l'onglet gardait l'ancien `main.js`, qui ne remplissait rien, et
+ * l'import dynamique allait chercher le fichier de vue neuf. La vue répondait
+ * « Le carnet n'est pas disponible », sans que rien ne soit cassé nulle part.
+ * En enregistrant le rendu sur l'objet au moment où on le crée, les deux ne
+ * peuvent plus être de versions différentes : c'est le même fichier.
+ *
+ * `chargerMoteur` rend un moteur déjà enregistré avant de tenter le moindre
+ * import — il n'y a donc rien à charger, et rien à rater.
+ */
+enregistrerRendu('carnet', (conteneur, contexteMoteur = {}) => {
+  conteneur.append(carnet.element);
+  carnet.replacer(true); // pleine page : le sommaire devient une colonne
+
+  return {
+    rendre(payload) {
+      carnet.appliquer(payload);
+      contexteMoteur.surDisposition?.({ personnes: payload.stats?.personnes });
     },
-  })
-);
+    majOptions() {},
+    /** Une note ne se « centre » pas : sélectionner quelqu'un ne la bouge pas. */
+    focus() {},
+    recentrer() {
+      carnet.element.querySelector('.cn-note')?.scrollTo({ top: 0 });
+    },
+    detruire() {
+      // On retire l'exemplaire de la scène **sans le détruire** : il repart
+      // vivre dans le volet si on l'y rappelle, avec son texte intact.
+      carnet.vider();
+      carnet.element.remove();
+    },
+  };
+});
 
 const editeurLien = creerEditeurLien({
   types: () => etat.referentiels.types_relations || [],
