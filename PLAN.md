@@ -1657,9 +1657,36 @@ Le correctif n'est pas de remettre l'accesseur au bon moment, c'est de
 `main.js` enregistre le rendu **sur l'objet qu'il vient de créer**. Un seul
 fichier, donc une seule version, donc plus de désaccord possible. Le harnais
 vérifie les deux moitiés : `enregistrerRendu('carnet'` est bien dans `main.js`,
-et `/js/views/carnet.js` répond bien **404**.
+et qu'il n'y a plus de **module** à `/js/views/carnet.js`. Pas un 404 : les
+fichiers statiques sont servis en monopage, un chemin inconnu retombe sur
+`index.html` avec un 200. C'est donc le corps qu'on regarde, pas le code.
 
 Ce que ça n'enlève pas : un onglet resté ouvert pendant un déploiement gardera
 toujours l'ancien code. Ce lot-ci ne peut plus tomber dessus ; la leçon
 générale, elle, est qu'un rendu chargé à la demande ne doit jamais **dépendre**
 de ce qu'un autre fichier a fait avant lui.
+
+## Le rond des initiales qui tombait sur le nom (15/08/2026)
+
+**Signalé par Maxime :** attribuer un joueur à une fiche faisait descendre la
+pastille de ses initiales sur son nom, sur la carte du plan.
+
+Une collision de noms de classes, et rien d'autre. Une carte jouée porte l'état
+`.joueur` — comme elle porte `.morte`, `.satellite` ou `.rang`. Or les lignes de
+la section « Humeur envers les joueurs » de la fiche s'appelaient `.joueur` tout
+court. La règle de la fiche rattrapait donc **les cartes du plan**, et comme
+elle vient plus bas dans la feuille à spécificité égale, son `padding: 8px 0`
+écrasait le `padding-top: 34px` que `.carte` réserve au portrait. Le portrait
+est en `position: absolute` : il ne bougeait pas, c'est le bandeau du nom qui
+remontait de 26 px sous lui. Mesuré sur la carte de Rickard Stark : le rond
+recouvrait le nom de **27 px** au lieu de l'effleurer d'**1 px**. Au passage,
+chaque carte jouée héritait aussi d'un trait pointillé en bas.
+
+Les lignes de la fiche s'appellent maintenant `.joueur-ligne`. Le harnais
+vérifie qu'aucune règle ne s'appelle `.joueur` tout court, que `.joueur-ligne`
+existe, et que `panel.js` pose bien cette classe-là.
+
+La leçon est la même que d'habitude sous une autre forme : **un état porté en
+classe nue partage l'espace de noms de toute l'application.** Les états des
+cartes (`morte`, `satellite`, `rang`, `focus`…) sont des mots courants ; aucun
+composant ne doit prendre l'un d'eux comme nom propre.

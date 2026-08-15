@@ -554,7 +554,7 @@ export function creerPanneau(element, rappels = {}) {
     const lignes = joueurs.map((joueur) => {
       const actuel = personne.relations_joueurs?.[joueur.id] || { note: null, commentaire: '' };
 
-      return h('div', { class: 'joueur' }, [
+      return h('div', { class: 'joueur-ligne' }, [
         h('div', { class: 'joueur-entete' }, [
           h('span', {
             class: 'joueur-pastille',

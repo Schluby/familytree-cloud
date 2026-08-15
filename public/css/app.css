@@ -322,6 +322,9 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .carte {
   position: absolute;
   display: flex; flex-direction: column;   /* le corps remplit la hauteur commune */
+  /* Le portrait est en `absolute` : cette réserve est la seule chose qui
+     l'empêche de recouvrir le nom. Aucune règle ne doit repasser sur le
+     `padding` d'une carte — pas même par un état porté en classe nue. */
   padding-top: 34px;                 /* espace du portrait */
   cursor: pointer;
   /* Un appui long sur une fiche ouvre notre menu : ni sélection de texte, ni
@@ -756,8 +759,14 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
 .champ-edit textarea { resize: vertical; min-height: 86px; line-height: 1.5; }
 .champ-edit input:focus, .champ-edit select:focus, .champ-edit textarea:focus { border-color: var(--accent); }
 
-.joueur { padding: 8px 0; border-bottom: 1px dashed var(--bord); }
-.joueur:last-child { border-bottom: 0; }
+/* Une ligne de joueur dans la fiche. Le suffixe n'est pas décoratif : sur le
+   plan, une carte jouée porte l'état `.joueur` (au même titre que `.morte` ou
+   `.satellite`). Un `.joueur` nu attrapait donc aussi les cartes, et comme il
+   vient plus bas dans la feuille à spécificité égale, son `padding` écrasait
+   les 34 px que `.carte` réserve au portrait : le rond des initiales retombait
+   sur le nom dès qu'on attribuait un joueur au personnage. */
+.joueur-ligne { padding: 8px 0; border-bottom: 1px dashed var(--bord); }
+.joueur-ligne:last-child { border-bottom: 0; }
 .joueur-entete { display: flex; align-items: center; gap: 8px; }
 .joueur-pastille { width: 9px; height: 9px; border-radius: 50%; }
 .joueur-nom { font-size: 12px; }

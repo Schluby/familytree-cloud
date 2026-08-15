@@ -1543,6 +1543,17 @@ verifier "il n'y a qu'un carnet, cree et enregistre au meme endroit" oui "$(cont
 code - GET /js/views/carnet.js > /dev/null
 verifier "  et plus de fichier de vue a desaccorder" oui "$(contient '<!DOCTYPE html')"
 
+# Une carte jouee porte l'etat `.joueur`, comme elle porte `.morte`. Une regle
+# `.joueur` nue rattrapait donc les cartes du plan et ecrasait les 34 px
+# reserves au portrait : le rond des initiales retombait sur le nom. Les lignes
+# de joueur de la fiche s'appellent `.joueur-ligne` pour que ca n'arrive plus.
+echo "-- la carte jouee garde la place de son portrait"
+code - GET /css/app.css > /dev/null
+verifier "aucune regle ne s'appelle « .joueur » tout court" non "$(contient '.joueur {')"
+verifier "  les lignes de la fiche sont nommees a part" oui "$(contient '.joueur-ligne {')"
+code - GET /js/panel.js > /dev/null
+verifier "  et la fiche pose bien cette classe la" oui "$(contient "class: 'joueur-ligne'")"
+
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
