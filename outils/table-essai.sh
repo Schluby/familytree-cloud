@@ -124,6 +124,18 @@ appel "$(champ "$J3" 2)" POST /api/relations \
   '{"source":"eddard-stark","cible":"jon-snow","type":"ami","label":"secret de Winterfell"}' > /dev/null
 echo "   J3 : bran-stark supprimé, un lien « ami » ajouté"
 
+# J3 a en plus une SECONDE campagne, jamais touchée : le plan doit prendre la
+# première, et laisser choisir l'autre. C'est le cas que le lot 17.G règle.
+appel "$(champ "$J3" 2)" GET /api/sauvegardes > /dev/null
+DEMO_J3="$(demo_id)"
+appel "$(champ "$J3" 2)" POST /api/sauvegardes \
+  "{\"nom\":\"Seconde campagne\",\"depuis\":\"$DEMO_J3\",\"contenu\":\"copie\"}" > /dev/null
+echo "   J3 : une « Seconde campagne » intacte à côté"
+
+# Le maître de jeu, lui, n'a QUE le monde reçu, jamais modifié : par défaut il
+# ne doit rien apporter au plan — mais rester visible au rail.
+echo "   MJ : son Westeros n'est pas touché — il doit être écarté d'office"
+
 echo
 echo "Connectez-vous en tant que $EMAIL_MJ"
 echo "  mot de passe : $MDP"

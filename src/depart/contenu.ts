@@ -55,3 +55,28 @@ export function contenuDepart(): ContenuMesure {
 export function octetsDepart(): number {
   return contenuDepart().octets;
 }
+
+/**
+ * Les identifiants de fiche du monde livré — le décor, par opposition au travail.
+ *
+ * **À quoi ça sert (lot 17.G).** Tout le monde part du même Westeros : sur un
+ * plan collectif, ses 67 fiches sont présentes chez chacun, identiques, et
+ * occupent tout l'écran. Ce sont les seules dont on sait d'avance qu'elles ne
+ * disent rien de la table — c'est un cadeau, pas une décision de joueur. Savoir
+ * les nommer permet de les mettre de côté sans les supprimer.
+ *
+ * Mémoïsé comme `contenuDepart` : l'isolat garde le résultat entre deux
+ * requêtes, et il n'y a rien là-dedans qu'un compte puisse modifier.
+ */
+let identifiants: ReadonlySet<string> | null = null;
+
+export function identifiantsDepart(): ReadonlySet<string> {
+  if (identifiants) return identifiants;
+  const fiches = (westeros as { personnes?: { id?: unknown }[] }).personnes ?? [];
+  identifiants = new Set(
+    (Array.isArray(fiches) ? fiches : [])
+      .map((personne) => String(personne?.id ?? ''))
+      .filter(Boolean)
+  );
+  return identifiants;
+}

@@ -1018,5 +1018,25 @@ export const TRADUCTIONS = {
       "{} tree(s) — {} to create, {} to update, {} already in place, {} refused.",
     "{} création(s), {} mise(s) à jour": "{} creation(s), {} update(s)",
     ", {} refus": ", {} refused",
+
+    // ----------------------------------------------------------------
+    // Choisir l'arbre de chaque membre (lot 17.G).
+    "Ce que la table a créé": "What the table created",
+    "Sous chaque nom, l’arbre que le plan regarde. Un clic pour en changer : les mondes de départ jamais modifiés sont écartés d’office.":
+      "Under each name, the tree the plan is looking at. One click to change it: starting worlds never modified are set aside by default.",
+    "Un seul arbre par membre sur le plan. Les gestes écriront dans celui-ci.":
+      "One tree per member on the plan. Actions will write into this one.",
+    "{} fiches, {} liens — changer d’arbre": "{} profiles, {} links — change tree",
+    "Ses mondes n’ont jamais été modifiés — en choisir un quand même":
+      "None of their worlds has ever been modified — pick one anyway",
+    "Revenir au choix automatique": "Back to the automatic choice",
+    "N’afficher que ce que {} a": "Show only what {} has",
+
+    // Hors de portée du releveur (voir lot 16.G) : ces quatre-là sortent d'une
+    // fonction, pas d'un `texte:`. « 0 sans traduction » ne les aurait pas vues.
+    "aucun arbre travaillé": "no tree worked on",
+    "{} fiches · jamais modifié": "{} profiles · never modified",
+    "{} fiches · ouvert par son propriétaire": "{} profiles · open on their side",
+    "{} fiches · modifié le {}": "{} profiles · modified on {}",
   },
 };

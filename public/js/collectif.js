@@ -45,6 +45,18 @@ let comptes = [];
 let superposes = new Set();
 /** Ceux dont on montre l'apport. Sous-ensemble de `superposes`. */
 let montres = new Set();
+/**
+ * Ce que chaque membre a comme arbres, et lequel le plan prendrait (lot 17.G).
+ *
+ * Le rail se construit **là-dessus** et non sur `plan.comptes` : un membre dont
+ * aucun arbre n'a été travaillé n'entre pas dans le plan, et doit pourtant
+ * rester visible — sans quoi il disparaîtrait de la table sans explication.
+ */
+let membres = [];
+/** Le choix explicite, compte → sauvegarde. Vide = on suit le défaut. */
+const arbres = new Map();
+/** Qui était dans le plan au chargement précédent — voir `charger`. */
+let presentsPrecedents = new Set();
 /** Le dernier plan reçu. */
 let plan = null;
 let seuil = 0.82;
@@ -90,6 +102,30 @@ function couleurPresence(combien, total) {
 
 /* ------------------------------------------------------------ chargement */
 
+/** Ce que le serveur doit savoir de la sélection : qui, et quel arbre. */
+function selection() {
+  const choisis = {};
+  for (const [compte, arbre] of arbres) {
+    if (superposes.has(compte)) choisis[compte] = arbre;
+  }
+  return { comptes: [...superposes], arbres: choisis, seuil };
+}
+
+/** Quel arbre le plan prendra chez ce membre — choix explicite, ou défaut. */
+function arbreDe(compteId) {
+  const membre = membres.find((candidat) => candidat.compte_id === compteId);
+  if (!membre) return null;
+  const vise = arbres.get(compteId) ?? membre.retenu;
+  return membre.arbres.find((arbre) => arbre.id === vise) ?? null;
+}
+
+/**
+ * Deux requêtes, et il faut les deux.
+ *
+ * La liste des arbres est **bon marché** (pas de documents) et sert à dessiner
+ * le rail — y compris pour les membres qui n'entreront pas dans le plan. Le
+ * plan, lui, charge les documents des seuls arbres retenus.
+ */
 async function charger({ silencieux = false } = {}) {
   if (!superposes.size) {
     $('scene-message').hidden = false;
@@ -102,28 +138,44 @@ async function charger({ silencieux = false } = {}) {
   }
   $('fil-etat').textContent = 'Lecture…';
 
+  const liste = await appeler('/api/admin/collectif/arbres', {
+    method: 'POST',
+    body: JSON.stringify({ comptes: [...superposes] }),
+  });
+  if (liste.ok) membres = liste.donnees.membres;
+
   const { ok, code, donnees } = await appeler('/api/admin/collectif/plan', {
     method: 'POST',
-    body: JSON.stringify({ comptes: [...superposes], seuil }),
+    body: JSON.stringify(selection()),
   });
   if (!ok) {
     if (code === 401) {
       location.replace('/connexion.html?retour=%2Fcollectif.html');
       return;
     }
+    plan = null;
+    // Le rail reste dessiné même sans plan : c'est de là qu'on choisit un
+    // arbre, donc c'est de là qu'on se sort d'un « rien à superposer ».
+    dessinerRail();
     $('scene-message').hidden = false;
-    $('scene-message').textContent = donnees?.erreur || `Erreur ${code}`;
+    $('scene-message').textContent =
+      (donnees?.erreur || `Erreur ${code}`) + (donnees?.indice ? ` ${donnees.indice}` : '');
     $('fil-etat').textContent = 'Erreur';
     return;
   }
 
   plan = donnees;
-  // Un membre qui n'a pas répondu (arbre vide, illisible) ne doit pas rester
-  // coché dans « montrer » : sa case pointerait vers un apport qui n'existe pas.
+  // Trois règles, dans cet ordre : un membre qui n'est plus dans le plan sort de
+  // « montrer » (sa case pointerait vers un apport qui n'existe pas) ; un membre
+  // qui **vient d'y entrer** y entre coché — sinon lui choisir un arbre le
+  // ferait apparaître sans rien montrer, ce qui ressemble à une panne ; et un
+  // décochage délibéré est respecté.
   const presents = new Set(plan.comptes.map((compte) => compte.id));
+  const nouveaux = [...presents].filter((id) => !presentsPrecedents.has(id));
   montres = new Set([...montres].filter((id) => presents.has(id)));
-  for (const compte of plan.comptes) if (!montres.size) montres.add(compte.id);
-  if (montres.size < presents.size && montres.size === 0) montres = new Set(presents);
+  for (const id of nouveaux) montres.add(id);
+  if (!montres.size) montres = new Set(presents);
+  presentsPrecedents = presents;
 
   $('scene-message').hidden = true;
   dessinerRail();
@@ -158,7 +210,23 @@ function payloadAffiche() {
     return true;
   };
 
-  const noeuds = plan.noeuds.filter((noeud) => retenu(noeud.comptes));
+  let noeuds = plan.noeuds.filter((noeud) => retenu(noeud.comptes));
+
+  // « Ce que la table a créé » : on retire le monde livré — soixante-sept
+  // fiches que tout le monde a déjà et que personne n'a décidées — **mais on
+  // garde celles auxquelles une fiche neuve est accrochée**. Sans ce halo,
+  // « Alys Karstark, amie d'Eddard Stark » perdrait Eddard, donc son lien, donc
+  // tout ce qu'elle avait d'intéressant.
+  if (montrer === 'cree') {
+    const neufs = new Set(noeuds.filter((noeud) => !noeud.du_depart).map((noeud) => noeud.id));
+    const voisins = new Set(neufs);
+    for (const arete of plan.aretes) {
+      if (neufs.has(arete.source)) voisins.add(arete.cible);
+      if (neufs.has(arete.cible)) voisins.add(arete.source);
+    }
+    noeuds = noeuds.filter((noeud) => voisins.has(noeud.id));
+  }
+
   const gardes = new Set(noeuds.map((noeud) => noeud.id));
   const aretes = plan.aretes.filter(
     (arete) => retenu(arete.comptes) && gardes.has(arete.source) && gardes.has(arete.cible)
@@ -226,41 +294,82 @@ function majStats() {
 
 /* ------------------------------------------------------------------ rail */
 
+/**
+ * Le rail des membres, construit sur la **liste des arbres** et non sur le plan.
+ *
+ * Un membre dont aucun arbre n'a été travaillé n'entre pas dans le plan, et
+ * doit pourtant figurer ici : c'est de cette ligne-là qu'on lui choisit un
+ * arbre à la main. Le construire sur `plan.comptes` le ferait disparaître au
+ * moment précis où l'on a besoin de lui.
+ */
 function dessinerRail() {
+  const couleurs = new Map((plan?.comptes ?? []).map((compte) => [compte.id, compte.couleur]));
+
   $('liste-membres').replaceChildren(
-    ...plan.comptes.map((compte) => {
+    ...membres.map((membre) => {
+      const dansLePlan = couleurs.has(membre.compte_id);
+      const arbre = arbreDe(membre.compte_id);
+
       const case_ = h('input', {
         type: 'checkbox',
-        checked: montres.has(compte.id),
-        title: `Montrer ce que ${compte.compte} a`,
+        checked: montres.has(membre.compte_id),
+        disabled: !dansLePlan,
+        title: `Montrer ce que ${membre.compte} a`,
         onchange: () => {
-          if (case_.checked) montres.add(compte.id);
-          else montres.delete(compte.id);
+          if (case_.checked) montres.add(membre.compte_id);
+          else montres.delete(membre.compte_id);
           rendre();
         },
       });
-      return h('li', { class: 'membre' }, [
+
+      // Les classes assemblées, sans ternaire : le releveur de textes lit les
+      // branches d'un ternaire comme de l'affichable, et rapportait
+      // « membre membre-absent » comme une chaîne à traduire.
+      const classes = ['membre'];
+      if (!dansLePlan) classes.push('membre-absent');
+
+      return h('li', { class: classes.join(' ') }, [
         case_,
-        h('span', { class: 'membre-pastille', style: { background: compte.couleur } }),
-        h('button', {
-          class: 'membre-nom',
-          type: 'button',
-          texte: compte.compte,
-          title: `N’afficher que ce que ${compte.compte} a — « ${compte.sauvegarde} »`,
-          onclick: () => {
-            montres = new Set([compte.id]);
-            dessinerRail();
-            rendre();
-          },
+        h('span', {
+          class: 'membre-pastille',
+          style: { background: couleurs.get(membre.compte_id) || 'transparent' },
         }),
+        h('div', { class: 'membre-qui' }, [
+          h('button', {
+            class: 'membre-nom',
+            type: 'button',
+            texte: membre.compte,
+            title: `N’afficher que ce que ${membre.compte} a`,
+            onclick: () => {
+              if (!dansLePlan) return;
+              montres = new Set([membre.compte_id]);
+              dessinerRail();
+              rendre();
+            },
+          }),
+          // L'arbre regardé, toujours dit, et toujours changeable. Sans cette
+          // ligne, un plan pourrait montrer une autre campagne que celle qu'on
+          // croit lire, et un geste y écrirait.
+          h('button', {
+            class: 'membre-arbre',
+            type: 'button',
+            texte: arbre ? arbre.nom : 'aucun arbre travaillé',
+            title: arbre
+              ? `${arbre.personnes} fiches, ${arbre.relations} liens — changer d’arbre`
+              : 'Ses mondes n’ont jamais été modifiés — en choisir un quand même',
+            onclick: (evenement) => choisirArbre(membre, evenement),
+          }),
+        ]),
         h('span', {
           class: 'membre-compte',
-          texte: `${compte.personnes}`,
-          title: `${compte.personnes} fiches, ${compte.relations} liens`,
+          texte: arbre ? `${arbre.personnes}` : '—',
+          title: arbre ? `${arbre.personnes} fiches, ${arbre.relations} liens` : '',
         }),
       ]);
     })
   );
+
+  if (!plan) return;
 
   $('types-collectif').replaceChildren(
     ...plan.legende.types.map((type) =>
@@ -565,6 +674,7 @@ function gesteProfil(noeud, cibles, evenement) {
         ? 'La fiche sera créée dans l’arbre de chaque membre visé. Un membre qui l’a déjà la verra mise à jour, pas dupliquée.'
         : 'Les champs laissés vides ne sont pas envoyés : ils restent tels quels chez chacun.',
       comptes: cibles,
+      arbres: selection().arbres,
       seuil,
       verbe: creation ? '＋ Créer' : 'Enregistrer',
       champs: [
@@ -618,6 +728,7 @@ function gesteLien(sourceCle, cibleCle, evenement, { type = '', comptes = null, 
         'Les deux fiches sont désignées par leur grappe : chaque arbre y retrouve la sienne, ' +
         'même si le joueur l’a renommée.',
       comptes: comptes ?? visesParDefaut(),
+      arbres: selection().arbres,
       seuil,
       verbe: arete ? 'Enregistrer' : '⚯ Poser le lien',
       champs: [
@@ -784,6 +895,65 @@ function menuLien(arete, evenement) {
 }
 
 /* ------------------------------------------------- choisir les superposés */
+
+const DATE_COURTE = (secondes) =>
+  secondes ? new Date(secondes * 1000).toISOString().slice(0, 10) : '—';
+
+/**
+ * Ce qu'on dit d'un arbre pour aider à choisir.
+ *
+ * L'ordre des cas est l'ordre d'importance : **« jamais modifié » l'emporte**,
+ * parce que c'est la seule mention qui explique pourquoi le défaut l'écarte.
+ * Un monde intact et ouvert reste avant tout un monde intact.
+ */
+function detailDArbre(arbre) {
+  if (arbre.intacte) return `${arbre.personnes} fiches · jamais modifié`;
+  if (arbre.active) return `${arbre.personnes} fiches · ouvert par son propriétaire`;
+  return `${arbre.personnes} fiches · modifié le ${DATE_COURTE(arbre.modifie_le)}`;
+}
+
+/**
+ * Quel arbre de ce membre le plan regarde.
+ *
+ * On montre **tous** ses arbres, y compris les mondes intacts, avec de quoi
+ * juger : la taille, la date, et la mention « jamais modifié » qui explique
+ * pourquoi le défaut les écarte. Les cacher reviendrait à décider à sa place ;
+ * les proposer sans le dire reviendrait à remplir le plan de décor.
+ */
+function choisirArbre(membre, evenement) {
+  const courant = arbreDe(membre.compte_id);
+  const entrees = [
+    { titre: membre.compte },
+    { texte: 'Un seul arbre par membre sur le plan. Les gestes écriront dans celui-ci.' },
+    ...membre.arbres.map((arbre) => ({
+      icone: courant && arbre.id === courant.id ? '●' : '○',
+      label: arbre.nom,
+      // Une phrase entière par cas plutôt qu'une concaténation de morceaux :
+      // « · jamais modifié » collé au bout d'un compte ne se traduit dans
+      // aucune langue, et l'état est ce qui décide, pas la date.
+      detail: detailDArbre(arbre),
+      onclick: () => {
+        arbres.set(membre.compte_id, arbre.id);
+        charger();
+      },
+    })),
+    membre.arbres.length > 1 &&
+      arbres.has(membre.compte_id) && {
+        separateur: true,
+      },
+    membre.arbres.length > 1 &&
+      arbres.has(membre.compte_id) && {
+        icone: '↺',
+        label: 'Revenir au choix automatique',
+        onclick: () => {
+          arbres.delete(membre.compte_id);
+          charger();
+        },
+      },
+  ].filter(Boolean);
+
+  menu.ouvrir(evenement.clientX, evenement.clientY, entrees);
+}
 
 function choisirMembres(evenement) {
   const entrees = [

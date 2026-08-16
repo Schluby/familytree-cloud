@@ -2146,12 +2146,28 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .membre:hover { background: var(--fond-3); }
 .membre input { margin: 0; flex: 0 0 auto; }
 .membre-pastille { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+.membre-qui { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .membre-nom {
-  flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; background: none; border: 0; padding: 0; cursor: pointer;
   color: var(--texte); font: inherit;
 }
 .membre-nom:hover { color: var(--accent); }
+/* L'arbre regardé, sous le nom. Toujours dit, toujours changeable : sans lui, un
+   plan pourrait montrer une autre campagne que celle qu'on croit lire — et un
+   geste irait y écrire. */
+.membre-arbre {
+  min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--texte-faible); font: inherit; font-size: 10px;
+  border-bottom: 1px dotted var(--bord-clair); align-self: flex-start; max-width: 100%;
+}
+.membre-arbre:hover { color: var(--accent); }
+/* Un membre dont aucun arbre n'a été travaillé : il reste au rail, sinon il
+   disparaîtrait de la table sans explication — et c'est de sa ligne qu'on lui
+   choisit un arbre à la main. */
+.membre-absent { opacity: .55; }
+.membre-absent .membre-arbre { font-style: italic; }
 .membre-compte {
   color: var(--texte-faible); font-size: 10.5px; font-variant-numeric: tabular-nums;
 }
@@ -2229,6 +2245,12 @@ body.sombre .gc-refuse .gc-etat { color: #e0a196; border-color: #5b3636; }
  * et c'est ce que ces trois règles disent. Sans elles, sous 760 px, le rail
  * était traduit hors de l'écran **sans plus rien pour l'y ramener** — le même
  * défaut que le lot 11.C avait réparé dans l'application. */
+/* Les menus du plan collectif portent des détails plus longs qu'ailleurs — le
+   nom d'un arbre suivi de son compte de fiches et de son état. Dans les 280 px
+   du menu ordinaire, « Westeros » se voyait rogné en « Wes… » au profit de
+   « ouvert par son propriétaire ». On élargit ici, et ici seulement. */
+body.collectif .menu-contextuel { min-width: 264px; max-width: 340px; }
+
 body.collectif #btn-panneau { display: none; }
 @media (max-width: 860px) {
   body.collectif #btn-panneau { display: inline-flex; }

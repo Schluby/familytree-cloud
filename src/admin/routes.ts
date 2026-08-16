@@ -47,7 +47,13 @@ import {
   type Perimetre,
   type VariablesAdmin,
 } from './intergiciel';
-import { construirePlan, tableDesGrappes, MAX_COMPTES_PLAN } from './collectif';
+import {
+  arbresDesMembres,
+  arbresDuPlan,
+  construirePlan,
+  tableDesGrappes,
+  MAX_COMPTES_PLAN,
+} from './collectif';
 import {
   compteDeLaReference,
   poserVerdict,
@@ -600,7 +606,15 @@ async function preparerLot(
     );
   }
 
-  const cibles = await resoudreCibles(c.env.DB, comptes, portee);
+  // **Un lot venu du plan collectif vise les arbres que le plan affiche**, et
+  // non « l'active de chacun » : depuis le lot 17.G, ce n'est plus la même
+  // chose — le plan écarte les mondes de départ intacts et laisse choisir. Sans
+  // ce chemin, un geste posé sur une carte irait écrire dans un autre arbre que
+  // celui qu'on regardait, et rien ne le dirait.
+  const choix = arbresChoisis(corps.arbres);
+  const cibles = Object.keys(choix).length
+    ? await arbresDuPlan(c.env.DB, comptes, choix, c.get('perimetre'))
+    : await resoudreCibles(c.env.DB, comptes, portee);
   if (!cibles.length) {
     return c.json({ erreur: 'aucune sauvegarde à toucher pour cette sélection' }, 404);
   }
@@ -698,12 +712,44 @@ routesAdmin.post('/lots/appliquer', async (c) => {
  * chemin d'écriture.
  * -------------------------------------------------------------------------- */
 
+/** Le choix d'arbre reçu, nettoyé : compte → sauvegarde. */
+function arbresChoisis(brut: unknown): Record<string, string> {
+  if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) return {};
+  const choix: Record<string, string> = {};
+  for (const [compte, arbre] of Object.entries(brut as Objet)) {
+    const cle = String(compte ?? '').trim();
+    const valeur = String(arbre ?? '').trim();
+    if (cle && valeur) choix[cle] = valeur;
+  }
+  return choix;
+}
+
+/**
+ * Ce que chaque membre a comme arbres, et lequel le plan prendra.
+ *
+ * Une lecture à part, et volontairement **sans les documents** : elle sert à
+ * remplir un menu de choix, et charger le contenu de toutes les sauvegardes de
+ * tout le monde pour ça coûterait plus cher que le plan lui-même.
+ */
+routesAdmin.post('/collectif/arbres', async (c) => {
+  const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
+  const demandes = nommes(corps.comptes);
+  if (!demandes.length) return c.json({ erreur: 'aucun compte sélectionné' }, 400);
+  const comptes = auPerimetre(demandes, c.get('perimetre'));
+  return c.json({ membres: await arbresDesMembres(c.env.DB, comptes) });
+});
+
 /**
  * Les mondes d'une sélection, superposés en un seul plan.
  *
- * **Portée « active » toujours**, et ce n'est pas une simplification : un compte
- * qui a trois campagnes n'a pas trois versions du même monde, il en a trois
+ * **Un arbre par membre**, et ce n'est pas une simplification : un compte qui a
+ * trois campagnes n'a pas trois versions du même monde, il en a trois
  * différents. Les empiler ferait un plan qui ne correspond à aucune table.
+ *
+ * Lequel ? Celui que `arbres` désigne, et à défaut celui que `arbreRetenu`
+ * choisit — qui **écarte les mondes de départ jamais touchés**, parce qu'ils
+ * apportent soixante-sept fiches de décor que tout le monde a déjà. Voir
+ * `collectif.ts` pour le détail de la règle.
  */
 routesAdmin.post('/collectif/plan', async (c) => {
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
@@ -720,9 +766,21 @@ routesAdmin.post('/collectif/plan', async (c) => {
   }
 
   const comptes = auPerimetre(demandes, c.get('perimetre'));
-  const cibles = await resoudreCibles(c.env.DB, comptes, 'active');
+  const cibles = await arbresDuPlan(
+    c.env.DB,
+    comptes,
+    arbresChoisis(corps.arbres),
+    c.get('perimetre')
+  );
   if (!cibles.length) {
-    return c.json({ erreur: 'aucune sauvegarde à superposer pour cette sélection' }, 404);
+    return c.json(
+      {
+        erreur: 'aucun arbre travaillé à superposer pour cette sélection',
+        indice:
+          'les mondes de départ jamais modifiés sont écartés — choisissez un arbre à la main pour en regarder un quand même',
+      },
+      404
+    );
   }
 
   const seuil = seuilValide(corps.seuil);

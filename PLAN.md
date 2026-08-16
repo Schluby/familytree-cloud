@@ -1997,6 +1997,77 @@ modification appliquée au mauvais. Le sens ne s'ignore que sur un lien qui n'en
 a pas, et **on ne retourne pas le trait de son propriétaire** : quand le
 repêchage a lieu à l'envers, `source` et `cible` sont retirés du patch.
 
+## 17.G — Quel arbre de chaque membre le plan regarde
+
+Signalé le 16/08/2026, dès le premier vrai coup d'œil : « on ne prendra pas en
+compte le truc de Westeros par défaut là… Il faut aussi pouvoir choisir les
+arbres pour chaque personne (s'il y en a plusieurs comment bien choisir ?) ».
+
+Le plan prenait la sauvegarde ouverte de chacun, sans rien demander. Deux
+ennuis, et une question qui méritait une réponse écrite.
+
+**Un monde reçu et jamais touché n'est pas une contribution.** Un membre qui a
+fait « en faire mon monde » et n'y a rien changé apportait au plan les 67 fiches
+du Westeros livré — identiques à celles de tout le monde, et décidées par
+personne. Le plan montrait le cadeau, pas la table.
+
+**Comment bien choisir, alors ?** La réponse tient à un signal qu'on avait déjà
+sans le savoir : `revision` part à 1 à la création et n'augmente que dans
+`ecrireDocument`. **À 1, personne n'a rien écrit depuis que la sauvegarde
+existe.** C'est le seul indicateur honnête qu'on puisse lire sans ouvrir le
+document, et il ne se trompe que dans un sens sans conséquence — un import
+jamais retouché passe pour intact, ce qui le met de côté sans l'interdire.
+
+L'ordre du choix automatique, donc :
+
+1. **écarter les arbres intacts** s'il en reste d'autres ;
+2. parmi le reste, celui que le membre a **ouvert** ;
+3. sinon le plus récemment modifié ;
+4. si tout est intact, **ne rien prendre**.
+
+Le quatrième cas est le seul qui demandait un arbitrage. Faire entrer le monde
+intact d'office remplit le plan de décor ; faire disparaître le membre cacherait
+quelqu'un de la table. Il **figure donc au rail, grisé, annoncé « aucun arbre
+travaillé »** — et reste choisissable à la main d'un clic.
+
+**Et le choix explicite existe partout.** Sous chaque nom, l'arbre regardé, avec
+son compte de fiches et son état ; un clic ouvre la liste des sauvegardes du
+membre. Un choix qui ne désigne pas un arbre **de ce membre-là** est ignoré : il
+vient d'un plan devenu vieux, et suivre une indication périmée écrirait ailleurs.
+
+### La conséquence qu'il ne faut jamais reperdre
+
+**Un geste doit écrire dans l'arbre que le plan affiche.** Les lots visaient
+« la sauvegarde active de chacun » ; depuis ce lot, ce n'est plus la même chose.
+`preparerLot` accepte donc la même table `arbres` que le plan, et la page la lui
+envoie à chaque aperçu. Vérifié à l'essai : le plan regardant la « Seconde
+campagne » d'un joueur, la fiche créée y est bien arrivée, et son « Westeros »
+ouvert n'a rien reçu.
+
+### Le monde livré, mis de côté sans être effacé
+
+`identifiantsDepart()` nomme les 67 fiches du Westeros livré ; chaque nœud du
+plan dit s'il en vient (`du_depart`). Une quatrième entrée de « Montrer » —
+**« Ce que la table a créé »** — retire le décor.
+
+Avec une nuance qui la rend utilisable : on garde les fiches du monde livré
+**auxquelles une fiche neuve est accrochée**. Sans ce halo, « Alys Karstark,
+amie d'Eddard Stark » perdrait Eddard, donc son lien, donc tout ce qu'elle avait
+d'intéressant. Mesuré sur la table d'essai : 68 cartes → **1** sans lien, **2**
+dès qu'un lien la rattache au monde.
+
+### Un essai qui ne prouvait rien depuis des mois
+
+En vidant la base locale pour éprouver ce lot, une vérification du lot 11.A a
+lâché : « le souverain en voit plus que l'intendant » au journal. Elle passait
+**grâce aux restes des exécutions précédentes** — la base d'essai garde son
+journal d'une fois sur l'autre. Sur une base vraiment vide, toutes les lignes du
+jour tombaient dans le périmètre de l'intendant, les deux comptes en voyaient
+autant, et l'égalité faisait échouer un test qui n'avait rien découvert. Le
+harnais pose maintenant lui-même une ligne hors périmètre avant de comparer.
+
+**739/739**, sur une base vidée de bout en bout — ce qui n'avait jamais été fait.
+
 ## Mesures
 
 Sur quatre comptes partis du même Westeros, dont trois avaient divergé

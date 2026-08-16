@@ -32,6 +32,7 @@
  * propriétaire, par « ✎ Éditer ».
  */
 
+import { identifiantsDepart } from '../depart/contenu';
 import { calculerGenerations } from '../domaine/genealogie';
 import * as humeur from '../domaine/humeur';
 import { Dataset, Relation, type Objet } from '../domaine/models';
@@ -117,6 +118,219 @@ function ouvrir(cibles: Cible[]): Monde[] {
 }
 
 const nomDuCompte = (cible: Cible) => cible.email || `essai ${cible.utilisateurId.slice(0, 8)}`;
+
+/* --------------------------------------------------------------------------
+ * Quel arbre de chaque membre le plan regarde (lot 17.G)
+ *
+ * **Le défaut qu'on répare.** Le plan prenait la sauvegarde ouverte de chacun,
+ * sans rien demander. Deux ennuis, signalés le 16/08/2026 :
+ *
+ * - un membre qui a copié le monde de départ et n'y a jamais touché apportait
+ *   **67 fiches de décor** identiques à celles de tout le monde. Le plan
+ *   affichait alors le cadeau, pas la table ;
+ * - un membre qui joue **deux campagnes** n'a aucune raison que la bonne soit
+ *   celle qu'il a ouverte, et personne ne pouvait le corriger.
+ *
+ * D'où deux choses : un **choix explicite**, arbre par arbre, et un **défaut
+ * qui écarte les mondes intacts**.
+ * -------------------------------------------------------------------------- */
+
+/** Un arbre d'un membre, tel qu'on le montre pour choisir — sans son contenu. */
+export interface ArbreDuMembre {
+  id: string;
+  nom: string;
+  personnes: number;
+  relations: number;
+  taille: number;
+  revision: number;
+  cree_le: number;
+  modifie_le: number;
+  /** Celle que son propriétaire a ouverte. */
+  active: boolean;
+  /**
+   * Jamais réécrite depuis sa création.
+   *
+   * `revision` part à 1 et n'augmente que dans `ecrireDocument` : à 1, personne
+   * n'a rien changé depuis que la sauvegarde existe. C'est le signal le plus
+   * honnête dont on dispose sans ouvrir le document — et il ne se trompe que
+   * dans un sens sans conséquence : un import jamais retouché passera pour
+   * intact, ce qui le met de côté par défaut mais reste choisissable à la main.
+   */
+  intacte: boolean;
+}
+
+export interface MembreEtSesArbres {
+  compte_id: string;
+  compte: string;
+  arbres: ArbreDuMembre[];
+  /** Celui que le plan prendra faute de choix explicite. Vide s'il n'y a rien. */
+  retenu: string;
+}
+
+interface LigneArbre {
+  id: string;
+  nom: string;
+  personnes: number;
+  relations: number;
+  taille: number;
+  revision: number;
+  cree_le: number;
+  modifie_le: number;
+  utilisateur_id: string;
+  email: string;
+  sauvegarde_active: string | null;
+}
+
+/**
+ * Lequel prendre, faute de choix.
+ *
+ * Dans l'ordre : **on écarte les mondes intacts** s'il reste autre chose, puis
+ * on prend celui que le membre a ouvert, sinon le plus récemment modifié. Si
+ * tout est intact, on ne rend **rien** : le membre figure quand même au rail,
+ * annoncé comme n'ayant rien travaillé, et il reste choisissable à la main.
+ * Le faire entrer d'office remplirait le plan de décor ; le faire disparaître
+ * cacherait quelqu'un de la table.
+ */
+export function arbreRetenu(arbres: ArbreDuMembre[]): string {
+  const travailles = arbres.filter((arbre) => !arbre.intacte);
+  if (!travailles.length) return '';
+  const ouvert = travailles.find((arbre) => arbre.active);
+  if (ouvert) return ouvert.id;
+  const parDate = [...travailles].sort((a, b) => b.modifie_le - a.modifie_le);
+  return parDate[0]?.id ?? '';
+}
+
+/** Ce que chaque membre a, et ce que le plan prendra. Sans lire les documents. */
+export async function arbresDesMembres(
+  base: D1Database,
+  comptes: string[]
+): Promise<MembreEtSesArbres[]> {
+  if (!comptes.length) return [];
+  const trous = comptes.map(() => '?').join(',');
+  // Pas de jointure sur `contenus` : cette liste sert à **choisir**, et charger
+  // le document de toutes les sauvegardes de tout le monde pour afficher un
+  // menu coûterait plus cher que le plan lui-même.
+  const { results } = await base
+    .prepare(
+      `SELECT s.id, s.nom, s.personnes, s.relations, s.taille, s.revision,
+              s.cree_le, s.modifie_le, s.utilisateur_id,
+              u.email, u.sauvegarde_active
+         FROM sauvegardes s
+         JOIN utilisateurs u ON u.id = s.utilisateur_id
+        WHERE s.utilisateur_id IN (${trous}) AND s.demo = 0
+        ORDER BY u.email, s.modifie_le DESC`
+    )
+    .bind(...comptes)
+    .all<LigneArbre>();
+
+  const parCompte = new Map<string, MembreEtSesArbres>();
+  for (const ligne of results) {
+    let membre = parCompte.get(ligne.utilisateur_id);
+    if (!membre) {
+      membre = {
+        compte_id: ligne.utilisateur_id,
+        compte: ligne.email || `essai ${ligne.utilisateur_id.slice(0, 8)}`,
+        arbres: [],
+        retenu: '',
+      };
+      parCompte.set(ligne.utilisateur_id, membre);
+    }
+    membre.arbres.push({
+      id: ligne.id,
+      nom: ligne.nom,
+      personnes: ligne.personnes,
+      relations: ligne.relations,
+      taille: ligne.taille,
+      revision: ligne.revision,
+      cree_le: ligne.cree_le,
+      modifie_le: ligne.modifie_le,
+      active: ligne.id === ligne.sauvegarde_active,
+      intacte: ligne.revision <= 1,
+    });
+  }
+
+  const membres = [...parCompte.values()];
+  for (const membre of membres) membre.retenu = arbreRetenu(membre.arbres);
+  return membres.sort((a, b) => a.compte.localeCompare(b.compte));
+}
+
+/**
+ * Les arbres nommés, chargés avec leur contenu — et **seulement ceux-là**.
+ *
+ * Le périmètre est appliqué dans la requête et non après : une liste complète
+ * chargée puis élaguée en mémoire, c'est une liste complète qui a existé. Une
+ * sauvegarde hors périmètre, inexistante, ou qui n'appartient pas au compte
+ * annoncé, disparaît en silence — le plan dira simplement qu'elle n'est pas là.
+ */
+export async function chargerArbres(
+  base: D1Database,
+  identifiants: string[],
+  perimetre: ReadonlySet<string> | null
+): Promise<Cible[]> {
+  if (!identifiants.length) return [];
+  const trous = identifiants.map(() => '?').join(',');
+  const { results } = await base
+    .prepare(
+      `SELECT s.id, s.nom, s.schema_version, s.personnes, s.relations, s.taille,
+              s.revision, s.cree_le, s.modifie_le, s.utilisateur_id,
+              u.email, u.role, u.plafond_octets, c.donnees
+         FROM sauvegardes s
+         JOIN utilisateurs u ON u.id = s.utilisateur_id
+         LEFT JOIN contenus c ON c.sauvegarde_id = s.id
+        WHERE s.id IN (${trous}) AND s.demo = 0
+        ORDER BY u.email`
+    )
+    .bind(...identifiants)
+    .all<Objet & { donnees: string | null }>();
+
+  return results
+    .filter((ligne) => perimetre === null || perimetre.has(String(ligne.utilisateur_id)))
+    .map((ligne) => ({
+      fiche: {
+        id: String(ligne.id),
+        nom: String(ligne.nom),
+        schema_version: Number(ligne.schema_version),
+        personnes: Number(ligne.personnes),
+        relations: Number(ligne.relations),
+        taille: Number(ligne.taille),
+        revision: Number(ligne.revision),
+        cree_le: Number(ligne.cree_le),
+        modifie_le: Number(ligne.modifie_le),
+        demo: 0,
+      },
+      utilisateurId: String(ligne.utilisateur_id),
+      email: String(ligne.email ?? ''),
+      role: String(ligne.role ?? 'membre'),
+      plafondOctets: Number(ligne.plafond_octets),
+      donnees: ligne.donnees,
+    }));
+}
+
+/**
+ * Les arbres à superposer : le choix explicite s'il y en a un, le défaut sinon.
+ *
+ * `choix` est ce que la page a sous les yeux. Le transmettre plutôt que de le
+ * recalculer garantit qu'un **geste** posé depuis le plan écrit dans l'arbre
+ * qui est **affiché**, et non dans celui que le membre a ouvert de son côté
+ * entre-temps.
+ */
+export async function arbresDuPlan(
+  base: D1Database,
+  comptes: string[],
+  choix: Record<string, string>,
+  perimetre: ReadonlySet<string> | null
+): Promise<Cible[]> {
+  const membres = await arbresDesMembres(base, comptes);
+  const vises: string[] = [];
+  for (const membre of membres) {
+    const demande = String(choix[membre.compte_id] ?? '');
+    // Un choix qui ne désigne pas un arbre de ce membre-là est ignoré : il vient
+    // d'un plan devenu vieux, et suivre une indication périmée écrirait ailleurs.
+    const valide = membre.arbres.some((arbre) => arbre.id === demande) ? demande : membre.retenu;
+    if (valide) vises.push(valide);
+  }
+  return chargerArbres(base, vises, perimetre);
+}
 
 /* --------------------------------------------------------------------------
  * Le plan
@@ -393,6 +607,12 @@ function construireNoeud(
     // Ce que le plan collectif ajoute, et que le moteur de rendu ignore.
     comptes: grappe.comptes,
     absents: absents.map((compte) => compte.id),
+    // Vient du monde livré, donc du décor : une seule écriture connue suffit à
+    // le dire, puisque c'est de là que la personne est arrivée chez tout le
+    // monde. La page s'en sert pour montrer « ce que la table a créé ».
+    du_depart: grappe.occurrences.some((occurrence) =>
+      identifiantsDepart().has(occurrence.personne_id)
+    ),
     accord: grappe.accord,
     raisons: grappe.raisons,
     ecritures: grappe.occurrences.map((occurrence) => ({

@@ -854,6 +854,41 @@ sens. Ils survivent au curseur de seuil : c'est tout leur intérêt.
   sous 760 px, le rail était hors de l'écran **sans plus rien pour l'y ramener**
   — exactement le défaut que le lot 11.C avait réparé dans l'application.
 
+### Quel arbre le plan regarde (lot 17.G)
+
+**Un arbre par membre, et il se choisit.** Le rail dit sous chaque nom lequel,
+et un clic ouvre la liste. Trois choses à ne pas défaire :
+
+- **`revision <= 1` veut dire « jamais réécrite depuis sa création »** —
+  `creerDocument` la pose à 1, `ecrireDocument` l'incrémente. C'est le seul
+  signal lisible sans ouvrir le document, et c'est celui qui écarte les mondes
+  de départ intacts.
+- **Un membre dont tout est intact reste au rail**, grisé, sans entrer dans le
+  plan. Le faire entrer d'office remplirait le plan de décor ; le faire
+  disparaître cacherait quelqu'un de la table.
+- **Un geste écrit dans l'arbre affiché.** La page envoie la même table `arbres`
+  au plan et aux lots. `preparerLot` la prend quand elle est là, et retombe sur
+  `portee` sinon. **Toute route qui écrit depuis le plan doit la transmettre** —
+  sans quoi le geste ira dans la sauvegarde que le membre a ouverte de son côté,
+  et rien ne le dira.
+
+Un choix qui ne désigne pas un arbre **de ce membre-là** est ignoré et remplacé
+par le défaut : il vient d'un plan devenu vieux. C'est aussi ce qui empêche de
+prêter à quelqu'un l'arbre d'un autre en trafiquant la requête.
+
+**« Ce que la table a créé »** retire les fiches du monde livré
+(`identifiantsDepart()`), mais **garde celles auxquelles une fiche neuve est
+accrochée** — sans ce halo, un personnage inventé perdrait tous ses liens vers
+le décor, donc tout son intérêt.
+
+**Piège d'essai payé le 16/08/2026** : la base locale garde son journal d'une
+exécution à l'autre, et une vérification du lot 11.A passait **grâce à ces
+restes**. Pour éprouver quoi que ce soit sur le registre ou les grappes,
+partir d'une base vidée :
+
+    npx wrangler d1 execute familytree --local --command "DELETE FROM utilisateurs"
+    npx wrangler d1 execute familytree --local --command "DELETE FROM journal_admin"
+
 ### Pour regarder le plan avec de vraies divergences
 
     bash outils/table-essai.sh

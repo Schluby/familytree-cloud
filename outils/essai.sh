@@ -956,6 +956,17 @@ verifier "  celle de l'invite" oui "$(contient "$ID_INVITE")"
 verifier "  et A n'a rien recu" non "$(code "$BOCAL_A" GET /api/referentiels > /dev/null; contient 'Maison de l intendant')"
 
 echo "-- le registre suit, et ne deborde pas"
+# On pose d'abord, expres, une ligne qui porte sur un compte HORS du perimetre
+# de l'intendant — sans quoi la comparaison du bas ne prouve rien.
+#
+# Garde-fou ajoute le 16/08/2026 : cette verification passait depuis des mois
+# **grace aux restes des executions precedentes**, la base locale gardant son
+# journal d'une fois sur l'autre. Sur une base vraiment vide, toutes les lignes
+# du jour tombaient dans le perimetre de B, les deux comptes en voyaient autant,
+# et l'egalite faisait echouer un test qui n'avait rien decouvert. Un essai qui
+# depend de ce qu'une execution anterieure a laisse n'est pas un essai.
+verifier "le souverain touche a un compte hors perimetre" 200 "$(code "$BOCAL_A" POST /api/admin/utilisateurs/$ID_ESSAI/plafond '{"octets":262144,"sauvegardes":5}')"
+
 verifier "l'intendant lit un journal" 200 "$(code "$BOCAL_B" GET /api/admin/journal)"
 LIGNES_INTENDANT="$(lire journal.length)"
 verifier "  ses ecritures sur son joueur y sont" oui "$([ "$(journal_vise "$ID_INVITE")" -gt 0 ] && echo oui || echo non)"
@@ -1826,6 +1837,129 @@ verifier "  puis par l'application" oui "$(contient '/api/admin/lots/appliquer')
 verifier "  et par aucune autre porte" non "$(contient '/api/personnes')"
 code - GET /admin > /dev/null
 verifier "l'administration mene au plan" oui "$(contient '/collectif.html')"
+
+
+# ---------------------------------------------------------------------------
+# Lot 17.G : quel arbre de chaque membre le plan regarde
+#
+# Deux ennuis signales le 16/08/2026, et une consequence qu'il ne faut jamais
+# reperdre :
+#
+#  1. un membre qui a copie le monde de depart sans y toucher apportait
+#     soixante-sept fiches de decor. Le defaut ecarte desormais les mondes
+#     jamais reecrits — mais le membre reste choisissable a la main ;
+#  2. un membre qui joue deux campagnes n'avait aucun moyen de dire laquelle ;
+#  3. et surtout : **un geste doit ecrire dans l'arbre que le plan affiche**,
+#     pas dans celui que son proprietaire a ouvert de son cote.
+# ---------------------------------------------------------------------------
+
+# Combien d'arbres la derniere reponse prete a ce compte, et lequel elle retient.
+arbres_du_membre() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    const m=(d.membres||[]).find(x=>x.compte_id==='$1');
+    process.stdout.write(String(m ? m.arbres.length : 0));
+  " 2>/dev/null
+}
+retenu_du_membre() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    const m=(d.membres||[]).find(x=>x.compte_id==='$1');
+    process.stdout.write(m ? (m.retenu || 'aucun') : 'inconnu');
+  " 2>/dev/null
+}
+# Combien de comptes le dernier plan superpose.
+comptes_du_plan() {
+  node -e "
+    const fs=require('fs');
+    let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+    process.stdout.write(String((d.comptes||[]).length));
+  " 2>/dev/null
+}
+
+echo "-- 17.G la liste des arbres, sans les documents"
+sql "UPDATE utilisateurs SET role='admin' WHERE email_norm='$EMAIL_A'"
+verifier "un membre ne lit pas la liste" 403 "$(code "$BOCAL_I" POST /api/admin/collectif/arbres '{}')"
+verifier "sans compte selectionne" 400 "$(code "$BOCAL_A" POST /api/admin/collectif/arbres '{"comptes":[]}')"
+verifier "la liste repond" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/arbres "{\"comptes\":[\"$ID_COMPTE_B\",\"$ID_INVITE\"]}")"
+verifier "  et elle ne porte aucun document" non "$(contient '\"donnees\"')"
+
+echo "-- 17.G un monde jamais reecrit est ecarte d'office"
+# B a travaille son arbre tout au long de ce fichier ; on lui en pose un second,
+# copie et jamais touche. Le defaut doit continuer de prendre le premier.
+code "$BOCAL_B" GET /api/sauvegardes > /dev/null
+ARBRE_TRAVAILLE="$(sienne)"
+verifier "on lui copie un monde intact" 201 "$(code "$BOCAL_B" POST /api/sauvegardes "{\"nom\":\"Copie intacte\",\"depuis\":\"$ARBRE_TRAVAILLE\",\"contenu\":\"copie\"}")"
+ARBRE_INTACT="$(lire sauvegarde.id)"
+code "$BOCAL_A" POST /api/admin/collectif/arbres "{\"comptes\":[\"$ID_COMPTE_B\"]}" > /dev/null
+verifier "il a bien deux arbres" 2 "$(arbres_du_membre "$ID_COMPTE_B")"
+verifier "  et c'est le travaille qui est retenu" "$ARBRE_TRAVAILLE" "$(retenu_du_membre "$ID_COMPTE_B")"
+
+echo "-- 17.G le choix explicite l'emporte"
+PLAN_CHOISI="{\"comptes\":[\"$ID_COMPTE_B\"],\"arbres\":{\"$ID_COMPTE_B\":\"$ARBRE_INTACT\"}}"
+verifier "le plan suit le choix" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_CHOISI")"
+verifier "  sur la sauvegarde demandee" oui "$(contient "$ARBRE_INTACT")"
+verifier "  et pas sur l'autre" non "$(contient "$ARBRE_TRAVAILLE")"
+# Un choix qui ne designe pas un arbre de ce membre vient d'un plan perime :
+# le suivre ecrirait ailleurs. On retombe donc sur le defaut.
+PLAN_PERIME="{\"comptes\":[\"$ID_COMPTE_B\"],\"arbres\":{\"$ID_COMPTE_B\":\"arbre-fantome\"}}"
+verifier "un choix perime retombe sur le defaut" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_PERIME")"
+verifier "  donc sur l'arbre travaille" oui "$(contient "$ARBRE_TRAVAILLE")"
+# Et l'arbre d'un autre compte ne se glisse pas dans le choix : la table est
+# construite a partir des arbres DE CE MEMBRE-LA, pas de ce qu'on nous envoie.
+PLAN_VOLE="{\"comptes\":[\"$ID_COMPTE_B\"],\"arbres\":{\"$ID_COMPTE_B\":\"$SAUVEGARDE_INVITE\"}}"
+verifier "on ne peut pas lui preter l arbre d un autre" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "$PLAN_VOLE")"
+verifier "  l'invite n'entre pas dans le plan" 1 "$(comptes_du_plan)"
+verifier "  et c'est encore l'arbre de B" oui "$(contient "$ARBRE_TRAVAILLE")"
+
+echo "-- 17.G un membre dont tout est intact sort du plan, pas du rail"
+# Un compte neuf, dont la seule sauvegarde est une copie jamais touchee :
+# c'est exactement le cas signale — le monde de depart qui remplit le plan.
+sql "DELETE FROM tentatives"
+EMAIL_G="essai-g-$MARQUE@exemple.test"
+BOCAL_G="$DOSSIER/g.txt"
+CLE_G="$(node outils/deriver.mjs "$EMAIL_G" "mot-de-passe-G-2026")"
+verifier "un compte neuf s inscrit" 201 "$(code "$BOCAL_G" POST /api/auth/inscription "{\"email\":\"$EMAIL_G\",\"cle\":\"$CLE_G\"}")"
+code "$BOCAL_G" GET /api/auth/moi > /dev/null
+ID_COMPTE_G="$(lire compte.id)"
+code "$BOCAL_G" GET /api/sauvegardes > /dev/null
+DEMO_G="$(demo_id)"
+verifier "  il fait du monde recu le sien, sans y toucher" 201 "$(code "$BOCAL_G" POST /api/sauvegardes "{\"nom\":\"Westeros\",\"depuis\":\"$DEMO_G\",\"contenu\":\"copie\"}")"
+code "$BOCAL_A" POST /api/admin/collectif/arbres "{\"comptes\":[\"$ID_COMPTE_G\"]}" > /dev/null
+verifier "il figure quand meme au rail" 1 "$(arbres_du_membre "$ID_COMPTE_G")"
+verifier "  mais aucun arbre n est retenu" aucun "$(retenu_du_membre "$ID_COMPTE_G")"
+verifier "le plan n a rien a superposer" 404 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "{\"comptes\":[\"$ID_COMPTE_G\"]}")"
+verifier "  et il dit comment en regarder un quand meme" oui "$(contient "main pour en regarder un quand")"
+code "$BOCAL_A" POST /api/admin/collectif/arbres "{\"comptes\":[\"$ID_COMPTE_G\"]}" > /dev/null
+ARBRE_G="$(node -e "
+  const fs=require('fs');
+  let d={}; try { d=JSON.parse(fs.readFileSync('$DOSSIER/corps.json','utf8')); } catch {}
+  process.stdout.write(((d.membres||[])[0]||{arbres:[]}).arbres.map(a=>a.id)[0]||'');
+" 2>/dev/null)"
+verifier "choisi a la main, il entre" 200 "$(code "$BOCAL_A" POST /api/admin/collectif/plan "{\"comptes\":[\"$ID_COMPTE_G\"],\"arbres\":{\"$ID_COMPTE_G\":\"$ARBRE_G\"}}")"
+verifier "  avec le monde livre au complet" 67 "$(cartes_du_plan '')"
+
+echo "-- 17.G un geste ecrit dans l'arbre affiche, pas dans l'actif"
+# B a ouvert son arbre travaille ; le plan, lui, regarde la copie intacte.
+# Le lot doit suivre le plan.
+LOT_SUR_CHOISI="{\"comptes\":[\"$ID_COMPTE_B\"],\"arbres\":{\"$ID_COMPTE_B\":\"$ARBRE_INTACT\"},\"portee\":\"active\",\"operation\":{\"type\":\"maison\",\"label\":\"Maison du plan\"}}"
+verifier "le lot passe" 200 "$(code "$BOCAL_A" POST /api/admin/lots/appliquer "$LOT_SUR_CHOISI")"
+verifier "  une seule sauvegarde touchee" 1 "$(lire resume.sauvegardes)"
+verifier "  et c'est celle que le plan affiche" oui "$(contient "$ARBRE_INTACT")"
+verifier "l'arbre ouvert de B n'a rien recu" non "$(code "$BOCAL_A" GET /api/admin/arbres/$ARBRE_TRAVAILLE/maisons > /dev/null; contient 'Maison du plan')"
+verifier "  celui que le plan visait, si" oui "$(code "$BOCAL_A" GET /api/admin/arbres/$ARBRE_INTACT/maisons > /dev/null; contient 'Maison du plan')"
+
+echo "-- 17.G le monde livre se met de cote"
+code "$BOCAL_A" POST /api/admin/collectif/plan "{\"comptes\":[\"$ID_COMPTE_B\"]}" > /dev/null
+verifier "le plan dit ce qui vient du monde de depart" oui "$(contient 'du_depart')"
+code - GET /collectif > /dev/null
+verifier "et la page sait le montrer a part" oui "$(contient 'Ce que la table a créé')"
+code - GET /js/collectif.js > /dev/null
+verifier "  en gardant le halo des fiches neuves" oui "$(contient 'voisins.add')"
+verifier "le rail se construit sur la liste des arbres" oui "$(contient 'membres.map')"
+verifier "  et les gestes visent les arbres affiches" oui "$(contient 'arbres: selection().arbres')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

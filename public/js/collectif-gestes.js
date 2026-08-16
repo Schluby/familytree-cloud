@@ -68,9 +68,11 @@ export function creerGestes({ surFait } = {}) {
   function corps() {
     return {
       comptes: geste.comptes,
-      // Le plan collectif ne superpose que la sauvegarde ouverte de chacun :
-      // un lot qui viserait « toutes » écrirait dans des campagnes qui ne sont
-      // pas celles qu'on regarde.
+      // `arbres` désigne, membre par membre, **l'arbre que le plan affiche**.
+      // C'est ce qui garantit qu'un geste posé sur une carte écrit là où on
+      // regardait, et non dans la sauvegarde que son propriétaire a ouverte de
+      // son côté. `portee` ne sert plus que de repli si le plan n'a rien dit.
+      arbres: geste.arbres ?? {},
       portee: 'active',
       seuil: geste.seuil,
       operation: geste.operation(valeurs),
