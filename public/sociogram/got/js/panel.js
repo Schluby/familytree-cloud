@@ -7,6 +7,7 @@ import { anneeDe, ageDe, naissanceDepuisAge } from './calendrier.js';
 import { h } from './dom.js';
 import { curseurHumeur } from './humeur.js';
 import { RANGS, basculerRang, porteLeRang, rangDuTag } from './rangs.js';
+import { cle } from './base.js';
 
 /**
  * Régions et châteaux de Westeros, chargés une fois pour toutes les fiches.
@@ -54,7 +55,7 @@ export function creerPanneau(element, rappels = {}) {
    * ouverture, et une table qui les note veut les avoir sous la main. Ouvert
    * par défaut — c'est ce que faisait la fiche avant qu'on puisse la replier.
    */
-  const MEMOIRE_JOUEURS = 'familytree-fiche-joueurs';
+  const MEMOIRE_JOUEURS = cle('familytree-fiche-joueurs');
   let joueursOuverts = localStorage.getItem(MEMOIRE_JOUEURS) !== '0';
 
   function definirEtat(texte, classe = '') {

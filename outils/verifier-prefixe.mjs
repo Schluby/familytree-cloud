@@ -91,12 +91,19 @@ if (base) {
   }
 
   const accueil = join(projet, 'public', 'index.html');
-  if (!existsSync(accueil)) {
+  const porteLaRacine = /export const SERT_LA_RACINE = true;/.test(source);
+
+  if (porteLaRacine && !existsSync(accueil)) {
     soucis.push('public/index.html est absent : la racine du domaine ne répondrait rien.');
-  } else if (readFileSync(accueil, 'utf8').includes('js/main.js')) {
+  } else if (porteLaRacine && readFileSync(accueil, 'utf8').includes('js/main.js')) {
     soucis.push(
       "public/index.html charge le module de l'application : c'est l'ancienne page " +
         'restée à la racine, pas la page de choix.'
+    );
+  } else if (!porteLaRacine && existsSync(accueil)) {
+    soucis.push(
+      "public/index.html existe alors que SERT_LA_RACINE est faux : ce projet ne reçoit " +
+        'jamais la racine du domaine, cette page ne serait jamais servie.'
     );
   }
 }

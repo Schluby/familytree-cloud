@@ -37,3 +37,21 @@ export const BASE = '/sociogram/got';
  * et rendent lisible ce qu'on voit dans l'inspecteur du navigateur.
  */
 export const NOM_COOKIE = 'ft_got_session';
+
+/**
+ * Ce projet sert-il la racine du domaine ?
+ *
+ * `myschlub.com` tout court doit répondre quelque chose — c'est là que mènent
+ * tous les liens d'avant le déménagement. La page de choix (`public/index.html`)
+ * s'en charge, mais elle n'appartient à aucune des deux applications : **un seul
+ * des deux dépôts la porte**, et c'est celui-ci, parce que le Custom Domain
+ * `myschlub.com` est posé sur son Worker.
+ *
+ * L'IRL, lui, ne reçoit que `/sociogram/irl/*` par une route : sa racine ne
+ * serait jamais servie, et y laisser une copie de la page de choix ferait deux
+ * versions à tenir dont une morte.
+ *
+ * `outils/verifier-prefixe.mjs` lit cette constante pour savoir s'il doit
+ * exiger la page ou en refuser une.
+ */
+export const SERT_LA_RACINE = true;
