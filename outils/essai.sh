@@ -20,7 +20,17 @@
 #     --command "DELETE FROM utilisateurs WHERE email_norm LIKE 'essai-%@exemple.test'"
 
 set -u
-BASE="${1:-http://127.0.0.1:8787}"
+ORIGINE="${1:-http://127.0.0.1:8787}"
+
+# Le prefixe sous lequel l'application est montee (lot 18). Il est lu dans
+# src/base.ts plutot qu'ecrit ici : deux endroits qui disent la meme chose
+# finissent toujours par diverger, et c'est le harnais qui mentirait.
+#
+# Il vaut aussi en local : `npm run dev` sert desormais l'application a
+# http://127.0.0.1:8787/sociogram/got/. Meme forme partout, donc aucun ecart
+# entre ce qu'on eprouve et ce qui tourne.
+PREFIXE="$(sed -n "s/^export const BASE = '\(.*\)';$/\1/p" "$(dirname "$0")/../src/base.ts")"
+BASE="$ORIGINE$PREFIXE"
 MARQUE="$(date +%s)"
 EMAIL_A="essai-a-$MARQUE@exemple.test"
 EMAIL_B="essai-b-$MARQUE@exemple.test"
@@ -413,7 +423,7 @@ verifier "  et son archive ne contient que les siennes" 200 "$(code "$BOCAL_B" G
 echo "-- l'interface"
 verifier "la racine sert l'application" 200 "$(code - GET /)"
 verifier "  et non le panneau provisoire" oui "$(contient 'id="liste-sauvegardes"')"
-verifier "  elle charge le module principal" oui "$(contient '/js/main.js')"
+verifier "  elle charge le module principal" oui "$(contient 'src="js/main.js"')"
 verifier "la page de connexion est servie" 200 "$(code - GET /connexion)"
 verifier "le client d'API est servi" 200 "$(code - GET /js/api.js)"
 verifier "  il renvoie les 401 vers la connexion" oui "$(contient '/connexion.html?retour=')"
@@ -1315,7 +1325,7 @@ if [ "$GOOGLE" = "true" ]; then
   # connexion echouerait sur « demande expiree ». C'est la verification qui
   # protege le mieux cette famille de routes.
   verifier "  en SameSite=Lax, sinon rien ne revient" oui "$(porte "$TEMOIN" 'SameSite=Lax')"
-  verifier "  et cantonne a sa famille de routes" oui "$(porte "$TEMOIN" 'Path=/api/auth/google')"
+  verifier "  et cantonne a sa famille de routes" oui "$(porte "$TEMOIN" "Path=$PREFIXE/api/auth/google")"
 
   RETOUR="$(entete - '/api/auth/google/retour?code=x&state=y' location)"
   verifier "un retour sans temoin est refuse" oui "$(porte "$RETOUR" 'erreur=')"
@@ -1824,7 +1834,7 @@ sql "UPDATE utilisateurs SET role='membre' WHERE email_norm='$EMAIL_B'"
 
 echo "-- 17.C la page du plan, et ce dont elle depend"
 verifier "la page est servie" 200 "$(code - GET /collectif)"
-verifier "  avec la feuille de l'application, pas celle de l'admin" oui "$(contient '/css/app.css')"
+verifier "  avec la feuille de l'application, pas celle de l'admin" oui "$(contient 'href="css/app.css"')"
 verifier "  et d3, que le moteur de cartes exige" oui "$(contient 'd3.v7.min.js')"
 verifier "  ses deux tiroirs ont leur bouton" oui "$(contient 'btn-panneau')"
 code - GET /js/collectif.js > /dev/null
@@ -1836,7 +1846,7 @@ verifier "un geste passe par l'apercu" oui "$(contient '/api/admin/lots/apercu')
 verifier "  puis par l'application" oui "$(contient '/api/admin/lots/appliquer')"
 verifier "  et par aucune autre porte" non "$(contient '/api/personnes')"
 code - GET /admin > /dev/null
-verifier "l'administration mene au plan" oui "$(contient '/collectif.html')"
+verifier "l'administration mene au plan" oui "$(contient 'href="collectif.html"')"
 
 
 # ---------------------------------------------------------------------------

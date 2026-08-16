@@ -23,14 +23,23 @@
   // Les fichiers de l'interface (public/) sont servis par Cloudflare, pas par
   // le Worker : ils ne comptent pas dans les 100 000 requêtes par jour.
   //
-  // run_worker_first : /api/* va TOUJOURS au Worker, même si un fichier du même
-  // nom existait. Tout le reste essaie d'abord un fichier, puis retombe sur le
-  // Worker (qui renvoie index.html).
+  // run_worker_first : les routes d'API vont TOUJOURS au Worker, même si un
+  // fichier du même nom existait. Tout le reste essaie d'abord un fichier, puis
+  // retombe sur le Worker (qui renvoie index.html).
+  //
+  // Le chemin porte le préfixe de l'application (`src/base.ts`), et les
+  // fichiers de `public/` sont rangés **sous ce même préfixe**. C'est ce qui
+  // permet à Cloudflare de les trouver et de les servir sans appeler le
+  // Worker ; un `public/` resté plat ferait manquer chaque fichier, retomber
+  // sur le Worker, et multiplierait par six la consommation du palier gratuit.
+  //
+  // `outils/verifier-prefixe.mjs` contrôle que les trois endroits qui portent
+  // le préfixe sont d'accord. `npm run verif` l'appelle.
   // ------------------------------------------------------------------------
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/sociogram/got/api/*"]
   },
 
   // ------------------------------------------------------------------------

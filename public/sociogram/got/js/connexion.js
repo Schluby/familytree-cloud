@@ -1,4 +1,5 @@
 import { appeler, compteConnecte, deriverCle } from './identite.js';
+import { lien } from './base.js';
 import { installerLangue } from './langue.js';
 
 installerLangue();
@@ -15,7 +16,9 @@ let mode = 'connexion';
  */
 function destination() {
   const demande = new URLSearchParams(location.search).get('retour');
-  return demande && demande.startsWith('/') && !demande.startsWith('//') ? demande : '/';
+  // `retour` porte déjà le préfixe : il vient de `location.pathname`. Le test
+  // reste le même — il refuse une adresse qui partirait vers un autre site.
+  return demande && demande.startsWith('/') && !demande.startsWith('//') ? demande : lien('/');
 }
 
 /** Le jeton du courriel, s'il y en a un : il change tout ce qui suit. */
@@ -65,7 +68,7 @@ function proposerLeChoix(compte) {
     // Sans ça, le marqueur ferait rouvrir un essai au prochain 401 alors qu'on
     // vient justement de se déconnecter pour saisir une autre adresse.
     localStorage.removeItem('familytree-compte-connu');
-    location.replace('/connexion.html');
+    location.replace(lien('/connexion.html'));
   });
 }
 
@@ -287,7 +290,7 @@ async function ouvrirNouveauMotDePasse(jeton) {
       $('codeAffiche').textContent = reponse.donnees.code_secours;
       $('carteCode').classList.remove('cache');
       $('continuer').textContent = "C'est noté, se connecter";
-      $('continuer').dataset.vers = '/connexion';
+      $('continuer').dataset.vers = lien('/connexion');
     });
   });
 }
@@ -326,6 +329,6 @@ $('formulaireRecuperation').addEventListener('submit', async (evenement) => {
     $('codeAffiche').textContent = donnees.code_secours;
     $('carteCode').classList.remove('cache');
     $('continuer').textContent = "C'est noté, se connecter";
-    $('continuer').dataset.vers = '/connexion';
+    $('continuer').dataset.vers = lien('/connexion');
   });
 });

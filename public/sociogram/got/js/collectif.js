@@ -29,8 +29,12 @@ import { creerRenduCartes } from './views/cartes.js';
 import { creerMenu } from './menu.js';
 import { h } from './dom.js';
 import { appeler } from './identite.js';
+import { cle, lien } from './base.js';
 import { installerLangue } from './langue.js';
 import { creerGestes } from './collectif-gestes.js';
+
+/** Cloisonnée par application : les deux sociogrammes partagent l'origine. */
+const CLE_THEME = cle('familytree-theme');
 
 installerLangue();
 
@@ -150,7 +154,7 @@ async function charger({ silencieux = false } = {}) {
   });
   if (!ok) {
     if (code === 401) {
-      location.replace('/connexion.html?retour=%2Fcollectif.html');
+      location.replace(lien('/connexion.html?retour=') + encodeURIComponent(lien('/collectif.html')));
       return;
     }
     plan = null;
@@ -979,7 +983,7 @@ function choisirMembres(evenement) {
 async function demarrer() {
   const { ok: connu, donnees: qui } = await appeler('/api/admin/contexte');
   if (!connu) {
-    location.replace('/connexion.html?retour=%2Fcollectif.html');
+    location.replace(lien('/connexion.html?retour=') + encodeURIComponent(lien('/collectif.html')));
     return;
   }
   contexte = qui;
@@ -1046,13 +1050,13 @@ $('seuil').addEventListener('change', () => charger({ silencieux: true }));
 $('btn-theme').addEventListener('click', () => {
   const sombre = document.body.classList.toggle('sombre');
   try {
-    localStorage.setItem('familytree-theme', sombre ? 'sombre' : 'clair');
+    localStorage.setItem(CLE_THEME, sombre ? 'sombre' : 'clair');
   } catch {
     /* navigation privée : le thème ne survivra pas, ce n'est pas grave */
   }
 });
 try {
-  if (localStorage.getItem('familytree-theme') === 'sombre') document.body.classList.add('sombre');
+  if (localStorage.getItem(CLE_THEME) === 'sombre') document.body.classList.add('sombre');
 } catch {
   /* idem */
 }

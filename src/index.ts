@@ -12,6 +12,7 @@
  */
 
 import { Hono } from 'hono';
+import { BASE } from './base';
 import { routesAuth } from './auth/routes';
 import { routesSauvegardes } from './sauvegardes/routes';
 import { routesAdmin } from './admin/routes';
@@ -21,7 +22,22 @@ import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import { contenuDepart } from './depart/contenu';
 import type { Variables } from './intergiciels';
 
-const app = new Hono<{ Bindings: Env; Variables: Variables }>();
+/**
+ * L'application est montée **sous un préfixe** (`src/base.ts`) : `myschlub.com`
+ * porte deux sociogrammes, celui-ci sous `/sociogram/got`.
+ *
+ * `basePath()` rend un clone qui partage le routeur et la table des routes du
+ * premier — donc tout ce qu'on enregistre sur `app` ci-dessous est bien servi,
+ * et `app.fetch` répond pour l'ensemble. Aucune route de ce fichier ni des
+ * modules montés n'a eu à changer d'adresse : le préfixe est ajouté à
+ * l'enregistrement, une fois.
+ *
+ * Le test n'est pas décoratif : `basePath('')` collerait un `mergePath('/', '')`
+ * là où on veut exactement rien, et l'application montée à la racine est une
+ * forme qui doit rester valable.
+ */
+const racine = new Hono<{ Bindings: Env; Variables: Variables }>();
+const app = BASE ? racine.basePath(BASE) : racine;
 
 /* --------------------------------------------------------------------------
  * En-têtes de sécurité, posés une fois pour toutes.
@@ -181,7 +197,11 @@ app.all('/api/*', (c) => c.json({ erreur: 'route inconnue' }, 404));
 app.all('*', async (c) => {
   const reponse = await c.env.ASSETS.fetch(c.req.raw);
   if (reponse.status !== 404) return reponse;
-  const accueil = new URL('/index.html', c.req.url);
+  // `${BASE}/index.html` et non `/index.html` : à la racine du domaine se
+  // trouve maintenant la page de choix entre les deux sociogrammes, qui n'est
+  // pas cette application. Un chemin inconnu **de cette application-ci** doit
+  // rendre cette application-ci.
+  const accueil = new URL(`${BASE}/index.html`, c.req.url);
   return c.env.ASSETS.fetch(new Request(accueil, { headers: c.req.raw.headers }));
 });
 
@@ -231,6 +251,8 @@ async function menage(env: Env): Promise<void> {
 }
 
 export default {
+  // `app` et `racine` partagent le même routeur : peu importe lequel des deux
+  // répond, tout ce qui a été enregistré est servi.
   fetch: app.fetch,
   async scheduled(_evenement: ScheduledController, env: Env): Promise<void> {
     await menage(env);

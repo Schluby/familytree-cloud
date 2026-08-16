@@ -8,6 +8,7 @@
  */
 
 import { appeler, deriverCle } from './identite.js';
+import { lien } from './base.js';
 import { installerLangue } from './langue.js';
 
 installerLangue();
@@ -31,7 +32,7 @@ const plurielGroupe = (nombre, mots) =>
 async function remplir() {
   const { ok, donnees } = await appeler('/api/auth/donnees');
   if (!ok) {
-    location.replace('/connexion.html?retour=%2Fdonnees.html');
+    location.replace(lien('/connexion.html?retour=') + encodeURIComponent(lien('/donnees.html')));
     return;
   }
 
@@ -139,7 +140,7 @@ $('formulaireSuppression').addEventListener('submit', async (evenement) => {
       document.body.innerHTML =
         '<main><h1>C’est effacé.</h1><p>Votre compte, vos sauvegardes et vos ' +
         'sessions n’existent plus. Merci d’être passé.</p>' +
-        '<p><a class="lien" href="/connexion.html">Créer un nouveau compte</a></p></main>';
+        `<p><a class="lien" href="${lien('/connexion.html')}">Créer un nouveau compte</a></p></main>`;
       return;
     }
     message(reponse.donnees?.erreur || `Échec (HTTP ${reponse.code}).`, 'erreur');
@@ -151,7 +152,7 @@ $('formulaireSuppression').addEventListener('submit', async (evenement) => {
 });
 
 $('retour').addEventListener('click', () => {
-  location.href = '/';
+  location.href = lien('/');
 });
 
 remplir();

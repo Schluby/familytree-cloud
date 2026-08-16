@@ -11,8 +11,12 @@
  */
 
 import { sha256, versBase64 } from './empreintes';
+import { BASE, NOM_COOKIE } from '../base';
 
-export const NOM_COOKIE = 'ft_session';
+// Le nom du cookie est une propriété du projet, pas des sessions : deux
+// applications partagent le domaine. Il vit donc dans `base.ts`, et se relit
+// ici pour que rien de ce qui l'importait n'ait à changer d'adresse.
+export { NOM_COOKIE };
 
 /** 30 jours. Assez long pour ne pas être déconnecté entre deux séances. */
 const DUREE_SECONDES = 30 * 24 * 3600;
@@ -99,12 +103,17 @@ export async function fermerToutesLesSessions(base: D1Database, utilisateurId: s
 /**
  * `Secure` est posé sauf en http://localhost, où le navigateur refuserait le
  * cookie et rendrait le développement local impossible.
+ *
+ * `Path` vaut le préfixe de l'application, et c'est ce qui **cloisonne les deux
+ * sociogrammes du domaine** : le navigateur n'envoie un cookie qu'aux chemins
+ * couverts par son `Path`, donc celui du JDR ne part jamais vers l'IRL. Sans
+ * cette ligne, se connecter d'un côté enverrait sa session de l'autre.
  */
 export function enteteCookie(url: string, jeton: string, dureeSecondes: number): string {
   const surHttps = new URL(url).protocol === 'https:';
   const morceaux = [
     `${NOM_COOKIE}=${jeton}`,
-    'Path=/',
+    `Path=${BASE}/`,
     'HttpOnly',
     'SameSite=Lax',
     `Max-Age=${dureeSecondes}`,

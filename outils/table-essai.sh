@@ -18,7 +18,10 @@
 # N'EXISTE QUE POUR LA BASE LOCALE. Il écrit en SQL dans `.wrangler/state`.
 
 set -u
-BASE="${1:-http://127.0.0.1:8787}"
+ORIGINE="${1:-http://127.0.0.1:8787}"
+# Le prefixe, lu dans src/base.ts — voir outils/essai.sh pour le pourquoi.
+PREFIXE="$(sed -n "s/^export const BASE = '\(.*\)';$/\1/p" "$(dirname "$0")/../src/base.ts")"
+BASE="$ORIGINE$PREFIXE"
 MARQUE="$(date +%s)"
 MDP="table-2026-essai"
 

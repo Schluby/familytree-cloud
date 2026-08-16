@@ -16,8 +16,16 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const RACINE = 'public';
+/**
+ * Le préfixe est lu dans `src/base.ts` plutôt qu'écrit ici : depuis le lot 18,
+ * les fichiers de l'interface vivent sous `public/<préfixe>/`, et la fourche
+ * IRL déplace ce préfixe. Le déduire évite un second endroit à corriger.
+ */
+const PREFIXE =
+  (readFileSync('src/base.ts', 'utf8').match(/export const BASE = '([^']*)';/) ?? [])[1] ?? '';
+const RACINE = join('public', PREFIXE);
 
 /**
  * Le serveur aussi envoie du texte qui s'affiche : le nom et la description de
@@ -192,7 +200,11 @@ for (const cible of COTE_SERVEUR) {
 const liste = [...toutes].sort((a, b) => a.localeCompare(b, 'fr'));
 
 if (process.argv.includes('--manquants')) {
-  const { TRADUCTIONS } = await import('../public/js/traductions.js');
+  // `pathToFileURL` : sous Windows, `import('C:\…')` prend le « C: » pour un
+  // protocole. Le chemin doit devenir une adresse `file://` avant l'import.
+  const { TRADUCTIONS } = await import(
+    pathToFileURL(join(process.cwd(), RACINE, 'js', 'traductions.js')).href
+  );
   const connus = new Set(Object.keys(TRADUCTIONS.en ?? {}));
   const manquants = liste.filter((texte) => !connus.has(texte));
   for (const texte of manquants) console.log(texte);

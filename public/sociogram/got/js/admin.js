@@ -9,6 +9,7 @@
  */
 
 import { appeler, deriverCle } from './identite.js';
+import { lien } from './base.js';
 import { installerLangue } from './langue.js';
 
 installerLangue();
@@ -119,7 +120,7 @@ let contexte = { souverain: false, compte: null, comptes_en_charge: 0 };
 async function chargerComptes() {
   const { ok, code, donnees } = await appeler('/api/admin/utilisateurs');
   if (!ok) {
-    if (code === 401) return location.replace('/connexion.html?retour=%2Fadmin.html');
+    if (code === 401) return location.replace(lien('/connexion.html?retour=') + encodeURIComponent(lien('/admin.html')));
     if (code === 403) {
       document.querySelector('main').replaceChildren(
         el('h1', 'Réservé aux administrateurs'),
@@ -411,15 +412,15 @@ async function chargerSauvegardes(compte) {
           );
           const actions = el('td', null, 'actions');
           const lienJson = el('a', '⤓ .json');
-          lienJson.href = `/api/admin/sauvegardes/${fiche.id}/export`;
+          lienJson.href = lien(`/api/admin/sauvegardes/${fiche.id}/export`);
           const lienXlsx = el('a', '⤓ .xlsx');
-          lienXlsx.href = `/api/admin/sauvegardes/${fiche.id}/export?format=xlsx`;
+          lienXlsx.href = lien(`/api/admin/sauvegardes/${fiche.id}/export?format=xlsx`);
           // « Éditer » ouvre l'application entière sur cet arbre, par
           // procuration (lot 8.F). « Consulter » reste la lecture à plat, qui
           // ne peut rien écrire — les deux gestes ne se valent pas, et on doit
           // pouvoir choisir le moindre.
           const lienEdition = el('a', '✎ Éditer');
-          lienEdition.href = `/?arbre=${encodeURIComponent(fiche.id)}`;
+          lienEdition.href = lien(`/?arbre=${encodeURIComponent(fiche.id)}`);
           lienEdition.title =
             `Ouvrir « ${fiche.nom} » dans l'application, avec droit d'écriture. ` +
             'Chaque modification est inscrite au journal.';
@@ -1188,7 +1189,7 @@ $('btnAppliquer').addEventListener('click', appliquer);
 $('btnPanorama').addEventListener('click', relever);
 
 $('retour').addEventListener('click', () => {
-  location.href = '/';
+  location.href = lien('/');
 });
 
 /**

@@ -1,322 +1,94 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>FamilyTree — Sociogramme</title>
-  <link rel="stylesheet" href="/css/app.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚔</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sociogrammes — myschlub.com</title>
+  <meta name="robots" content="noindex">
+  <!--
+    La racine du domaine. Elle n'appartient à aucune des deux applications :
+    `/sociogram/got` et `/sociogram/irl` sont deux Workers, deux bases, deux
+    dépôts. Cette page est le seul endroit qui les connaisse toutes les deux.
+
+    Elle est servie par le serveur de fichiers de Cloudflare, sans passer par
+    un Worker — d'où les styles en ligne plutôt qu'une feuille à part : une
+    requête de moins, et rien à tenir en double. `public/_headers` lui pose la
+    même politique de sécurité qu'au reste.
+
+    Elle existe surtout pour que les liens d'avant le déménagement tombent
+    quelque part. Ils pointaient tous vers la racine ; sans cette page, ils
+    tomberaient dans le vide.
+  -->
+  <style>
+    :root {
+      color-scheme: dark;
+      --fond: #14110f;
+      --fond-carte: #1b1714;
+      --bord: #3a322a;
+      --encre: #e8ded0;
+      --encre-douce: #b7a894;
+      --accent: #c9a227;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--fond);
+      color: var(--encre);
+    }
+    main { width: 100%; max-width: 34rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 .3rem; letter-spacing: .02em; }
+    .chapeau { margin: 0 0 1.4rem; color: var(--encre-douce); }
+    .portes { display: grid; gap: .9rem; }
+    a.porte {
+      display: block;
+      border: 1px solid var(--bord);
+      background: var(--fond-carte);
+      border-radius: .6rem;
+      padding: 1.1rem 1.3rem;
+      text-decoration: none;
+      color: inherit;
+    }
+    a.porte:hover, a.porte:focus-visible {
+      border-color: var(--accent);
+      outline: none;
+    }
+    .titre { display: block; font-weight: 600; letter-spacing: .01em; }
+    .titre .ico { color: var(--accent); margin-right: .5rem; }
+    .quoi { display: block; margin-top: .25rem; color: var(--encre-douce); font-size: .93rem; }
+    footer { margin-top: 1.5rem; color: var(--encre-douce); font-size: .85rem; }
+  </style>
 </head>
 <body>
-  <div class="application">
+  <main>
+    <h1>Deux sociogrammes</h1>
+    <p class="chapeau">Des gens, des liens, et de quoi regarder l’ensemble.</p>
 
-    <!-- Procuration : on édite l'arbre de quelqu'un d'autre. Le bandeau ne se
-         referme pas — on ne doit jamais oublier chez qui on écrit. -->
-    <div class="bandeau-procuration" id="bandeau-procuration" hidden></div>
-
-    <!-- La démonstration (lot 14). Sans bouton de fermeture, et c'est voulu :
-         c'est le seul endroit de l'application où ce qu'on fait ne sera pas
-         gardé, et le dire une fois puis se taire serait un piège. Il ne
-         s'affiche que tant que la démonstration est le monde ouvert — dans le
-         sien, il disparaît. -->
-    <div class="bandeau-demo" id="bandeau-demo" hidden>
-      <span class="bandeau-demo-texte" id="bandeau-demo-texte"></span>
-      <button class="bouton bouton-primaire bouton-plat" id="btn-demo-garder" type="button"></button>
-      <button class="bouton bouton-plat" id="btn-demo-tutoriel" type="button"
-              title="Refaire la visite guidée">? Tutoriel</button>
-    </div>
-
-    <!-- Essai sans compte. Discret tant qu'on regarde, insistant dès qu'on a
-         modifié quelque chose : c'est à ce moment-là qu'il y a quelque chose à
-         perdre, et c'est là qu'il faut le dire. Masqué tant que le bandeau de
-         démonstration parle : deux barres empilées, c'est la moitié d'un écran
-         de téléphone pour deux fois le même conseil. -->
-    <div class="bandeau-essai" id="bandeau-essai" hidden>
-      <span class="bandeau-essai-texte" id="bandeau-essai-texte"></span>
-      <a class="bouton bouton-primaire bouton-plat" href="/connexion.html?creer=1">Créer un compte</a>
-      <button class="bouton bouton-icone bandeau-essai-fermer" id="bandeau-essai-fermer"
-              type="button" title="Masquer ce rappel">✕</button>
-    </div>
-
-    <header class="barre-haut">
-      <div class="marque">
-        <span class="marque-icone">⚔</span>
-        <div>
-          <div class="marque-titre">FamilyTree</div>
-          <div class="marque-univers" id="univers">…</div>
-        </div>
-      </div>
-
-      <div class="fil-ariane">
-        <span class="fil-vue" id="fil-vue">Sociogramme</span>
-        <span class="fil-separateur" id="fil-separateur" hidden>›</span>
-        <span class="fil-focus" id="fil-focus"></span>
-      </div>
-
-      <div class="barre-controles">
-        <!-- Pas de bouton « Enregistrer » : en ligne, chaque modification est
-             écrite en base tout de suite. Il ne reste que sortir ses données. -->
-        <span class="groupe-enregistrement" id="groupe-enregistrement">
-          <button id="btn-telecharger" class="bouton" title="Toutes vos sauvegardes dans un .zip, avec un LISEZMOI — réimportable ici comme dans la version locale">
-            ⤓ Tout télécharger
-          </button>
-          <button id="btn-instantane" class="bouton bouton-icone" title="Prendre un instantané — une copie datée de la sauvegarde ouverte">📸</button>
-          <span class="etat-ecriture" id="etat-ecriture"></span>
+    <div class="portes">
+      <a class="porte" href="/sociogram/got/">
+        <span class="titre"><span class="ico" aria-hidden="true">⚔</span>Sociogramme de campagne</span>
+        <span class="quoi">
+          Pour une table de jeu de rôle : maisons, générations, serments,
+          rancunes. Le carnet de campagne, et le plan de tous les joueurs
+          superposé.
         </span>
-        <label class="champ champ-couleur">
-          <span>Couleur &amp; filtre</span>
-          <select id="selecteur-couleur"></select>
-        </label>
-        <a id="lien-document" class="bouton" target="_blank" rel="noopener"
-           title="Ouvrir le document de campagne dans un nouvel onglet">📜 Document</a>
-        <!-- L'année courante : c'est d'elle que tous les âges se déduisent. -->
-        <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
-        <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
-        <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
-        <!-- La langue (lot 16.G) et les raccourcis (lot 16.D) : deux dépliants
-             qu'on ouvre une fois et qu'on referme. Ils vivent près du thème,
-             avec les autres réglages de confort, et non parmi les outils. -->
-        <button id="btn-langue" class="bouton bouton-icone" title="Langue / Language"><span class="ico">🌐</span><span class="lib">Langue</span></button>
-        <button id="btn-raccourcis" class="bouton bouton-icone" title="Raccourcis clavier"><span class="ico">⌨</span><span class="lib">Raccourcis clavier</span></button>
-        <!-- La visite guidée, relançable à tout moment (lot 14.C). Une icône et
-             rien d'autre : elle ne sert qu'une fois par personne, et prendre la
-             place d'un bouton de travail pour ça serait mal la placer. -->
-        <button id="btn-tutoriel" class="bouton bouton-icone" title="Revoir la visite guidée">?</button>
-        <span class="groupe-compte">
-          <!-- Essai sans compte : l'invitation vit là où on cherche son compte,
-               en haut à droite, et pas dans une fenêtre qui coupe le travail. -->
-          <span class="groupe-essai" id="groupe-essai" hidden>
-            <a class="bouton bouton-primaire" href="/connexion.html?creer=1"
-               title="Garder ce travail : votre adresse et un mot de passe, rien d'autre">Créer un compte</a>
-            <a class="bouton" href="/connexion.html">Se connecter</a>
-          </span>
-          <span class="compte" id="compte" title="Compte connecté">…</span>
-          <!-- Les `.lib` ne servent qu'au téléphone, où ces boutons quittent la
-               barre pour le bloc « Votre compte » : là ils ont la largeur de
-               les porter, et au doigt il n'y a pas d'infobulle à survoler. -->
-          <a class="bouton bouton-icone" id="lien-admin" href="/admin.html" title="Administration : les comptes de cette instance et leurs arbres" hidden><span class="ico">⚙</span><span class="lib">Administration</span></a>
-          <a class="bouton bouton-icone" id="lien-donnees" href="/donnees.html" title="Vos données : ce qui est stocké, tout télécharger, tout supprimer"><span class="ico">🛡</span><span class="lib">Vos données</span></a>
-          <button id="btn-deconnexion" class="bouton bouton-icone" title="Se déconnecter"><span class="ico">⏻</span><span class="lib">Se déconnecter</span></button>
+      </a>
+
+      <a class="porte" href="/sociogram/irl/">
+        <span class="titre"><span class="ico" aria-hidden="true">◍</span>Sociogramme de la vraie vie</span>
+        <span class="quoi">
+          Les gens qu’on connaît vraiment : cercles, villes, écoles, boulots.
+          Et, en joignant plusieurs cartes, qui se retrouve entre elles.
         </span>
-        <button id="btn-rail" class="bouton bouton-icone" title="Afficher/masquer le panneau de gauche">☰</button>
-        <!-- Deux têtes pour la liste des personnes, une seule pour le compte :
-             au téléphone ces deux boutons se touchent, et il faut pouvoir les
-             distinguer sans lire l'infobulle — qui n'existe pas au doigt. -->
-        <button id="btn-panneau" class="bouton bouton-icone btn-telephone" title="Afficher/masquer la liste des personnes">👥</button>
-        <!-- Le compte au téléphone. Il remplace « Créer un compte » et « Se
-             connecter », qui réclamaient 240 px des 375 de la barre et n'en
-             laissaient que 9 à la marque. Voir `public/js/telephone.js`. -->
-        <button id="btn-compte" class="bouton bouton-icone btn-telephone" title="Votre compte et les réglages">👤</button>
-      </div>
-    </header>
-
-    <div class="corps">
-
-      <!-- Rail gauche : vues, légendes, filtres -->
-      <aside class="rail" id="rail">
-        <!-- Téléphone : le rail devient un tiroir plein écran, et accueille ce
-             que la barre du haut ne peut plus porter. Voir
-             `public/js/telephone.js`, qui descend les commandes ici et les
-             remonte quand l'écran s'élargit.
-
-             Deux blocs et non un : « votre compte » et « comment s'affiche
-             l'arbre » ne se cherchent pas au même moment. Le 👤 de la barre
-             ouvre le tiroir sur le premier. -->
-        <section class="rail-bloc" id="bloc-compte" hidden>
-          <h2>Votre compte</h2>
-          <p class="rail-aide" id="aide-compte"></p>
-          <div class="rail-actions" id="accueil-compte"></div>
-        </section>
-
-        <section class="rail-bloc" id="bloc-telephone" hidden>
-          <h2>Réglages de l’affichage</h2>
-          <div class="rail-actions" id="accueil-telephone"></div>
-        </section>
-
-        <!-- Lot 14. Bloc à part, et non mêlé aux siennes — pour la même raison
-             que « Partagés avec moi » : cet arbre n'est pas à vous, ne compte
-             pas dans votre plafond, et **ne se conserve pas**. Le ranger avec
-             les vraies sauvegardes mentirait sur ce qu'on peut en attendre. -->
-        <section class="rail-bloc" id="bloc-demonstration" hidden>
-          <h2>Démonstration</h2>
-          <!-- Le texte est réécrit par `dessinerBlocDemonstration` : il ne dit
-               pas la même chose selon qu'on a encore la démonstration ou qu'on
-               l'a retirée. Celui-ci est ce qu'on lit avant la première
-               réponse du serveur. -->
-          <p class="rail-aide"><b>Rien n’y est conservé</b> — il repart à zéro à votre prochaine connexion.</p>
-          <ul class="liste-sauvegardes" id="liste-demonstration"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-demo-copier"
-                    title="Copier la démonstration dans une sauvegarde à vous — celle-là, vous la gardez">⎘ En faire mon monde</button>
-            <button class="bouton bouton-plat" id="btn-demo-reinitialiser"
-                    title="Effacer ce que vous avez fait dans la démonstration et la rendre à son état d’origine">↺ Remettre à zéro</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc">
-          <h2>Sauvegardes</h2>
-          <p class="rail-aide">Clic droit ou appui long : renommer, dupliquer, télécharger, <b>partager en lecture</b>.</p>
-          <ul class="liste-sauvegardes" id="liste-sauvegardes"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouvelle-sauvegarde" title="Créer une sauvegarde">＋ Nouvelle</button>
-            <button class="bouton bouton-plat" id="btn-importer-sauvegarde" title="Charger un .json exporté, ou un .zip de « Tout télécharger »">⤒ Importer</button>
-          </div>
-          <p class="rail-aide" id="aide-plafonds"></p>
-        </section>
-
-        <!-- Lot 11.B. Bloc à part, et non mêlé aux siennes : ces arbres ne
-             sont pas à vous, ne comptent pas dans votre plafond, et ne
-             s'écrivent pas. Les confondre mentirait sur ce qu'on peut en
-             faire. Masqué tant que personne ne vous a rien ouvert. -->
-        <section class="rail-bloc" id="bloc-partages" hidden>
-          <h2>Partagés avec moi</h2>
-          <p class="rail-aide">Ouverts par d’autres comptes, en lecture seule.</p>
-          <ul class="liste-sauvegardes" id="liste-partages"></ul>
-        </section>
-
-        <section class="rail-bloc">
-          <h2>Vues</h2>
-          <ul class="liste-vues" id="liste-vues"></ul>
-        </section>
-
-        <section class="rail-bloc bloc-joueurs" id="bloc-joueurs">
-          <h2>Joueurs</h2>
-          <p class="rail-aide">Un clic passe le plan dans son regard. Clic droit : modifier.</p>
-          <ul class="liste-joueurs" id="liste-joueurs"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouveau-joueur" title="Ajouter un joueur">＋ Nouveau joueur</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc" id="bloc-liens">
-          <h2>Liens</h2>
-          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : modifier.</p>
-          <ul class="legende" id="legende-types"></ul>
-          <!-- Les liens révolus (ancien vassal, serment rompu) restent dessinés,
-               en pointillé serré. Cet interrupteur ne garde que le présent. -->
-          <label class="option option-revolus">
-            <input type="checkbox" id="bascule-revolus">
-            <span>Masquer les liens révolus</span>
-          </label>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouveau-type" title="Créer un type de lien">＋ Nouveau type</button>
-            <button class="bouton bouton-plat" id="btn-type-historique" hidden
-                    title="Créer le type « Événement historique » — batailles, sièges, serments rompus">＋ Événement</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc" id="bloc-maisons">
-          <div class="rail-bloc-entete">
-            <h2 id="titre-filtre">Filtre</h2>
-            <button class="bouton bouton-icone btn-entete" id="btn-nouveau-filtre"
-                    title="Créer un filtre sur mesure (variable, segments, dégradé, tests)">＋</button>
-          </div>
-          <div class="axes-filtre" id="axes-filtre"></div>
-          <p class="rail-aide" id="aide-filtre">Maisons — un clic isole une maison, un clic droit la modifie.</p>
-          <ul class="legende legende-maisons" id="legende-maisons"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouvelle-maison" title="Créer une entrée sur cet axe">＋ Nouvelle maison</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc">
-          <h2>Options</h2>
-          <div class="options" id="options-vue"></div>
-        </section>
-
-        <!-- Le bloc « Édition » est parti dans le dépliant ⌨ de la barre du
-             haut (lot 16.D) : ces gestes se cherchent une fois, et occupaient
-             un écran entier du rail à chaque partie. -->
-
-        <section class="rail-bloc">
-          <h2>Sélection</h2>
-          <div id="stats" class="stats">…</div>
-        </section>
-      </aside>
-
-      <!-- Scène : la vue courante s'y monte -->
-      <main class="scene" id="scene">
-        <div class="scene-vide" id="scene-message" hidden></div>
-        <div class="infobulle" id="infobulle" hidden></div>
-        <div class="astuce-scene" id="astuce-scene" hidden></div>
-
-        <div class="barre-basse">
-          <!-- Créer quelqu'un sans passer par le clic droit : c'est le geste le
-               plus fréquent, et le seul qui n'avait pas de bouton. -->
-          <button class="bouton bouton-plat bouton-creer" id="btn-nouveau-profil"
-                  title="Créer un profil — il apparaît sur le plan sans quitter la vue">
-            <span class="ico">＋</span><span class="lib">Profil</span>
-          </button>
-          <!-- Le carnet s'ouvre **à côté** du plan, sans le fermer : on écrit
-               pendant qu'on regarde. Son propre en-tête sait ensuite le
-               déplacer en pleine page. -->
-          <button class="bouton bouton-plat" id="btn-carnet"
-                  title="Carnet de notes — écrire pendant la partie, à côté du plan">
-            <span class="ico">✎</span><span class="lib">Carnet</span>
-          </button>
-          <!-- Téléphone : la porte directe vers ce qu'on vient filtrer. Les
-               maisons et les types de liens vivent dans le rail, à six blocs de
-               défilement du haut — ce bouton l'ouvre déjà déroulé dessus. -->
-          <button class="bouton bouton-plat btn-telephone" id="btn-filtres"
-                  title="Maisons et liens : filtrer la vue">
-            <span class="ico">⛨</span><span class="lib">Filtres</span>
-          </button>
-          <span class="separateur-vertical"></span>
-          <span class="groupe-cadrage" id="groupe-cadrage">
-            <button class="bouton bouton-plat" id="btn-ajuster" title="Tout afficher">
-              <span class="ico">⤢</span><span class="lib">Ajuster</span>
-            </button>
-            <button class="bouton bouton-plat" id="btn-focus" title="Centrer sur la personne sélectionnée">
-              <span class="ico">◎</span><span class="lib">Focus</span>
-            </button>
-            <span class="separateur-vertical"></span>
-            <button class="bouton bouton-icone" id="zoom-moins" title="Dézoomer">−</button>
-            <input type="range" id="zoom-curseur" min="10" max="160" value="60" title="Zoom">
-            <button class="bouton bouton-icone" id="zoom-plus" title="Zoomer">+</button>
-            <span class="separateur-vertical"></span>
-          </span>
-        </div>
-      </main>
-
-      <!-- Le carnet, quand il est en volet. Il n'y a qu'un carnet dans la
-           page : ce conteneur l'accueille, et la vue « Carnet » le lui prend
-           le temps qu'elle reste ouverte. -->
-      <aside class="volet-carnet" id="volet-carnet" hidden></aside>
-
-      <!-- Panneau droit : liste des personnes / fiche -->
-      <aside class="panneau" id="panneau">
-        <div class="pn-onglets">
-          <button class="onglet actif" data-onglet="liste">Personnes</button>
-          <button class="onglet" data-onglet="fiche" id="onglet-fiche" disabled>Fiche</button>
-          <button class="bouton bouton-icone btn-fermer-volet btn-telephone" id="btn-fermer-panneau" title="Fermer">✕</button>
-        </div>
-
-        <div class="pn-vue" id="panneau-liste">
-          <div class="liste-entete">
-            <div class="champ-recherche">
-              <span class="loupe">⌕</span>
-              <input id="recherche" type="search" placeholder="Rechercher…" autocomplete="off">
-            </div>
-            <label class="champ champ-groupe">
-              <span>Grouper par</span>
-              <select id="selecteur-groupe">
-                <option value="maison">Maison</option>
-                <option value="generation">Génération</option>
-                <option value="statut">Statut</option>
-                <option value="aucun">Rien (A→Z)</option>
-              </select>
-            </label>
-          </div>
-          <div class="liste-personnes" id="liste-personnes"></div>
-        </div>
-
-        <div class="pn-vue" id="panneau-fiche" hidden></div>
-      </aside>
-
+      </a>
     </div>
-  </div>
 
-  <script src="/vendor/d3.v7.min.js"></script>
-  <script type="module" src="/js/main.js"></script>
+    <footer>Chaque application a son compte : s’inscrire d’un côté n’ouvre pas l’autre.</footer>
+  </main>
 </body>
 </html>

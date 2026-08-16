@@ -6,6 +6,7 @@
  */
 
 import { Api, memoriserCompte } from './api.js';
+import { cle, lien } from './base.js';
 import { enregistrerRendu, obtenirRendu } from './registry.js';
 import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
@@ -31,6 +32,9 @@ import { creerRaccourcis } from './raccourcis.js';
 import { creerOffres } from './offres.js';
 import { installerLangue } from './langue.js';
 import { creerChoixLangue } from './choix-langue.js';
+
+/** Cloisonnée par application : les deux sociogrammes partagent l'origine. */
+const CLE_THEME = cle('familytree-theme');
 
 const elements = {
   univers: document.getElementById('univers'),
@@ -416,7 +420,7 @@ async function demarrer() {
   // Avant tout affichage : la traversée traduit ce que le HTML porte déjà, et
   // l'observateur qu'elle installe reprend tout ce qui sera dessiné ensuite.
   installerLangue();
-  appliquerTheme(localStorage.getItem('familytree-theme') || 'clair');
+  appliquerTheme(localStorage.getItem(CLE_THEME) || 'clair');
   message('Chargement…');
   // Le compte d'abord : c'est lui qui dit si la session tient encore, et un
   // 401 renvoie à la connexion avant qu'on ait affiché un arbre vide.
@@ -523,7 +527,7 @@ function proposerLeTutoriel() {
  * ne montre rien : mieux vaut un message qu'un arbre sans étiquette.
  */
 async function preparerProcuration() {
-  const reponse = await fetch(`/api/admin/sauvegardes/${PROCURATION}`);
+  const reponse = await fetch(lien(`/api/admin/sauvegardes/${PROCURATION}`));
   if (!reponse.ok) {
     const corps = await reponse.json().catch(() => null);
     throw new Error(corps?.erreur || `HTTP ${reponse.status}`);
@@ -548,7 +552,7 @@ async function preparerProcuration() {
   );
   const retour = document.createElement('a');
   retour.className = 'bouton bouton-icone';
-  retour.href = '/admin.html';
+  retour.href = lien('/admin.html');
   retour.textContent = '↩ Administration';
   elements.bandeauProcuration.append(retour);
 
@@ -590,7 +594,7 @@ async function preparerPartage() {
   );
   const retour = document.createElement('a');
   retour.className = 'bouton bouton-icone';
-  retour.href = '/';
+  retour.href = lien('/');
   retour.textContent = '↩ Mes arbres';
   elements.bandeauProcuration.append(retour);
 
@@ -774,7 +778,7 @@ async function dessinerPartages() {
 
       li.append(pastille, corps);
       li.addEventListener('click', () => {
-        location.href = `/?partage=${encodeURIComponent(fiche.id)}`;
+        location.href = lien(`/?partage=${encodeURIComponent(fiche.id)}`);
       });
       return li;
     })
@@ -2634,7 +2638,7 @@ function trouverNoeud(id) {
 
 function appliquerTheme(nom) {
   document.body.classList.toggle('sombre', nom === 'sombre');
-  localStorage.setItem('familytree-theme', nom);
+  localStorage.setItem(CLE_THEME, nom);
 }
 
 // ---------------------------------------------------------------- événements
@@ -2979,7 +2983,7 @@ function marquerDemoModifiee() {
 /** « En faire mon monde » : une copie, avec son nom, qui se garde, elle. */
 function garderLaDemonstration(evenement) {
   if (etat.invite) {
-    location.href = '/connexion.html?creer=1';
+    location.href = lien('/connexion.html?creer=1');
     return;
   }
   if (!etat.demo) return;
@@ -3046,7 +3050,7 @@ async function seDeconnecter() {
   } catch (erreur) {
     // Peu importe : la session est de toute façon inutilisable ici.
   }
-  location.href = '/connexion.html';
+  location.href = lien('/connexion.html');
 }
 
 const sauvegardeActive = () => etat.sauvegardes.find((fiche) => fiche.actif) || null;

@@ -25,6 +25,8 @@
  * sauvegardes restent ceux de la personne connectée : un administrateur qui
  * édite l'arbre d'un autre reste lui-même.
  */
+import { cle, lien } from './base.js';
+
 const ARBRE_VISE = new URLSearchParams(location.search).get('arbre') || '';
 
 /* ------------------------------------------------------- le partage (11.B)
@@ -48,9 +50,11 @@ const DOMAINE = ARBRE_VISE
 
 /** Redirige vers la connexion en gardant l'adresse demandée. */
 function versConnexion() {
-  if (location.pathname.startsWith('/connexion')) return;
+  if (location.pathname.startsWith(lien('/connexion'))) return;
+  // `location.pathname` porte déjà le préfixe, donc le retour est complet et la
+  // page de connexion peut le rejouer tel quel.
   const retour = location.pathname + location.search;
-  location.replace(`/connexion.html?retour=${encodeURIComponent(retour)}`);
+  location.replace(lien(`/connexion.html?retour=${encodeURIComponent(retour)}`));
 }
 
 /* --------------------------------------------------- l'essai sans compte
@@ -74,7 +78,7 @@ const PAGES_SANS_ESSAI = ['/connexion', '/donnees', '/admin'];
  * tout neuf — il croirait avoir perdu son travail alors qu'il lui suffit de se
  * reconnecter. Ce n'est pas une sécurité, c'est un aiguillage.
  */
-const MEMOIRE_COMPTE = 'familytree-compte-connu';
+const MEMOIRE_COMPTE = cle('familytree-compte-connu');
 
 export function memoriserCompte(role) {
   if (role && role !== 'invite') localStorage.setItem(MEMOIRE_COMPTE, '1');
@@ -89,7 +93,7 @@ function essaiPossible() {
   // connexion — comme pour les pages de compte.
   if (PARTAGE_VISE) return false;
   if (localStorage.getItem(MEMOIRE_COMPTE)) return false;
-  return !PAGES_SANS_ESSAI.some((page) => location.pathname.startsWith(page));
+  return !PAGES_SANS_ESSAI.some((page) => location.pathname.startsWith(lien(page)));
 }
 
 // Une seule tentative en vol : au chargement, plusieurs appels partent
@@ -99,7 +103,7 @@ let essaiEnCours = null;
 
 function ouvrirEssai() {
   if (!essaiEnCours) {
-    essaiEnCours = fetch('/api/auth/invite', {
+    essaiEnCours = fetch(lien('/api/auth/invite'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     })
@@ -109,8 +113,13 @@ function ouvrirEssai() {
   return essaiEnCours;
 }
 
+/**
+ * **C'est ici que le préfixe est ajouté** pour tout le domaine : les chemins de
+ * `Api` ci-dessous restent écrits `/api/…`, comme si l'application vivait à la
+ * racine. Un seul endroit à tenir, et la fourche IRL n'en change aucun.
+ */
 async function requete(chemin, options = {}, reessai = true) {
-  const reponse = await fetch(chemin, {
+  const reponse = await fetch(lien(chemin), {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -278,7 +287,9 @@ export const Api = {
    * compte d'un coup, ce qui n'a de sens que là où les sauvegardes ne sont
    * pas déjà des fichiers sur un disque.
    */
-  urlExport: (format, parametres) => `${DOMAINE}/export/${format}${versQuery(parametres)}`,
+  // `lien()` et non `requete()` : cette adresse ne part pas en `fetch`, elle
+  // devient le `href` d'un lien de téléchargement. Rien ne la préfixerait.
+  urlExport: (format, parametres) => lien(`${DOMAINE}/export/${format}${versQuery(parametres)}`),
 
   maisons: () => requete(`${DOMAINE}/maisons`),
   creerMaison: (donnees) =>

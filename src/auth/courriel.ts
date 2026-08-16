@@ -18,6 +18,8 @@
  * dans les indésirables.
  */
 
+import { BASE } from '../base';
+
 export interface Resultat {
   envoye: boolean;
   /** Pourquoi ça n'est pas parti — journalisé, jamais renvoyé au navigateur. */
@@ -35,11 +37,24 @@ export function envoiConfigure(env: Env): boolean {
  * de la requête en cours — ce qui marche en développement comme en ligne, sans
  * réglage. On ne prend jamais l'origine d'un en-tête que le client contrôle
  * (`Origin`, `Referer`) : ce serait laisser fabriquer le lien du courriel.
+ *
+ * Le préfixe de l'application est ajouté ici, une fois pour toutes : c'est de
+ * cette racine que sortent le lien de réinitialisation **et** l'adresse de
+ * retour donnée à Google. Un lien sans préfixe atterrirait sur la page de choix
+ * du domaine, où il ne veut plus rien dire.
+ *
+ * `ADRESSE_PUBLIQUE` se pose donc sans préfixe : `https://myschlub.com`, pas
+ * `https://myschlub.com/sociogram/got`. Un préfixe déjà présent est toléré et
+ * n'est pas doublé — c'est le genre de réglage qu'on repose des mois plus tard.
  */
 export function racinePublique(env: Env, requete: Request): string {
-  if (env.ADRESSE_PUBLIQUE) return env.ADRESSE_PUBLIQUE.replace(/\/+$/, '');
-  const url = new URL(requete.url);
-  return `${url.protocol}//${url.host}`;
+  const origine = env.ADRESSE_PUBLIQUE
+    ? env.ADRESSE_PUBLIQUE.replace(/\/+$/, '')
+    : (() => {
+        const url = new URL(requete.url);
+        return `${url.protocol}//${url.host}`;
+      })();
+  return origine.endsWith(BASE) ? origine : `${origine}${BASE}`;
 }
 
 export async function envoyerLienReinitialisation(

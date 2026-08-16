@@ -11,6 +11,7 @@
  */
 
 import { Hono } from 'hono';
+import { BASE } from '../base';
 import { envoiConfigure, envoyerLienReinitialisation, racinePublique } from './courriel';
 import {
   adresseDAutorisation,
@@ -546,7 +547,13 @@ async function emettreLien(
     .bind(await empreinteJeton(jeton), utilisateurId, maintenant, maintenant + DUREE_JETON)
     .run();
 
-  const lien = `${racinePublique(c.env, c.req.raw)}/mot-de-passe-oublie.html?jeton=${jeton}`;
+  // `connexion.html`, et pas une page à part : c'est `public/js/connexion.js`
+  // qui lit `?jeton=` et ouvre le formulaire de nouveau mot de passe. L'adresse
+  // pointait vers `mot-de-passe-oublie.html`, qui n'a jamais existé — le lien
+  // tombait donc dans le repli SPA, servait l'application, et le jeton n'était
+  // lu par personne. Invisible jusqu'ici parce qu'aucun courriel ne part tant
+  // que `RESEND_API_KEY` n'est pas posée.
+  const lien = `${racinePublique(c.env, c.req.raw)}/connexion.html?jeton=${jeton}`;
   const resultat = await envoyerLienReinitialisation(c.env, destinataire, lien);
   if (!resultat.envoye) console.error('courriel non envoyé :', resultat.raison);
 }
@@ -750,7 +757,7 @@ const COOKIE_GOOGLE = 'ft_google';
 function enteteCookieGoogle(url: string, valeur: string, dureeSecondes: number): string {
   const morceaux = [
     `${COOKIE_GOOGLE}=${valeur}`,
-    'Path=/api/auth/google',
+    `Path=${BASE}/api/auth/google`,
     'HttpOnly',
     'SameSite=Lax',
     `Max-Age=${dureeSecondes}`,
@@ -769,7 +776,7 @@ function tirerAlea(): string {
 
 /** Retour à la page de connexion en disant ce qui n'a pas marché. */
 function echecGoogle(c: { redirect: (u: string, s?: 302) => Response }, raison: string): Response {
-  return c.redirect(`/connexion.html?erreur=${encodeURIComponent(raison)}`, 302);
+  return c.redirect(`${BASE}/connexion.html?erreur=${encodeURIComponent(raison)}`, 302);
 }
 
 routesAuth.get('/google/depart', (c) => {
@@ -905,5 +912,5 @@ routesAuth.get('/google/retour', async (c) => {
   // Deux `Set-Cookie` : celui qui efface le témoin de la demande, et celui de
   // la session. `c.header(..., { append: true })` sinon le second écrase.
   c.header('Set-Cookie', enteteCookie(c.req.url, jeton, expireLe - maintenant), { append: true });
-  return c.redirect('/', 302);
+  return c.redirect(`${BASE}/`, 302);
 });

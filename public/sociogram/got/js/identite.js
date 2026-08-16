@@ -15,6 +15,8 @@
  * ont un compte.
  */
 
+import { lien } from './base.js';
+
 export const TOURS_NAVIGATEUR = 600_000;
 const ETIQUETTE_SEL = 'familytree|v1|';
 
@@ -52,9 +54,16 @@ export async function deriverCle(email, motDePasse) {
   return btoa(binaire);
 }
 
-/** Petit enrobage : renvoie toujours { ok, code, donnees }. */
+/**
+ * Petit enrobage : renvoie toujours { ok, code, donnees }.
+ *
+ * **C'est ici que le préfixe est ajouté**, une fois pour les cinq écrans qui
+ * passent par cette fonction (administration, plan collectif, gestes du plan,
+ * connexion, vos données). Les chemins restent donc écrits `/api/…` partout
+ * ailleurs, comme si l'application vivait à la racine.
+ */
 export async function appeler(chemin, options = {}) {
-  const reponse = await fetch(chemin, {
+  const reponse = await fetch(lien(chemin), {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
   });
