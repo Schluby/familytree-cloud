@@ -6,10 +6,26 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 17** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 16/08/2026. En
-ligne sur https://familytree.schlub-perso.workers.dev et sur
-https://myschlub.com (**le même Worker**, pas un second déploiement).
+**Les sept lots du plan sont livrés, puis les lots 8 à 20** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 17/08/2026.
+
+**L'application n'est plus à la racine du domaine** (lot 18, 16/08). Elle est
+montée sous `/sociogram/got`, parce que `myschlub.com` porte désormais deux
+sociogrammes : celui-ci, et la fourche « vraie vie » sous `/sociogram/irl`
+(dépôt `Sociogram_IRL`, autre Worker, autre base). La racine sert une page de
+choix entre les deux. Le préfixe est écrit à **trois endroits qui doivent
+s'accorder** — `src/base.ts`, `assets.run_worker_first` dans `wrangler.jsonc`,
+et l'arborescence de `public/` ; `npm run verif` les contrôle. En ligne sur
+https://familytree.schlub-perso.workers.dev/sociogram/got et sur
+https://myschlub.com/sociogram/got (**le même Worker**, pas un second
+déploiement).
+
+Le lot 20 (17/08) porte sur **ce qu'on voit du plan en jouant** : la carte
+n'affiche plus qu'un nom en grand, sa maison et son lieu ; un profil peut porter
+un contour de couleur ; on pose des rectangles, des cercles et des zones de
+texte derrière les fiches ; et une maison compte ses unités de guerre. Voir
+« Le plan repensé (lot 20) » plus bas — surtout les deux pièges, qui se
+reproduiront à l'identique dans l'IRL.
 
 Le lot 17 ouvre une **seconde page d'administration**, `/collectif.html` : les
 mondes des membres superposés en un seul sociogramme, où l'on pilote par clic
@@ -897,6 +913,45 @@ Monte dans la base **locale** un maître de jeu et trois joueurs partis du même
 Westeros, puis fait diverger leurs mondes : un renommage, un doublon avec faute
 de frappe, une suppression et un lien en plus. Quatre mondes identiques ne
 montrent rien de ce que cette page sert à voir.
+
+## Le plan repensé (lot 20)
+
+**`bordure` n'est pas `couleur`.** Une personne a deux champs de couleur, et
+les confondre est le piège d'entrée. `couleur` **remplace** celle de sa maison :
+c'est une valeur *sur l'axe courant*, donc elle disparaît dès qu'on bascule
+« Couleur & filtre » sur l'humeur ou sur un filtre. `bordure` (lot 20.B) est un
+contour qui ne dépend d'aucun axe — il marque une fiche pour soi et tient quoi
+qu'on affiche. Rendu par un `outline` CSS, jamais une `border` : une bordure
+décalerait la fiche de trois pixels alors que les traits de liaison sont tracés
+d'après les boîtes calculées en JavaScript, qui, elles, ne bougeraient pas.
+
+**Les deux pièges qui se reproduiront dans l'IRL :**
+
+- **`flex-grow` ne fait pas des moitiés.** La carte partage 1/2 + 1/4 + 1/4. La
+  première version donnait `flex: 2` au bandeau et `flex: 2` au corps : le
+  résultat mesurait 52 / 80 au lieu de 66 / 66, parce que la taille minimale
+  automatique d'un élément flex est celle de son contenu. Il faut une hauteur
+  **ferme** sur `.carte` (`height: var(--carte-hauteur)`) et des parts
+  **déclarées** (`flex: 0 0 50%`), plus `min-height: 0` sur le corps.
+- **d3-zoom mange les `mousemove`.** La surface de tracé des formes est un
+  enfant du plan, où d3 écoute. Sans `stopPropagation` sur le `mousedown`, d3
+  ouvre un geste de panoramique et pose ses écouteurs sur la fenêtre **en phase
+  de capture**, où il appelle `stopImmediatePropagation` : les `mousemove` ne
+  parviennent jamais au tracé, et le rectangle reste à zéro pixel. Le symptôme
+  — « on trace et rien n'apparaît » — ne désigne pas sa cause.
+
+**Une forme de fond ne contient personne** (`src/domaine/formes.ts`). Aucune
+fiche n'y est rattachée, rien n'est recalculé quand on la déplace. Conséquence
+assumée : elle ne suit pas les fiches, et un filtre qui redessine le plan la
+laisse où elle est. Elle est **inerte au repos** (`pointer-events: none`) —
+sinon un rectangle tracé autour du Nord empêcherait de faire glisser le plan
+dans tout le Nord ; le bouton « ▭ Formes » ouvre le mode dessin.
+
+**Trois champs nouveaux ne s'écrivent que s'ils portent quelque chose** :
+`bordure` sur une personne, `formes` sur le document, `unites` sur une maison.
+C'est la règle de tout ce dépôt — un monde qui ne s'en sert pas doit ressortir
+octet pour octet comme il est entré — et le harnais la vérifie dans les deux
+sens.
 
 ## Pour repartir
 

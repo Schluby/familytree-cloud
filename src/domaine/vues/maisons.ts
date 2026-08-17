@@ -10,9 +10,10 @@
  *
  *     {
  *       "vue": "maisons", "rendu": "maisons",
- *       "maisons": [ {id, label, couleur, devise, caracteristiques,
+ *       "maisons": [ {id, label, couleur, devise, caracteristiques, unites,
  *                     notes, evenements, liens, membres, chefs, heritiers} ],
  *       "caracteristiques": [ {id, label, aide} ],
+ *       "etats_unite": [ {id, label} ], "entrainements_unite": [ {id, label} ],
  *       "noeuds": [ … ],   // contrat commun : la liste de droite marche encore
  *       "stats":  {…}
  *     }
@@ -25,7 +26,11 @@
 import { calculerGenerations } from '../genealogie';
 import { Dataset, type Objet } from '../models';
 import { arrondir } from '../python';
-import { CARACTERISTIQUES_MAISON } from '../referentiels';
+import {
+  CARACTERISTIQUES_MAISON,
+  ENTRAINEMENTS_UNITE,
+  ETATS_UNITE,
+} from '../referentiels';
 import { Vue, lireBool, noeudMinimal, type Parametres } from './base';
 
 /** Les tags reconnus comme rangs, à l'identique de `public/js/rangs.js`. */
@@ -199,6 +204,9 @@ export class VueMaisons extends Vue {
           categorie,
           categorie_label: categorie ? (dataset.categorie(categorie).label ?? '') : '',
           caracteristiques: (fiche.caracteristiques as Objet) ?? {},
+          // Lot 20.E, tel quel : contrairement aux événements, une unité ne
+          // cite personne — il n'y a rien à aller enrichir ailleurs.
+          unites: (fiche.unites as Objet[]) ?? [],
           notes: fiche.notes ?? '',
           evenements: evenementsEcrits,
           evenements_lies: evenementsLies.get(id) ?? [],
@@ -221,6 +229,11 @@ export class VueMaisons extends Vue {
       {
         maisons,
         caracteristiques: CARACTERISTIQUES_MAISON.map((c) => ({ ...c })),
+        // Les deux listes fermées d'une unité, descendues avec le reste : le
+        // navigateur ne recopie aucun de ces mots, et en ajouter un se fait
+        // d'un seul côté (`referentiels.ts`).
+        etats_unite: ETATS_UNITE.map((e) => ({ ...e })),
+        entrainements_unite: ENTRAINEMENTS_UNITE.map((e) => ({ ...e })),
         annee_courante: dataset.meta.annee_courante ?? '',
         noeuds,
         stats: {

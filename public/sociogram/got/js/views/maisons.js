@@ -222,6 +222,10 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       maison.devise && h('p', { class: 'mz-devise', texte: `« ${maison.devise} »` }),
       blocRangs(maison),
       blocCaracteristiques(maison),
+      // Les unités juste sous les caractéristiques (lot 20.E) : ce sont les
+      // deux blocs chiffrés, et on passe de « ce qu'elle a » à « ce qu'elle
+      // peut envoyer » sans changer de moitié d'écran.
+      blocUnites(maison),
       blocNotes(maison),
       blocLiens(maison)
     );
@@ -281,6 +285,179 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
     return h('section', { class: 'mz-bloc' }, [
       h('h3', { texte: 'Caractéristiques' }),
       h('div', { class: 'mz-caracs' }, lignes),
+    ]);
+  }
+
+  /* ------------------------------------------------------ unités de guerre
+   *
+   * Ce qu'une maison peut envoyer sur le terrain (lot 20.E). Chaque champ
+   * s'enregistre au fil de la frappe, comme le reste de la vue.
+   *
+   * **Une seule règle vaut la peine d'être dite** : chaque modification renvoie
+   * la liste *entière* des unités, jamais une seule. Le champ `unites` d'une
+   * maison est un tableau — il n'a pas d'identifiant par ligne, donc rien ne
+   * permettrait au serveur de savoir laquelle on vient de changer. Le patch
+   * accumulé par `modifier()` porte donc toujours le dernier état complet, et
+   * deux frappes rapprochées dans deux unités différentes ne s'écrasent pas :
+   * la seconde part avec ce que la première a déjà écrit dans le payload local.
+   */
+
+  /** Nom, type, arme, équipement : quatre petites zones de texte identiques. */
+  function champUnite(maison, index, cle, placeholder, { large = false } = {}) {
+    return h('input', {
+      type: 'text',
+      class: large ? 'mz-unite-large' : '',
+      value: courante().unites[index][cle] ?? '',
+      placeholder,
+      oninput: (evenement) => {
+        courante().unites[index][cle] = evenement.target.value;
+        modifier(maison.id, { unites: courante().unites });
+      },
+    });
+  }
+
+  /** État et entraînement : deux listes fermées, descendues par le serveur. */
+  function menuUnite(maison, index, cle, options) {
+    const select = h('select', {
+      onchange: (evenement) => {
+        courante().unites[index][cle] = evenement.target.value;
+        modifier(maison.id, { unites: courante().unites });
+      },
+    });
+    for (const option of options) {
+      const noeud = h('option', { value: option.id, texte: option.label });
+      if (courante().unites[index][cle] === option.id) noeud.selected = true;
+      select.append(noeud);
+    }
+    // L'état colore la ligne : sur une liste de douze unités en pleine
+    // bataille, c'est la seule chose qu'on relit vraiment.
+    if (cle === 'etat') select.classList.add(`mz-etat-${courante().unites[index].etat}`);
+    return select;
+  }
+
+  /** Défense, santé (en %) et attaque (un chiffre). Vide reste vide. */
+  function nombreUnite(maison, index, cle, { max = null, suffixe = '' } = {}) {
+    const champ = h('input', {
+      type: 'number',
+      min: 0,
+      value: courante().unites[index][cle] ?? '',
+      placeholder: '—',
+      oninput: (evenement) => {
+        const brut = evenement.target.value;
+        courante().unites[index][cle] = brut === '' ? null : Number(brut);
+        modifier(maison.id, { unites: courante().unites });
+      },
+    });
+    if (max !== null) champ.max = max;
+    if (!suffixe) return champ;
+    return h('span', { class: 'mz-unite-pourcent' }, [champ, h('span', { texte: suffixe })]);
+  }
+
+  function ligneUnite(maison, unite, index) {
+    const notes = h('textarea', {
+      rows: 3,
+      placeholder: 'Pertes, moral, ordres reçus, ce qu’elle a vécu…',
+      texte: unite.notes || '',
+      oninput: (evenement) => {
+        courante().unites[index].notes = evenement.target.value;
+        modifier(maison.id, { unites: courante().unites });
+      },
+    });
+    // Repliées par défaut : douze unités dépliées feraient trois écrans, et on
+    // ouvre celle qu'on regarde. Le `<details>` natif porte l'état lui-même —
+    // rien à retenir, rien à redessiner.
+    const bloc = h('details', { class: 'mz-unite-notes' }, [
+      h('summary', { texte: unite.notes ? 'Notes ✎' : 'Notes' }),
+      notes,
+    ]);
+
+    return h('div', { class: 'mz-unite' }, [
+      h('div', { class: 'mz-unite-haut' }, [
+        champUnite(maison, index, 'nom', 'Nom de l’unité', { large: true }),
+        champUnite(maison, index, 'type', 'Type (piquiers, cavalerie…)'),
+        h('button', {
+          class: 'bouton bouton-icone mz-retirer-unite',
+          type: 'button',
+          texte: '✕',
+          title: `Retirer « ${unite.nom || 'cette unité'} »`,
+          onclick: () => {
+            courante().unites.splice(index, 1);
+            modifier(maison.id, { unites: courante().unites }, { immediat: true });
+            dessiner();
+          },
+        }),
+      ]),
+      h('div', { class: 'mz-unite-grille' }, [
+        champUniteEtiquete('État', menuUnite(maison, index, 'etat', payload.etats_unite || [])),
+        champUniteEtiquete(
+          'Entraînement',
+          menuUnite(maison, index, 'entrainement', payload.entrainements_unite || [])
+        ),
+        champUniteEtiquete('Défense', nombreUnite(maison, index, 'defense', { max: 100, suffixe: '%' })),
+        champUniteEtiquete('Santé', nombreUnite(maison, index, 'sante', { max: 100, suffixe: '%' })),
+        champUniteEtiquete('Attaque', nombreUnite(maison, index, 'attaque')),
+        champUniteEtiquete('Arme', champUnite(maison, index, 'arme', 'Pique, arc long…')),
+        champUniteEtiquete(
+          'Équipement spécial',
+          champUnite(maison, index, 'equipement', 'Cottes de mailles, béliers…'),
+          { large: true }
+        ),
+      ]),
+      bloc,
+    ]);
+  }
+
+  function champUniteEtiquete(libelle, controle, { large = false } = {}) {
+    return h('label', { class: `mz-unite-champ ${large ? 'pleine' : ''}`.trim() }, [
+      h('span', { texte: libelle }),
+      controle,
+    ]);
+  }
+
+  function blocUnites(maison) {
+    // `unites` peut manquer d'un monde d'avant le lot 20.E : on l'installe une
+    // fois pour toutes, sinon chaque écriture aurait à se demander s'il existe.
+    if (!Array.isArray(maison.unites)) maison.unites = [];
+    const unites = maison.unites;
+
+    return h('section', { class: 'mz-bloc' }, [
+      h('div', { class: 'mz-entete-bloc' }, [
+        h('h3', { texte: 'Unités de guerre' }),
+        h('button', {
+          class: 'bouton bouton-plat',
+          type: 'button',
+          texte: '＋ Unité',
+          title: 'Ajouter une unité à cette maison',
+          onclick: () => {
+            // Un nom par défaut, et pas une ligne vide : le serveur écarte les
+            // unités sans nom ni type (voir `unites()` dans `referentiels.ts`),
+            // donc une ligne vraiment vide disparaîtrait au rechargement.
+            courante().unites.push({
+              nom: 'Nouvelle unité',
+              type: '',
+              etat: 'active',
+              entrainement: 'entrainee',
+              defense: null,
+              sante: null,
+              attaque: null,
+              arme: '',
+              equipement: '',
+              notes: '',
+            });
+            modifier(maison.id, { unites: courante().unites }, { immediat: true });
+            dessiner();
+            // Le nom est déjà là mais il est provisoire : on le sélectionne
+            // pour que la première frappe le remplace. Le dernier de la liste,
+            // et non `:last-of-type` — qui désigne le dernier `div` du parent,
+            // pas la dernière unité.
+            const champs = droite.querySelectorAll('.mz-unite .mz-unite-large');
+            champs[champs.length - 1]?.select();
+          },
+        }),
+      ]),
+      ...(unites.length
+        ? unites.map((unite, index) => ligneUnite(maison, unite, index))
+        : [h('p', { class: 'mz-aide', texte: 'Aucune unité pour cette maison.' })]),
     ]);
   }
 

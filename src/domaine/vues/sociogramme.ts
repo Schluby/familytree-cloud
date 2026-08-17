@@ -9,6 +9,7 @@
  *       "noeuds":  [ {id, label, generation, couleur, …} ],
  *       "aretes":  [ {id, source, cible, type, role, couleur, dirige, …} ],
  *       "legende": {"types": [...], "maisons": [...]},
+ *       "formes":  [ {id, genre, x, y, l, h, trait, epaisseur, fond, texte, …} ],
  *       "stats":   {...}
  *     }
  *
@@ -17,6 +18,7 @@
  * couple, ou trait pointillé de relation sociale.
  */
 
+import * as formesDeFond from '../formes';
 import * as humeur from '../humeur';
 import {
   TYPES_UNION,
@@ -334,6 +336,12 @@ export class VueSociogramme extends Vue {
         aretes,
         legende,
         joueurs: dataset.joueurs,
+        // Les formes de fond (lot 20.D) voyagent avec le plan, et non par un
+        // appel à part : elles sont derrière les fiches, donc les recevoir plus
+        // tard voudrait dire les voir apparaître après coup sur un plan déjà
+        // dessiné. Elles ne dépendent d'aucun filtre — un rectangle tracé
+        // autour du Nord reste là quand on n'affiche que les Lannister.
+        formes: formesDeFond.liste(dataset.formes),
         focus: focusValide || null,
         stats: {
           personnes: noeuds.length,

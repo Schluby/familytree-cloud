@@ -9,6 +9,7 @@
  */
 
 import { enregistrerRendu } from '../registry.js';
+import { creerCoucheFormes } from '../formes.js';
 import { couleurHumeur, ecartHumeur } from '../humeur.js';
 import { surMenuContextuel } from '../dom.js';
 import { ageAffiche, formaterAge } from '../calendrier.js';
@@ -63,27 +64,38 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   const coucheCartes = document.createElement('div');
   coucheCartes.className = 'cartes';
 
-  // Gabarit invisible portant le contenu maximal d'une fiche. C'est lui qui
-  // fixe la hauteur commune : mesurer les vraies fiches ferait dépendre la
-  // mise en page de ce qu'elles affichent, et tout bougerait au moindre filtre.
-  const gabarit = document.createElement('article');
-  gabarit.className = 'carte gabarit';
-  gabarit.style.width = `${GEO.largeurCarte}px`;
-  gabarit.innerHTML = `
-    <div class="carte-photo"><span>AA</span></div>
-    <div class="carte-entete"><span class="carte-nom">Nom<br>Nom</span></div>
-    <div class="carte-corps">
-      <div class="carte-titre">Titre</div>
-      <div class="carte-ligne"><span class="ic">✳</span><span class="lib">Naissance</span><span class="val">—</span></div>
-      <div class="carte-lieu">Lieu</div>
-      <div class="carte-ligne"><span class="ic">†</span><span class="lib">Décès</span><span class="val">—</span></div>
-      <div class="carte-separateur"></div>
-      <div class="carte-notes">Note<br>Note<br>Note</div>
-    </div>`;
-  coucheCartes.append(gabarit);
+  // Il n'y a plus de gabarit invisible ici.
+  //
+  // Il existait parce que les fiches n'affichaient pas toutes la même chose —
+  // une sans date à côté d'une à trois lignes donnait des bandes en dents de
+  // scie — et il portait donc le contenu *maximal*, pour en tirer une hauteur
+  // commune. Depuis le lot 20.C, toute fiche a exactement la même structure :
+  // un nom, une maison, un lieu. La hauteur est déclarée une fois dans la
+  // feuille de style (`--carte-hauteur`), et `mesurer()` la relit sur une
+  // fiche réelle — ce qui reste juste si le thème change la taille du texte.
 
-  monde.append(svg, coucheCartes);
+  // Les formes de fond (lot 20.D) sont montées **en premier** dans le monde :
+  // elles passent donc derrière les traits de liaison et derrière les fiches,
+  // ce qui est tout leur propos. Elles subissent le même `transform` que le
+  // reste, donc elles zooment et se déplacent avec le plan.
+  const formes = creerCoucheFormes({
+    monde,
+    plan,
+    pointMonde,
+    rappels: {
+      surCreation: (donnees) => contexte.surFormeCreee?.(donnees),
+      surModification: (id, patch) => contexte.surFormeModifiee?.(id, patch),
+      surSuppression: (id) => contexte.surFormeSupprimee?.(id),
+      surOutil: (genre) => contexte.surOutilForme?.(genre),
+    },
+  });
+
+  monde.append(formes.couche, svg, coucheCartes);
   plan.append(monde);
+  // La surface de tracé est posée sur le plan, et non dans le monde : elle doit
+  // couvrir l'écran sans subir le zoom, sinon un tracé au loin manquerait les
+  // bords. C'est `pointMonde` qui rend au tracé ses coordonnées de monde.
+  plan.append(formes.capture);
   conteneur.append(plan);
 
   // ---------------------------------------------------------------- état
@@ -370,13 +382,15 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     // Un personnage joué n'est pas un PNJ : sa carte porte un liseré à la
     // couleur de son joueur, pour le repérer d'un coup d'œil sur le plan.
     carte.classList.toggle('joueur', !!noeud.joueur);
-    if (noeud.joueur) {
-      carte.style.setProperty('--couleur-joueur', noeud.joueur.couleur);
-      carte.title = `Joué par ${noeud.joueur.nom}`;
-    } else {
-      carte.style.removeProperty('--couleur-joueur');
-    }
+    if (noeud.joueur) carte.style.setProperty('--couleur-joueur', noeud.joueur.couleur);
+    else carte.style.removeProperty('--couleur-joueur');
     carte.style.setProperty('--couleur-carte', couleur);
+    // Le liseré choisi dans la fiche (lot 20.B). Il ne dépend pas de l'axe de
+    // couleur : c'est justement ce qui le rend utile — on marque « à revoir ce
+    // soir » et la marque tient qu'on regarde les maisons ou les humeurs.
+    carte.classList.toggle('bordee', !!noeud.bordure);
+    if (noeud.bordure) carte.style.setProperty('--couleur-bordure', noeud.bordure);
+    else carte.style.removeProperty('--couleur-bordure');
     carte.style.width = `${GEO.largeurCarte}px`;
 
     // Chef de maison et héritier : ce sont les fiches qu'on cherche des yeux
@@ -388,45 +402,27 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     carte.classList.toggle('rang-chef', rang?.classe === 'chef');
     carte.classList.toggle('rang-heritier', rang?.classe === 'heritier');
 
-    const lignes = [];
-    if (noeud.titres?.length) {
-      lignes.push(
-        `<div class="carte-titre">${echapper(noeud.titres[0])}</div>`
-      );
-    }
-    // L'âge plutôt que l'année de naissance : c'est ce qu'on relit en jeu.
-    // L'année reste en infobulle, et pour un mort l'âge est celui qu'il avait.
-    const age = ageAffiche(noeud, options.anneeCourante);
-    if (age !== null) {
-      lignes.push(ligneInfo('✳', 'Âge', formaterAge(age), noeud.lieu, noeud.naissance));
-    } else if (noeud.naissance || noeud.lieu) {
-      lignes.push(ligneInfo('✳', 'Naissance', noeud.naissance, noeud.lieu));
-    }
-    if (noeud.statut === 'mort') {
-      lignes.push(ligneInfo('†', 'Décès', noeud.deces, ''));
-    }
-
-    // Sous le personnage : ses notes. Les liens, eux, se lisent sur les
-    // flèches — les répéter ici prenait la place de ce qu'on relit vraiment.
-    if (noeud.notes) {
-      lignes.push('<div class="carte-separateur"></div>');
-      lignes.push(`<div class="carte-notes">${echapper(noeud.notes)}</div>`);
-    }
-
-    // `avatar` est une URL servie par l'API, jamais l'image elle-même : le
-    // navigateur la met en cache, et le payload de la vue reste léger.
-    const portrait = noeud.avatar
-      ? `<img src="${echapper(noeud.avatar)}" alt="" draggable="false"
-              onerror="this.remove()">`
-      : `<span>${echapper(noeud.initiales)}</span>`;
+    // ---------------------------------------------------------------- le fond
+    //
+    // Lot 20.C : la carte tient en trois quarts. Le nom prend la moitié du
+    // haut, la maison le troisième quart, le lieu du moment le dernier. C'est
+    // ce qu'on cherche des yeux sur un plan de soixante fiches — « qui »,
+    // « avec qui », « où » — et le reste encombrait plus qu'il ne servait.
+    //
+    // Ce qui a quitté la carte n'est pas perdu : l'âge, la naissance, le décès
+    // et le titre principal passent en infobulle (ci-dessous), et les notes se
+    // lisent dans la fiche, à droite, où on les écrit de toute façon.
+    carte.title = infobulle(noeud);
 
     carte.innerHTML = `
-      <div class="carte-photo ${noeud.avatar ? 'avec-photo' : ''}">${portrait}</div>
       ${rang ? `<span class="carte-rang" title="${echapper(rang.label)}">${rang.icone}</span>` : ''}
       <div class="carte-entete">
         <span class="carte-nom">${echapper(noeud.label)}</span>
       </div>
-      <div class="carte-corps">${lignes.join('')}</div>
+      <div class="carte-corps">
+        ${fait('Maison', noeud.maison_label)}
+        ${fait('Région', noeud.lieu)}
+      </div>
       <button class="carte-poignee" type="button" tabindex="-1"
               title="Glisser vers une autre fiche pour créer un lien">+</button>`;
 
@@ -438,16 +434,42 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     });
   }
 
-  function ligneInfo(icone, libelle, valeur, lieu, infobulle = '') {
-    if (!valeur && !lieu) return '';
-    const titre = infobulle ? ` title="${echapper(`Né en ${infobulle}`)}"` : '';
+  /**
+   * Un des deux quarts du bas : un intitulé discret, une valeur lisible.
+   *
+   * Le bloc est rendu **même vide** — un tiret. Sans lui la carte n'aurait plus
+   * ses quatre quarts, et deux fiches côte à côte ne s'aligneraient plus.
+   */
+  function fait(libelle, valeur) {
     return `
-      <div class="carte-ligne"${titre}>
-        <span class="ic">${icone}</span>
-        <span class="lib">${libelle}</span>
-        <span class="val">${echapper(valeur || '—')}</span>
-      </div>
-      ${lieu ? `<div class="carte-lieu">${echapper(lieu)}</div>` : ''}`;
+      <div class="carte-fait">
+        <span class="carte-fait-lib">${echapper(libelle)}</span>
+        <span class="carte-fait-val">${echapper(valeur || '—')}</span>
+      </div>`;
+  }
+
+  /**
+   * Tout ce que la carte ne montre plus, au survol.
+   *
+   * L'infobulle native (`title`) et non une bulle dessinée : elle ne coûte rien
+   * à l'affichage, et il y a jusqu'à trois cents fiches sur le plan. Elle porte
+   * aussi « Joué par … », qui vivait ici avant le lot 20.C.
+   */
+  function infobulle(noeud) {
+    const morceaux = [];
+    if (noeud.titres?.length) morceaux.push(String(noeud.titres[0]));
+
+    const age = ageAffiche(noeud, options.anneeCourante);
+    if (age !== null) {
+      const libelle = noeud.statut === 'mort' ? 'Âge à sa mort' : 'Âge';
+      morceaux.push(`${libelle} : ${formaterAge(age)}`);
+    }
+    if (noeud.naissance) morceaux.push(`Né en ${noeud.naissance}`);
+    if (noeud.statut === 'mort' && noeud.deces) morceaux.push(`Mort en ${noeud.deces}`);
+    if (noeud.joueur) morceaux.push(`Joué par ${noeud.joueur.nom}`);
+    if (noeud.notes) morceaux.push(noeud.notes);
+
+    return morceaux.join('\n');
   }
 
   function echapper(texte) {
@@ -461,14 +483,18 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   }
 
   /**
-   * Toutes les fiches partagent une taille unique : sans ça, une fiche sans
-   * date à côté d'une fiche à trois lignes donne des bandes en dents de scie
-   * et des trous que la mise en page ne sait pas exploiter.
+   * La taille commune des fiches, telle qu'elle est vraiment rendue.
+   *
+   * Elle vient de la feuille de style (`--carte-hauteur`) : on ne la fixe pas
+   * ici, on la **relit** sur une fiche existante. C'est ce qui garde les traits
+   * de liaison d'accord avec le dessin — ils sont tracés d'après ces mesures,
+   * et une hauteur recopiée en JavaScript se serait un jour désaccordée de la
+   * feuille sans que rien ne le dise.
    */
   function mesurer() {
-    const hauteur = Math.max(120, gabarit.offsetHeight);
-    cartes.forEach((carte, id) => {
-      carte.style.minHeight = `${hauteur}px`;
+    const premiere = cartes.values().next().value;
+    const hauteur = premiere?.offsetHeight || 132;
+    cartes.forEach((_carte, id) => {
       mesures.set(id, { l: GEO.largeurCarte, h: hauteur });
     });
   }
@@ -1557,6 +1583,10 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       options = { ...options, ...nouvellesOptions };
       indexNoeuds = new Map((payload.noeuds || []).map((noeud) => [noeud.id, noeud]));
       aretesVisibles = payload.aretes || [];
+      // Les formes ne dépendent d'aucun filtre : elles viennent avec le payload
+      // et se redessinent telles quelles, y compris quand le plan se resserre
+      // sur une maison. Un rectangle tracé autour du Nord doit rester là.
+      formes.definir(payload.formes);
       construireCartes();
       appliquer({ animer: !premierRendu, cadrer: premierRendu });
       premierRendu = false;
@@ -1653,6 +1683,16 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       if (!boite) return null;
       const [x, y] = transformCourante.apply([boite.x + boite.l / 2, boite.y]);
       return { x, y };
+    },
+
+    /* Les formes de fond (lot 20.D). Le moteur ne fait que passer les
+       commandes : c'est `js/formes.js` qui les dessine, et `main.js` qui décide
+       ce qu'on en enregistre. */
+    formes: {
+      basculerMode: (actif) => formes.basculerMode(actif),
+      modeActif: () => formes.modeActif(),
+      armer: (genre) => formes.armer(genre),
+      outilArme: () => formes.outilArme(),
     },
 
     detruire() {

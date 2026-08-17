@@ -7,6 +7,7 @@ import { anneeDe, ageDe, naissanceDepuisAge } from './calendrier.js';
 import { h } from './dom.js';
 import { curseurHumeur } from './humeur.js';
 import { RANGS, basculerRang, porteLeRang, rangDuTag } from './rangs.js';
+import { grillePalette } from './palette.js';
 import { cle } from './base.js';
 
 /**
@@ -489,6 +490,25 @@ export function creerPanneau(element, rappels = {}) {
   }
 
   /**
+   * Le liseré de la fiche (lot 20.B).
+   *
+   * Il n'y a pas de redessin ici : les cases se marquent elles-mêmes, et
+   * `bordure` fait partie des `CHAMPS_VISIBLES`, donc le plan se met à jour
+   * quand le patch part. Redessiner la fiche entière à chaque clic aurait
+   * refermé les blocs repliés et perdu le curseur de qui tapait ailleurs.
+   */
+  function champBordure() {
+    return h('div', { class: 'champ-edit pleine' }, [
+      h('label', {
+        texte: 'Couleur du contour',
+        title:
+          'Entoure la fiche sur le plan, quel que soit l’axe de couleur choisi en haut. Elle ne remplace pas celle de la maison.',
+      }),
+      grillePalette(brouillon.bordure, (valeur) => marquerModifie('bordure', valeur)),
+    ]);
+  }
+
+  /**
    * Une seule chose mérite un paragraphe : le champ « Âge » est désactivé et
    * il faut dire pourquoi. Quand il marche, il se passe d'explication — son
    * infobulle dit sur quelle année il compte.
@@ -538,6 +558,7 @@ export function creerPanneau(element, rappels = {}) {
         champListe('titres', 'Titres'),
         champRang(),
         champListe('tags', 'Tags'),
+        champBordure(),
       ]),
       // Ne reste que ce qui ne se devine pas : sans année de campagne, le champ
       // « Âge » ne peut rien calculer, et il faut le dire. Le reste — comment
@@ -662,13 +683,19 @@ export function creerPanneau(element, rappels = {}) {
    *
    * `naissance` et `deces` y sont depuis que les fiches affichent un **âge** :
    * sans eux, on tapait « 13 ans » et la carte continuait d'en afficher 11.
-   * (`notes`, `titres` et `lieu` restent dehors : ils se voient aussi sur la
-   * carte, mais on les saisit par paragraphes, et recharger la vue à chaque
-   * pause de frappe coûterait un aller-retour pour rien.)
+   *
+   * `notes` reste dehors : depuis le lot 20.C la carte ne les montre plus, et
+   * de toute façon on les saisit par paragraphes — recharger la vue à chaque
+   * pause de frappe coûterait un aller-retour pour rien. `titres` aussi, pour
+   * la même raison : il ne se lit plus que dans la fiche.
    */
   const CHAMPS_VISIBLES = new Set([
-    'prenom', 'nom', 'surnom', 'maison', 'statut', 'couleur',
+    'prenom', 'nom', 'surnom', 'maison', 'statut', 'couleur', 'bordure',
     'tags', 'relations_joueurs', 'avatar', 'naissance', 'deces',
+    // `lieu` depuis le lot 20.C : la carte du plan l'affiche maintenant en
+    // clair, sur son quart bas. Sans lui, on tapait « Winterfell » et la fiche
+    // continuait d'annoncer l'ancien lieu jusqu'au prochain rechargement.
+    'lieu',
   ]);
 
   const enAttente = () => Object.keys(aEnvoyer).length > 0;

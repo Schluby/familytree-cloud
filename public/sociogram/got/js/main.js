@@ -28,6 +28,7 @@ import {
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
 import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
 import { creerCarnet } from './carnet.js';
+import { OUTILS as OUTILS_FORMES } from './formes.js';
 import { creerRaccourcis } from './raccourcis.js';
 import { creerOffres } from './offres.js';
 import { installerLangue } from './langue.js';
@@ -115,6 +116,8 @@ const elements = {
   btnDemoReinitialiser: document.getElementById('btn-demo-reinitialiser'),
   btnCarnet: document.getElementById('btn-carnet'),
   voletCarnet: document.getElementById('volet-carnet'),
+  btnFormes: document.getElementById('btn-formes'),
+  outilsFormes: document.getElementById('outils-formes'),
 };
 
 /**
@@ -1150,6 +1153,10 @@ async function rechargerVue({ conserverFocus = false } = {}) {
       },
       surLiaisonRapide: (id, evenement) => liaisonRapide(id, evenement),
       surDeport: (id, decalage) => enregistrerDeport(id, decalage),
+      surFormeCreee: (donnees) => creerForme(donnees),
+      surFormeModifiee: (id, patch) => enregistrerForme(id, patch),
+      surFormeSupprimee: (id) => supprimerForme(id),
+      surOutilForme: () => majBarreFormes(),
       // La vue « Maisons » édite le catalogue en place : elle prévient quand
       // un nom change (le rail l'affiche) et quand sa propre structure bouge.
       surReferentielChange: () => chargerUnivers(),
@@ -1203,6 +1210,15 @@ const MOTEUR_MUET = {
   marquerEnAttente() {},
   epingler() {},
   recolorer() {},
+  // Les formes de fond n'existent que sur le plan (lot 20.D). Un moteur qui ne
+  // sait pas les dessiner répond « non » plutôt que rien : c'est ce qui permet
+  // à la barre du bas de cacher le bouton au lieu de le laisser inerte.
+  formes: {
+    basculerMode: () => false,
+    modeActif: () => false,
+    armer() {},
+    outilArme: () => null,
+  },
 };
 
 function adapterMoteur(moteur) {
@@ -1217,6 +1233,15 @@ function majCapacites(vue) {
   // La capacité « edition » ne cache plus de bloc du rail depuis que les gestes
   // sont dans le dépliant ⌨ : celui-ci se lit depuis n'importe quelle vue.
   elements.groupeCadrage.hidden = !capacites.has('zoom');
+  // Les formes de fond n'existent que sur un plan : la vue « Maisons » et le
+  // carnet n'ont pas d'arrière-plan où les poser. Le bouton disparaît plutôt
+  // que de rester là sans rien faire.
+  const dessinable = (vue?.rendu || '') === 'cartes';
+  elements.btnFormes.hidden = !dessinable;
+  if (!dessinable) {
+    elements.outilsFormes.hidden = true;
+    elements.btnFormes.classList.remove('actif');
+  }
 }
 
 async function chargerMoteur(payload) {
@@ -1431,6 +1456,76 @@ async function enregistrerDeport(id, decalage) {
     if (noeud) noeud.decalage = decalage;
   } catch (erreur) {
     message(`Position non enregistrée : ${erreur.message}`);
+  }
+}
+
+/* --------------------------------------------------------------- les formes
+ *
+ * Lot 20.D. Le moteur dessine et prévient ; c'est ici qu'on écrit.
+ *
+ * Une modification n'entraîne **aucun rechargement de la vue** : le moteur a
+ * déjà bougé la forme à l'écran, et redemander tout le plan pour ça ferait
+ * sauter les fiches à chaque déplacement. On recharge seulement quand la liste
+ * des formes change — une création, une suppression.
+ */
+
+async function creerForme(donnees) {
+  try {
+    await Api.creerForme(donnees);
+    await rechargerVue({ conserverFocus: true });
+    astuce('Forme ajoutée — cliquez-la pour la modifier.');
+  } catch (erreur) {
+    message(`Forme non créée : ${erreur.message}`);
+  }
+}
+
+async function enregistrerForme(id, patch) {
+  try {
+    await Api.majForme(id, patch);
+  } catch (erreur) {
+    message(`Forme non enregistrée : ${erreur.message}`);
+  }
+}
+
+async function supprimerForme(id) {
+  try {
+    await Api.supprimerForme(id);
+    await rechargerVue({ conserverFocus: true });
+  } catch (erreur) {
+    message(`Forme non supprimée : ${erreur.message}`);
+  }
+}
+
+/** Les trois outils, montés une fois, et l'état de la barre à chaque bascule. */
+function construireBarreFormes() {
+  elements.outilsFormes.replaceChildren(
+    ...OUTILS_FORMES.map((outil) => {
+      const bouton = document.createElement('button');
+      bouton.type = 'button';
+      bouton.className = 'bouton bouton-icone outil-forme';
+      bouton.dataset.genre = outil.genre;
+      bouton.textContent = outil.icone;
+      bouton.title = `${outil.label} — cliquez sur le plan, ou étirez pour choisir la taille`;
+      bouton.addEventListener('click', () => {
+        const moteur = etat.moteur?.formes;
+        // Recliquer l'outil actif le désarme : sinon, sortir du mode « je vais
+        // tracer » demanderait de tracer quelque chose dont on ne veut pas.
+        moteur?.armer(moteur.outilArme() === outil.genre ? null : outil.genre);
+        majBarreFormes();
+      });
+      return bouton;
+    })
+  );
+}
+
+function majBarreFormes() {
+  const moteur = etat.moteur?.formes;
+  const actif = !!moteur?.modeActif();
+  elements.btnFormes.classList.toggle('actif', actif);
+  elements.outilsFormes.hidden = !actif;
+  const arme = moteur?.outilArme() || null;
+  for (const bouton of elements.outilsFormes.children) {
+    bouton.classList.toggle('actif', bouton.dataset.genre === arme);
   }
 }
 
@@ -2708,6 +2803,15 @@ elements.btnAnnee.addEventListener('click', (evenement) => {
 });
 elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
 elements.btnCarnet.addEventListener('click', () => basculerLeCarnet());
+
+construireBarreFormes();
+elements.btnFormes.addEventListener('click', () => {
+  const moteur = etat.moteur?.formes;
+  if (!moteur) return;
+  const actif = moteur.basculerMode(!moteur.modeActif());
+  majBarreFormes();
+  if (actif) astuce('Choisissez une forme, puis cliquez sur le plan (ou étirez).');
+});
 // Sur écran large, ☰ replie le rail. Sur téléphone, les deux volets sont des
 // tiroirs qui couvrent la scène : ouvrir l'un ferme l'autre, sinon on empile
 // deux panneaux plein écran sans savoir lequel on regarde.

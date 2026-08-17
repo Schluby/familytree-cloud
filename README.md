@@ -48,9 +48,11 @@ deux versions restent compréhensibles ensemble.
 - Des comptes **administrateurs** peuvent consulter tous les arbres, en lecture
   seule et de façon journalisée. C'est écrit sur l'écran d'inscription : les
   utilisateurs doivent le savoir avant de créer un compte.
-- **Pas de portraits.** C'est ce qui pesait le plus lourd pour le moins de
-  valeur en ligne ; les cartes affichent les initiales. Un `avatar` qui est une
-  adresse `http(s)` reste accepté, il ne coûte rien.
+- **Pas de portraits hébergés.** C'est ce qui pesait le plus lourd pour le moins
+  de valeur en ligne. Un `avatar` qui est une adresse `http(s)` reste accepté,
+  il ne coûte rien : il s'affiche dans la fiche et dans la liste des personnes.
+  Depuis le lot 20.C, la carte du plan, elle, n'en affiche plus — elle porte le
+  nom en grand, la maison et le lieu du moment.
 - Il n'y a plus de disque : le Worker ne garde rien entre deux requêtes, donc
   l'écriture différée en mémoire du serveur local disparaît (voir
   [`ARCHITECTURE.md`](ARCHITECTURE.md), section « Enregistrement »).

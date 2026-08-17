@@ -80,9 +80,35 @@ export const PERSONNE_CHAMPS = [
   'relations_joueurs',
   'decalage',
   'generation',
+  // Lot 20.B. Voir `Personne.bordure` : c'est le liseré autour de la fiche,
+  // et il ne remplace pas `couleur`.
+  'bordure',
 ] as const;
 
 export const STATUTS = ['vivant', 'mort', 'inconnu'] as const;
+
+/** `#rgb` ou `#rrggbb`, seule forme acceptée pour une couleur de fiche. */
+const COULEUR_HEXA = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Une couleur choisie dans la fiche.
+ *
+ * Trois réponses, et les trois comptent : la couleur normalisée, `null` pour
+ * « pas de couleur » (le vide efface), et **`undefined` pour « ce n'est pas une
+ * couleur »**. `appliquerPatch` saute alors le champ sans lever, comme il le
+ * fait déjà pour `statut` et `importance` : une valeur illisible ne doit pas
+ * faire tomber un patch qui porte peut-être aussi le nom de la personne.
+ */
+function normaliserBordure(brut: unknown): string | null | undefined {
+  if (brut === null || brut === undefined) return null;
+  const texte = String(brut).trim();
+  if (!texte) return null;
+  if (!COULEUR_HEXA.test(texte)) return undefined;
+  // `#abc` → `#aabbcc` : une seule forme en base, comme pour les maisons.
+  const complet =
+    texte.length === 4 ? '#' + [...texte.slice(1)].map((c) => c + c).join('') : texte;
+  return complet.toLowerCase();
+}
 
 /** Champs librement éditables depuis l'API (`PATCH /api/personnes/<id>`). */
 export const PERSONNE_CHAMPS_EDITABLES = PERSONNE_CHAMPS.filter((champ) => champ !== 'id');
@@ -181,6 +207,17 @@ export class Personne {
   importance = 3;
   avatar: string | null = null;
   couleur: string | null = null;
+  /**
+   * Le liseré qui **entoure** la fiche sur le plan (lot 20.B).
+   *
+   * À ne pas confondre avec `couleur` juste au-dessus, qui remplace celle de la
+   * maison : `couleur` peint le bandeau, et elle disparaît dès qu'on bascule
+   * l'axe (« Couleur & filtre » en haut) sur l'humeur ou sur un filtre — c'est
+   * une valeur *sur* l'axe courant. Le liseré, lui, ne dépend d'aucun axe : il
+   * marque une fiche pour soi (« ceux que je dois revoir ce soir »), et il
+   * reste visible quoi qu'on affiche par ailleurs.
+   */
+  bordure: string | null = null;
   notes = '';
   tags: unknown[] = [];
   relations_joueurs: Record<string, NoteJoueur> = {};
@@ -218,6 +255,10 @@ export class Personne {
     const avatar: unknown = personne.avatar;
     personne.avatar = typeof avatar === 'string' && avatar ? avatar : null;
 
+    // Un liseré illisible vaut « pas de liseré » : à la lecture on ne refuse
+    // rien, on nettoie.
+    personne.bordure = normaliserBordure(personne.bordure) ?? null;
+
     const statut = texteOuVide(personne.statut, 'inconnu').toLowerCase();
     personne.statut = (STATUTS as readonly string[]).includes(statut) ? statut : 'inconnu';
 
@@ -248,6 +289,11 @@ export class Personne {
       relations_joueurs: this.relations_joueurs,
       decalage: this.decalage,
       generation: this.generation,
+      // Écrit seulement s'il porte quelque chose, comme `revolu` et `emoji` sur
+      // une relation : un monde qui ne se sert pas des liserés doit ressortir
+      // exactement comme il est entré, sans gagner soixante-sept `"bordure":
+      // null` au premier aller-retour.
+      ...(this.bordure ? { bordure: this.bordure } : {}),
       ...this.extra,
     };
   }
@@ -295,6 +341,10 @@ export class Personne {
         const statut = String(brut).toLowerCase();
         if (!(STATUTS as readonly string[]).includes(statut)) continue;
         valeur = statut;
+      } else if (champ === 'bordure') {
+        const bordure = normaliserBordure(brut);
+        if (bordure === undefined) continue; // pas une couleur : on ne touche à rien
+        valeur = bordure;
       }
 
       const courant = (this as unknown as Objet)[champ];
@@ -498,6 +548,12 @@ export class Dataset {
    * doit ressortir exactement comme elle est entrée.
    */
   carnet: Objet | null = null;
+  /**
+   * Les rectangles, ellipses et zones de texte posés derrière les fiches
+   * (lot 20.D). Voir `formes.ts` : ce sont des traits de crayon, ils ne
+   * contiennent personne et ne changent rien à ce que dit le monde.
+   */
+  formes: Objet[] = [];
 
   /** Construit une fois par requête, et réutilisé : c'est du CPU en moins. */
   private _index: Map<string, Personne> | null = null;
@@ -601,6 +657,11 @@ export class Dataset {
       .filter(estObjet)
       .map((r) => Relation.depuisDict(r));
     jeu.carnet = estObjet(donnees.carnet) ? { ...donnees.carnet } : null;
+    // Tel quel, comme le carnet : c'est `formes.ts` qui sait ce qu'est une
+    // forme valable, et `models.ts` n'a pas à le savoir. Ce module ne dépend
+    // d'aucun de ses satellites — c'est ce qui garde le graphe d'imports à
+    // sens unique.
+    jeu.formes = Array.isArray(donnees.formes) ? [...(donnees.formes as Objet[])] : [];
     return jeu;
   }
 
@@ -615,9 +676,10 @@ export class Dataset {
       joueurs: this.joueurs,
       personnes: this.personnes.map((p) => p.versDict()),
       relations: this.relations.map((r) => r.versDict()),
-      // En dernier, et seulement s'il porte quelque chose : un monde sans
-      // carnet ressort octet pour octet comme il est entré.
+      // En dernier, et seulement s'ils portent quelque chose : un monde sans
+      // carnet ni formes ressort octet pour octet comme il est entré.
       ...(this.carnet ? { carnet: this.carnet } : {}),
+      ...(this.formes.length ? { formes: this.formes } : {}),
     };
   }
 

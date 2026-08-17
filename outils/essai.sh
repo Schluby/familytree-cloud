@@ -1565,9 +1565,10 @@ code - GET /js/views/carnet.js > /dev/null
 verifier "  et plus de fichier de vue a desaccorder" oui "$(contient '<!DOCTYPE html')"
 
 # Une carte jouee porte l'etat `.joueur`, comme elle porte `.morte`. Une regle
-# `.joueur` nue rattrapait donc les cartes du plan et ecrasait les 34 px
-# reserves au portrait : le rond des initiales retombait sur le nom. Les lignes
-# de joueur de la fiche s'appellent `.joueur-ligne` pour que ca n'arrive plus.
+# `.joueur` nue rattrape donc aussi les cartes du plan, et son `padding`
+# l'emporte : c'est ainsi que le rond des initiales retombait sur le nom, avant
+# que le lot 20.C ne retire ce rond. La collision reste possible — d'ou les
+# lignes de joueur nommees `.joueur-ligne`.
 # ---------------------------------------------------------------------------
 # Lot 16 : offrir une note a un autre compte
 #
@@ -1683,7 +1684,7 @@ echo "-- 16.I ce que le plan accepte de peindre"
 code - GET /css/app.css > /dev/null
 verifier "l'ombre des cartes tient en une couche" non "$(contient '--carte-ombre: 0 1px 2px')"
 verifier "  la poignee n'en porte plus" oui "$(contient 'soixante-sept halos flous')"
-verifier "un mort sans portrait est terni sans filtre" oui "$(contient '.carte.morte .carte-photo:not(.avec-photo)')"
+verifier "un mort est terni sans filtre" oui "$(contient '.carte.morte .carte-entete { opacity')"
 verifier "de loin, le corps de fiche ne se dessine plus" oui "$(contient '.plan.loin .carte-corps > * { display: none; }')"
 verifier "  mais sa boite reste, sinon les liens finiraient dans le vide" oui "$(contient '.plan.loin .carte-corps { background')"
 verifier "le monde annonce qu'il bouge" oui "$(contient 'will-change: transform')"
@@ -1970,6 +1971,101 @@ code - GET /js/collectif.js > /dev/null
 verifier "  en gardant le halo des fiches neuves" oui "$(contient 'voisins.add')"
 verifier "le rail se construit sur la liste des arbres" oui "$(contient 'membres.map')"
 verifier "  et les gestes visent les arbres affiches" oui "$(contient 'arbres: selection().arbres')"
+
+# ---------------------------------------------------------------------------
+# Lot 20 : le plan et les maisons
+#
+# Quatre choses a proteger, et elles cassent de quatre facons differentes :
+#
+#  1. Le lisere d'un profil (20.B) est un champ de plus sur une personne. Le
+#     piege classique d'un champ nouveau : qu'il s'ecrive **toujours**, et que
+#     soixante-sept `"bordure": null` apparaissent dans un monde qui ne s'en
+#     sert pas. On verifie donc les deux sens.
+#  2. La carte du plan (20.C) : la moitie et les deux quarts sont des parts
+#     declarees dans la feuille de style. Une regression s'y voit a l'oeil nu et
+#     nulle part ailleurs — d'ou les verifications sur le CSS.
+#  3. Les formes (20.D) sont bornees au serveur : ce qui n'est pas une couleur,
+#     une taille ou un genre connu ne doit pas entrer.
+#  4. Les unites (20.E) ont deux listes fermees. Une valeur inventee retombe sur
+#     la premiere entree plutot que de faire echouer tout l'enregistrement.
+# ---------------------------------------------------------------------------
+
+echo "-- 20.A le bouton vers les regles"
+code - GET / > /dev/null
+verifier "la barre du haut mene aux regles" oui "$(contient 'id="lien-regles"')"
+verifier "  dans un nouvel onglet, sans referent" oui "$(contient 'rel="noopener"')"
+verifier "  et sans l'identifiant Google du proprietaire" non "$(contient 'ouid=')"
+code - GET /js/telephone.js > /dev/null
+verifier "  il descend aussi dans le tiroir du telephone" oui "$(contient "'#lien-regles'")"
+
+echo "-- 20.B le lisere d'un profil"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Bordee","nom":"Essai"}' > /dev/null
+ID_BORDEE="$(lire personne.id)"
+verifier "un profil neuf n'ecrit pas de lisere" "" "$(lire personne.bordure)"
+verifier "une couleur du nuancier est acceptee" 200 "$(code "$BOCAL_A" PATCH "/api/personnes/$ID_BORDEE" '{"bordure":"#d64545"}')"
+verifier "  et elle est rangee en minuscules" "#d64545" "$(lire personne.bordure)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_BORDEE" '{"bordure":"#ABC"}' > /dev/null
+verifier "la forme courte est developpee" "#aabbcc" "$(lire personne.bordure)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_BORDEE" '{"bordure":"bleu ciel","surnom":"garde"}' > /dev/null
+verifier "ce qui n'est pas une couleur est saute" "#aabbcc" "$(lire personne.bordure)"
+verifier "  sans faire tomber le reste du patch" garde "$(lire personne.surnom)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_BORDEE" '{"bordure":""}' > /dev/null
+verifier "le vide efface le lisere" "" "$(lire personne.bordure)"
+code "$BOCAL_A" GET /api/vue/sociogramme > /dev/null
+verifier "  et la vue descend le champ aux fiches" oui "$(contient '"bordure"')"
+
+echo "-- 20.C la carte du plan"
+code - GET /css/app.css > /dev/null
+verifier "la fiche a une hauteur ferme" oui "$(contient 'height: var(--carte-hauteur)')"
+verifier "  le nom prend la moitie" oui "$(contient 'flex: 0 0 50%')"
+verifier "  et le corps ne peut pas la lui reprendre" oui "$(contient 'flex: 0 0 50%; min-height: 0')"
+verifier "le rond des initiales a disparu du plan" non "$(contient '.carte-photo {')"
+code - GET /js/views/cartes.js > /dev/null
+verifier "la carte montre la maison et le lieu" oui "$(contient "fait('Maison'")"
+verifier "  et ce qu'elle ne montre plus est en infobulle" oui "$(contient 'carte.title = infobulle(noeud)')"
+verifier "  il n'y a plus de gabarit a mesurer" non "$(contient 'carte gabarit')"
+
+echo "-- 20.D les formes de fond"
+code "$BOCAL_A" GET /api/formes > /dev/null
+verifier "un monde sans forme en rend zero" 0 "$(lire formes.length)"
+verifier "creer un rectangle" 201 "$(code "$BOCAL_A" POST /api/formes '{"genre":"rectangle","x":10,"y":20,"l":300,"h":200,"trait":"#d64545","epaisseur":3,"texte":"Le Nord"}')"
+ID_FORME="$(lire forme.id)"
+verifier "  il garde ce qu'on lui a donne" "Le Nord" "$(lire forme.texte)"
+code "$BOCAL_A" POST /api/formes '{"genre":"tetraedre","l":999999,"epaisseur":80,"trait":"rouge vif","taille":900}' > /dev/null
+verifier "un genre inconnu retombe sur le rectangle" rectangle "$(lire forme.genre)"
+verifier "  une taille demesuree est bornee" 20000 "$(lire forme.l)"
+verifier "  une epaisseur aussi" 12 "$(lire forme.epaisseur)"
+verifier "  une couleur illisible garde la valeur par defaut" "#8a8f98" "$(lire forme.trait)"
+verifier "  et le corps du texte reste dans ses bornes" 96 "$(lire forme.taille)"
+verifier "deplacer n'envoie que la position" 200 "$(code "$BOCAL_A" PATCH "/api/formes/$ID_FORME" '{"x":500,"y":400}')"
+verifier "  et ne perd pas le reste" "Le Nord" "$(lire forme.texte)"
+verifier "une forme inconnue est un 404" 404 "$(code "$BOCAL_A" PATCH /api/formes/inexistante '{"x":1}')"
+verifier "B ne voit pas les formes de A" 0 "$(code "$BOCAL_B" GET /api/formes > /dev/null; lire formes.length)"
+verifier "supprimer" 200 "$(code "$BOCAL_A" DELETE "/api/formes/$ID_FORME")"
+code "$BOCAL_A" GET /api/formes > /dev/null
+verifier "  il en reste une" 1 "$(lire formes.length)"
+code - GET /css/app.css > /dev/null
+verifier "au repos une forme n'attrape pas les clics" oui "$(contient '.formes { position: absolute; left: 0; top: 0; pointer-events: none; }')"
+verifier "  le mode dessin les rend saisissables" oui "$(contient '.formes.actives .forme { pointer-events: auto')"
+code - GET /js/formes.js > /dev/null
+verifier "le trace coupe le panoramique de d3" oui "$(contient 'evenement.stopPropagation();')"
+
+echo "-- 20.E les unites de guerre"
+code "$BOCAL_A" POST /api/maisons '{"id":"unites-essai","label":"Maison d essai"}' > /dev/null
+verifier "une maison neuve n'ecrit pas d'unites" "" "$(lire maison.unites)"
+code "$BOCAL_A" PATCH /api/maisons/unites-essai '{"unites":[{"nom":"Piquiers","type":"Infanterie","etat":"en_deroute","entrainement":"veterans","defense":150,"sante":40,"attaque":12,"arme":"Pique","equipement":"Mailles","notes":"Deux jours de siege."}]}' > /dev/null
+verifier "l'etat choisi est garde" en_deroute "$(lire maison.unites.0.etat)"
+verifier "  l'entrainement aussi" veterans "$(lire maison.unites.0.entrainement)"
+verifier "  un pourcentage au-dela de 100 est ramene" 100 "$(lire maison.unites.0.defense)"
+verifier "  l'attaque reste un chiffre libre" 12 "$(lire maison.unites.0.attaque)"
+code "$BOCAL_A" PATCH /api/maisons/unites-essai '{"unites":[{"nom":"Eclaireurs","etat":"en fuite","entrainement":"heroique"}]}' > /dev/null
+verifier "un etat invente retombe sur « active »" active "$(lire maison.unites.0.etat)"
+verifier "  et un entrainement invente sur « entrainee »" entrainee "$(lire maison.unites.0.entrainement)"
+code "$BOCAL_A" PATCH /api/maisons/unites-essai '{"unites":[{"nom":"","type":""}]}' > /dev/null
+verifier "une unite sans nom ni type n'est pas gardee" "" "$(lire maison.unites)"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "la vue descend les etats possibles" oui "$(contient '"etats_unite"')"
+verifier "  et les niveaux d'entrainement" oui "$(contient '"entrainements_unite"')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

@@ -43,6 +43,7 @@ import { contenuDepart } from '../depart/contenu';
 import * as carnet from './carnet';
 import { glossaireDe, glossaireDepuisJson, rattacher } from './envois';
 import * as filtres from './filtres';
+import * as formes from './formes';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
 import * as registre from './registre';
@@ -90,6 +91,8 @@ const SURFACE = [
   '/listes/*',
   '/filtres',
   '/filtres/*',
+  '/formes',
+  '/formes/*',
   '/carnet',
   '/carnet/*',
   '/lieux',
@@ -163,7 +166,8 @@ function enErreur(c: Contexte, erreur: unknown): Response {
   if (
     erreur instanceof ErreurReferentiel ||
     erreur instanceof ErreurPortrait ||
-    erreur instanceof carnet.ErreurCarnet
+    erreur instanceof carnet.ErreurCarnet ||
+    erreur instanceof formes.ErreurForme
   ) {
     return c.json({ erreur: erreur.message }, 400);
   }
@@ -1167,6 +1171,71 @@ routesDomaine.delete('/filtres/:id', async (c) => {
     return absent(c, `filtre inconnu : ${identifiant}`);
   }
   delete courant.dataset.filtres[identifiant];
+  await enregistrer(c, courant);
+  return c.json({ supprime: identifiant });
+});
+
+/* --------------------------------------------------------------------------
+ * Formes de fond du plan (lot 20.D)
+ *
+ * Quatre routes plates, sur le modèle des filtres : une forme n'appartient à
+ * personne et ne dépend de rien, il n'y a donc rien à recalculer autour d'elle.
+ *
+ * `PATCH` porte le plus souvent juste `{x, y}` : on déplace une forme bien plus
+ * souvent qu'on ne la recolore, et un déplacement n'a pas à renvoyer sa
+ * couleur, son texte et sa taille pour rien.
+ * -------------------------------------------------------------------------- */
+
+routesDomaine.get('/formes', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+  return c.json({ formes: formes.liste(courant.dataset.formes) });
+});
+
+routesDomaine.post('/formes', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const liste = formes.liste(courant.dataset.formes);
+  let forme: Objet;
+  try {
+    forme = formes.creer(liste, corps);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+  courant.dataset.formes = liste;
+  await enregistrer(c, courant);
+  return c.json({ forme }, 201);
+});
+
+routesDomaine.patch('/formes/:id', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const liste = formes.liste(courant.dataset.formes);
+  const identifiant = c.req.param('id');
+  const forme = liste.find((entree) => entree.id === identifiant);
+  if (!forme) return absent(c, `forme inconnue : ${identifiant}`);
+
+  const modifies = formes.appliquer(forme, corps);
+  courant.dataset.formes = liste;
+  if (modifies.length) await enregistrer(c, courant);
+  return c.json({ forme, modifies });
+});
+
+routesDomaine.delete('/formes/:id', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const liste = formes.liste(courant.dataset.formes);
+  const identifiant = c.req.param('id');
+  const index = liste.findIndex((entree) => entree.id === identifiant);
+  if (index === -1) return absent(c, `forme inconnue : ${identifiant}`);
+
+  liste.splice(index, 1);
+  courant.dataset.formes = liste;
   await enregistrer(c, courant);
   return c.json({ supprime: identifiant });
 });

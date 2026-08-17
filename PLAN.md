@@ -2106,3 +2106,113 @@ identiques.
   plan qui ne correspond à aucune table.
 - **Le fenêtrage du plan** reste dû au-delà de ~300 fiches (voir 16.I). Un plan
   collectif à douze membres est le premier endroit qui y touchera.
+
+---
+
+# Lot 20 — Le plan qu'on lit de loin, et ce qu'une maison peut envoyer  ☑
+
+*Demandé le 17/08/2026. Cinq demandes, dont trois portent sur la même chose :
+**ce qu'on voit sur le plan pendant qu'on joue**.*
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 20.A | Un bouton « 📖 Règles » dans la barre du haut. | `index.html`, `js/telephone.js` |
+| 20.B | Une couleur de contour par profil, choisie dans un nuancier. | `models.ts`, `js/palette.js`, `js/panel.js` |
+| 20.C | La carte du plan : le nom sur la moitié, la maison et le lieu sur un quart chacun. | `js/views/cartes.js`, `css/app.css` |
+| 20.D | Des rectangles, des cercles et des zones de texte derrière les fiches. | `src/domaine/formes.ts`, `js/formes.js` |
+| 20.E | Les unités de guerre d'une maison. | `referentiels.ts`, `js/views/maisons.js` |
+
+## Les quatre décisions qui méritent d'être relues
+
+**Le contour n'est pas la couleur.** Une personne avait déjà un champ
+`couleur`, qui *remplace* celle de sa maison — donc qui disparaît dès qu'on
+bascule l'axe (« Couleur & filtre ») sur l'humeur ou sur un filtre. C'est une
+valeur **sur l'axe courant**. Le contour demandé est autre chose : il marque une
+fiche pour soi (« ceux que je dois revoir ce soir ») et doit tenir quoi qu'on
+affiche par ailleurs. D'où un champ à part, `bordure`, et un `outline` CSS —
+pas une `border`, qui décalerait la fiche de trois pixels alors que les traits
+de liaison sont tracés d'après des boîtes calculées en JavaScript, qui, elles,
+ne bougeraient pas.
+
+**Des cases, et pas un cercle chromatique.** Un sélecteur libre rend seize
+millions de teintes, dont quinze qui se ressemblent deux à deux : sur un plan de
+soixante fiches, deux verts voisins ne se distinguent plus et le marquage ne
+veut plus rien dire. Douze cases nommées se choisissent d'un clic et se redisent
+à voix haute. Le **serveur**, lui, accepte tout `#rrggbb` : le jour où la
+palette change, les fiches déjà marquées gardent leur couleur au lieu de se
+vider.
+
+**Une forme de fond ne contient personne.** C'est la décision qui tient tout le
+20.D. Aucune fiche n'y est rattachée, rien n'est recalculé quand on la déplace,
+et la poser sur d'autres gens ne change rien à ce que dit le monde. Un
+regroupement qui *compte* existe déjà — c'est une maison, une catégorie, un
+filtre ; celui-là est fait pour tout le reste, ce qu'on entoure une séance et
+qu'on efface la suivante. Conséquence assumée : une forme ne suit pas les
+fiches, et un filtre qui redessine le plan la laisse où elle est.
+
+**Les formes sont inertes au repos.** Une forme couvre de la surface, souvent
+beaucoup. Si elle attrapait les clics en permanence, un rectangle tracé autour
+du Nord empêcherait de faire glisser le plan **dans tout le Nord** — c'est-à-dire
+là où il y a justement quelque chose à regarder. Le bouton « ▭ Formes » de la
+barre du bas ouvre le mode dessin ; hors de lui, `pointer-events: none`.
+
+## Ce que la carte ne montre plus
+
+L'âge, l'année de naissance, l'année de décès, le titre principal et les notes
+ont quitté la fiche du plan : la place demandée par le nom et les deux faits ne
+les laissait pas tenir. **Rien n'est perdu** — tout cela passe en infobulle au
+survol (`infobulle()` dans `views/cartes.js`), et les notes se lisent dans la
+fiche de droite, où on les écrit de toute façon. Le portrait, lui, ne se voit
+plus que dans cette même fiche et dans la liste des personnes.
+
+Le **gabarit invisible** disparaît avec eux. Il existait parce que les fiches
+n'affichaient pas toutes la même chose — une sans date à côté d'une à trois
+lignes donnait des bandes en dents de scie — et il portait donc le contenu
+*maximal* pour en tirer une hauteur commune. Toute fiche ayant désormais la même
+structure, la hauteur se déclare une fois (`--carte-hauteur`) et `mesurer()` la
+relit sur une fiche réelle.
+
+## Deux pièges payés en chemin
+
+**`flex-grow` ne fait pas des moitiés.** La première version donnait `flex: 2`
+au bandeau et `flex: 2` au corps, en comptant sur le partage à parts égales. Le
+résultat mesurait 52 / 80 au lieu de 66 / 66 : la taille minimale automatique
+d'un élément flex est celle de son contenu, et le corps réclamait la hauteur de
+ses deux blocs. Il faut une hauteur **ferme** sur la fiche et des parts
+**déclarées** (`flex: 0 0 50%`), pas une élasticité qu'on espère équilibrée.
+
+**d3-zoom mange les `mousemove`.** La surface de tracé est un enfant du plan, où
+d3 écoute. Sans `stopPropagation` sur le `mousedown`, d3 ouvrait un geste de
+panoramique et posait ses propres écouteurs sur la fenêtre **en phase de
+capture**, où il appelle `stopImmediatePropagation` : nos `mousemove` ne nous
+parvenaient jamais et le rectangle restait à zéro pixel. Le symptôme — « on
+trace et rien n'apparaît » — ne désigne pas sa cause.
+
+## Vérification
+
+**785/785** au harnais, contre 739 à la fin du lot 18. Les 46 vérifications
+neuves couvrent notamment : un champ `bordure` qui **ne s'écrit pas** quand il
+est vide (sinon soixante-sept `"bordure": null` apparaîtraient dans un monde qui
+ne s'en sert pas), une couleur illisible qui est sautée **sans faire tomber le
+reste du patch**, les bornes du serveur sur les formes (genre inconnu, taille
+démesurée, épaisseur, couleur), le cloisonnement des formes entre comptes, et
+les deux listes fermées d'une unité — une valeur inventée retombe sur la
+première entrée plutôt que de faire échouer l'enregistrement.
+
+**0 chaîne sans traduction sur 954 relevées** (`outils/relever-textes.mjs`).
+
+## Ce qui n'est pas fait, et pourquoi
+
+- **Les formes ne se dessinent qu'à la souris.** Tracer, déplacer et
+  redimensionner passent par `mousedown`/`mousemove` : au doigt, il n'y a rien.
+  Le reste de l'application a son équivalent tactile (l'appui long remplace le
+  clic droit) ; celui-ci reste à faire, et demande de traiter le conflit avec le
+  panoramique à un doigt.
+- **Pas de plans superposés ni d'ordre entre formes.** Deux formes qui se
+  recouvrent s'affichent dans l'ordre de la sauvegarde. Un « mettre au premier
+  plan » supposerait un champ d'ordre et une commande de plus, pour un besoin
+  qui n'a pas été exprimé.
+- **Les unités ne sont pas dans les lots d'administration.** Le panneau de lot
+  sait écrire les caractéristiques d'une maison chez plusieurs comptes ; il ne
+  sait pas écrire ses unités. Elles changent de séance en séance et par table —
+  c'est le contraire d'une donnée qu'on applique en masse.

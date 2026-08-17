@@ -321,6 +321,15 @@ export const Api = {
   valeursVariable: (variable) =>
     requete(`${DOMAINE}/filtres/valeurs${versQuery({ variable })}`),
 
+  /* Formes de fond du plan (lot 20.D). Pas de `formes()` en lecture : elles
+     arrivent avec le payload de la vue « sociogramme », qui est le seul endroit
+     où on les dessine. */
+  creerForme: (donnees) =>
+    requete(`${DOMAINE}/formes`, { method: 'POST', body: JSON.stringify(donnees) }),
+  majForme: (id, patch) =>
+    requete(`${DOMAINE}/formes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  supprimerForme: (id) => requete(`${DOMAINE}/formes/${id}`, { method: 'DELETE' }),
+
   listes: () => requete(`${DOMAINE}/listes`),
   creerListe: (donnees) =>
     requete(`${DOMAINE}/listes`, { method: 'POST', body: JSON.stringify(donnees) }),

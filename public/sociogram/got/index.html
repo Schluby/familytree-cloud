@@ -69,6 +69,23 @@
         </label>
         <a id="lien-document" class="bouton" target="_blank" rel="noopener"
            title="Ouvrir le document de campagne dans un nouvel onglet">📜 Document</a>
+        <!-- Les règles du JDR. Deux boutons voisins et non un seul, parce que
+             ce sont deux documents de nature différente : « Document » est
+             **celui de la sauvegarde** (chaque table met le sien, il disparaît
+             quand la case est vide), « Règles » est celui de l'instance — il
+             ne change pas d'une campagne à l'autre, donc il vit dans le HTML
+             et non dans les données.
+
+             L'adresse est celle donnée par le propriétaire de l'instance,
+             débarrassée de son `ouid` : ce paramètre désigne le compte Google
+             qui a fabriqué le lien, et cette page est servie à tout le monde.
+             Il ne sert de toute façon à rien à qui n'est pas déjà connecté
+             dessus. Qui n'a pas l'autorisation verra la page « demander
+             l'accès » de Google — cela se règle dans le partage du document,
+             pas ici. -->
+        <a id="lien-regles" class="bouton" target="_blank" rel="noopener"
+           href="https://docs.google.com/document/d/1iKSLqAWBq9HfTkYdreupiAQw5C3f40Pb/edit?usp=sharing&amp;rtpof=true&amp;sd=true"
+           title="Ouvrir les règles du jeu de rôle dans un nouvel onglet">📖 Règles</a>
         <!-- L'année courante : c'est d'elle que tous les âges se déduisent. -->
         <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
@@ -261,6 +278,16 @@
                   title="Maisons et liens : filtrer la vue">
             <span class="ico">⛨</span><span class="lib">Filtres</span>
           </button>
+          <!-- Les formes de fond (lot 20.D). Un interrupteur, et non des formes
+               toujours cliquables : une forme couvre de la surface, et si elle
+               attrape les clics en permanence on ne peut plus faire glisser le
+               plan là où il y a justement quelque chose à regarder. Au repos,
+               c'est un décor ; ici, on les dessine et on les modifie. -->
+          <button class="bouton bouton-plat" id="btn-formes"
+                  title="Dessiner derrière les fiches : rectangles, cercles, zones de texte">
+            <span class="ico">▭</span><span class="lib">Formes</span>
+          </button>
+          <span class="outils-formes" id="outils-formes" hidden></span>
           <span class="separateur-vertical"></span>
           <span class="groupe-cadrage" id="groupe-cadrage">
             <button class="bouton bouton-plat" id="btn-ajuster" title="Tout afficher">

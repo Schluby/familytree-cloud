@@ -327,8 +327,11 @@ Ce que ça implique, précisément :
 - À l'import, une valeur `data:` est **retirée**, avec un message qui le dit.
   Une valeur `http(s)` est **conservée** : pointer l'image d'un wiki ne coûte
   rien en stockage, et le navigateur la charge tout seul.
-- Les cartes affichent les initiales sur la couleur de la maison, comme
-  aujourd'hui pour les fiches sans portrait.
+- Les cartes affichaient les initiales sur la couleur de la maison, comme pour
+  les fiches sans portrait. **Depuis le lot 20.C, la carte du plan ne porte plus
+  de portrait du tout** : il ne se voit que dans la fiche de droite et dans la
+  liste des personnes. Rien n'a changé au stockage — c'est toujours une adresse,
+  jamais une image.
 - **R2 devient inutile** : plus de deuxième service, plus de clés à gérer. Tout
   tient dans D1.
 

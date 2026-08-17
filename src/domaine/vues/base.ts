@@ -58,6 +58,10 @@ export function noeudMinimal(
     categorie,
     categorie_label: categorie ? (dataset.categorie(categorie).label ?? '') : '',
     couleur: personne.couleur || (maison.couleur ?? '#7a7f87'),
+    // Le liseré (lot 20.B) : `null` la plupart du temps, et c'est bien ainsi —
+    // il n'entoure que les fiches qu'on a voulu marquer. Il ne se mélange pas
+    // à `couleur` ci-dessus, qui suit l'axe courant.
+    bordure: personne.bordure,
     initiales: personne.initiales,
     // Une adresse, jamais l'image : en ligne, il n'y a de toute façon pas
     // d'image intégrée à sortir.

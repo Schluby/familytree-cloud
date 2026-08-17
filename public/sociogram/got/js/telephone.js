@@ -80,6 +80,7 @@ const A_DESCENDRE = [
       '#btn-vue-generale',
       '#selecteur-couleur',
       '#lien-document',
+      '#lien-regles',
       '#btn-annee',
       '#btn-theme',
       '#btn-langue',

@@ -111,6 +111,8 @@ export const CHAMPS_MAISON = [
   'notes',
   'evenements',
   'liens',
+  // Lot 20.E : ce qu'elle peut mettre sur le champ de bataille.
+  'unites',
 ] as const;
 
 /**
@@ -135,6 +137,78 @@ export const CARACTERISTIQUES_MAISON = [
 ] as const;
 
 const IDS_CARACTERISTIQUES = new Set(CARACTERISTIQUES_MAISON.map((c) => c.id) as string[]);
+
+/* --------------------------------------------------------------------------
+ * Unités de guerre (lot 20.E)
+ *
+ * Les caractéristiques ci-dessus disent ce qu'une maison *possède* ; les unités
+ * disent ce qu'elle peut *envoyer*. Deux choses différentes, et la seconde
+ * change de séance en séance : une unité se désorganise, se met en déroute,
+ * disparaît — d'où l'état, qui est le champ qu'on touche le plus souvent.
+ *
+ * Les deux listes fermées sont déclarées ici et **descendues au front** par la
+ * vue « Maisons » : le navigateur ne recopie aucun de ces mots, et en ajouter
+ * un se fait sur une ligne, d'un seul côté.
+ * -------------------------------------------------------------------------- */
+
+export const ETATS_UNITE = [
+  { id: 'active', label: 'Active' },
+  { id: 'desorganisee', label: 'Désorganisée' },
+  { id: 'en_deroute', label: 'En déroute' },
+  { id: 'detruite', label: 'Détruite' },
+] as const;
+
+export const ENTRAINEMENTS_UNITE = [
+  { id: 'bleus', label: 'Bleus' },
+  { id: 'entrainee', label: 'Entraînée' },
+  { id: 'veterans', label: 'Vétérans' },
+  { id: 'elite', label: 'Élite' },
+] as const;
+
+const IDS_ETATS = new Set(ETATS_UNITE.map((e) => e.id) as string[]);
+const IDS_ENTRAINEMENTS = new Set(ENTRAINEMENTS_UNITE.map((e) => e.id) as string[]);
+
+/** Un pourcentage, borné à 0-100. Vide reste vide : « on n'a pas noté ». */
+function pourcentage(brut: unknown): number | null {
+  if (brut === null || brut === undefined || brut === '') return null;
+  const entier = versEntier(brut);
+  if (entier === null) return null;
+  return Math.max(0, Math.min(100, entier));
+}
+
+/**
+ * Les unités d'une maison.
+ *
+ * Une valeur hors liste retombe sur la première entrée plutôt que d'être
+ * refusée : une unité qu'on vient de créer n'a pas d'état, et « Active » est ce
+ * qu'on veut dire en la créant. Le plafond de 60 est là pour la même raison que
+ * partout ailleurs — une sauvegarde est un document JSON, pas une base.
+ */
+function unites(brut: unknown): Objet[] {
+  if (!Array.isArray(brut)) return [];
+  return brut
+    .filter(estObjet)
+    .slice(0, 60)
+    .map((entree) => {
+      const etat = texte(entree.etat, 40);
+      const entrainement = texte(entree.entrainement, 40);
+      return {
+        nom: texte(entree.nom, 120),
+        type: texte(entree.type, 120),
+        etat: IDS_ETATS.has(etat) ? etat : 'active',
+        entrainement: IDS_ENTRAINEMENTS.has(entrainement) ? entrainement : 'entrainee',
+        defense: pourcentage(entree.defense),
+        sante: pourcentage(entree.sante),
+        attaque: versEntier(entree.attaque),
+        arme: texte(entree.arme, 120),
+        equipement: texte(entree.equipement, 160),
+        notes: texte(entree.notes, 4000),
+      };
+    })
+    // Une unité sans nom ni type n'est rien : c'est une ligne ajoutée puis
+    // abandonnée, et la garder encombrerait la fiche à chaque ouverture.
+    .filter((entree) => entree.nom || entree.type);
+}
 
 /**
  * Les scores. Une caractéristique absente reste absente : `{}` est un état
@@ -260,6 +334,11 @@ export function appliquerMaison(base: Objet | null, patch: Objet): Objet {
     const liste = liensMaison(patch.liens);
     if (liste.length) fiche.liens = liste;
     else delete fiche.liens;
+  }
+  if (fourni(patch, 'unites')) {
+    const liste = unites(patch.unites);
+    if (liste.length) fiche.unites = liste;
+    else delete fiche.unites;
   }
 
   if (!fiche.label) throw new ErreurReferentiel("une maison a besoin d'un nom");

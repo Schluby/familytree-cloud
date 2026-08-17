@@ -1,5 +1,5 @@
 import { appeler, compteConnecte, deriverCle } from './identite.js';
-import { lien } from './base.js';
+import { cle, lien } from './base.js';
 import { installerLangue } from './langue.js';
 
 installerLangue();
@@ -67,7 +67,12 @@ function proposerLeChoix(compte) {
     await appeler('/api/auth/deconnexion', { method: 'POST' });
     // Sans ça, le marqueur ferait rouvrir un essai au prochain 401 alors qu'on
     // vient justement de se déconnecter pour saisir une autre adresse.
-    localStorage.removeItem('familytree-compte-connu');
+    //
+    // `cle()` et non le nom nu : depuis le lot 18 le marqueur est rangé sous le
+    // préfixe de l'application — c'est ainsi qu'`api.js` l'écrit et le relit.
+    // Cette ligne visait l'ancien nom, que la reprise de `base.js` a de toute
+    // façon déjà retiré : elle n'effaçait donc plus rien.
+    localStorage.removeItem(cle('familytree-compte-connu'));
     location.replace(lien('/connexion.html'));
   });
 }
