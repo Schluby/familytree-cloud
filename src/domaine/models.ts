@@ -83,6 +83,9 @@ export const PERSONNE_CHAMPS = [
   // Lot 20.B. Voir `Personne.bordure` : c'est le liseré autour de la fiche,
   // et il ne remplace pas `couleur`.
   'bordure',
+  // Lot 21.D : les deux autres quarts de la carte du plan.
+  'role',
+  'ville',
 ] as const;
 
 export const STATUTS = ['vivant', 'mort', 'inconnu'] as const;
@@ -218,6 +221,16 @@ export class Personne {
    * reste visible quoi qu'on affiche par ailleurs.
    */
   bordure: string | null = null;
+  /**
+   * Le rôle tenu **dans sa maison** (lot 21.D) : mestre, capitaine des gardes,
+   * intendante, otage. Ce n'est pas un titre — les `titres` ci-dessus sont ce
+   * que le monde lui donne (« Ser », « Gardien du Nord ») et ils sont
+   * plusieurs ; le rôle est ce qu'elle *fait* là où elle sert, et il n'y en a
+   * qu'un, parce que la carte n'a qu'un quart de ligne à lui offrir.
+   */
+  role = '';
+  /** La ville, sous la région de `lieu` : Winterfell dans le Nord (lot 21.D). */
+  ville = '';
   notes = '';
   tags: unknown[] = [];
   relations_joueurs: Record<string, NoteJoueur> = {};
@@ -294,6 +307,10 @@ export class Personne {
       // exactement comme il est entré, sans gagner soixante-sept `"bordure":
       // null` au premier aller-retour.
       ...(this.bordure ? { bordure: this.bordure } : {}),
+      // Même règle pour les deux champs du lot 21.D : une campagne qui ne s'en
+      // sert pas ne les voit jamais passer dans son fichier.
+      ...(this.role ? { role: this.role } : {}),
+      ...(this.ville ? { ville: this.ville } : {}),
       ...this.extra,
     };
   }
@@ -345,6 +362,10 @@ export class Personne {
         const bordure = normaliserBordure(brut);
         if (bordure === undefined) continue; // pas une couleur : on ne touche à rien
         valeur = bordure;
+      } else if (champ === 'role' || champ === 'ville') {
+        // Deux textes libres, bornés comme partout où le réseau écrit dans la
+        // sauvegarde. Vide efface : c'est ce que veut dire une case qu'on vide.
+        valeur = texteOuVide(brut).trim().slice(0, 120);
       }
 
       const courant = (this as unknown as Objet)[champ];

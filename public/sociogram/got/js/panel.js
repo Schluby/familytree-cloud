@@ -398,7 +398,9 @@ export function creerPanneau(element, rappels = {}) {
     // La liste arrive peut-être après l'affichage : elle sera lue au premier
     // caractère tapé, la fiche n'a pas à attendre.
     chargerLieux();
-    return h('div', { class: 'champ-edit pleine' }, [h('label', { texte: 'Lieu' }), champ]);
+    // « Région » et non « Lieu » depuis le lot 21.D : la ville a maintenant sa
+    // propre case juste à côté, et la carte du plan les intitule ainsi.
+    return h('div', { class: 'champ-edit' }, [h('label', { texte: 'Région' }), champ]);
   }
 
   /**
@@ -543,6 +545,10 @@ export function creerPanneau(element, rappels = {}) {
           'Maison',
           (referentiels.maisons || []).map((m) => ({ id: m.id, label: m.label }))
         ),
+        // Le rôle **dans** cette maison-là, donc juste à côté d'elle : mestre,
+        // capitaine des gardes, otage. Ce n'est pas un titre — ceux-là sont
+        // plus bas, ils sont plusieurs et viennent du monde, pas de la maison.
+        champTexte('role', 'Rôle dans la maison'),
         champSelection('statut', 'Statut', [
           { id: 'vivant', label: 'Vivant' },
           { id: 'mort', label: 'Mort' },
@@ -555,6 +561,9 @@ export function creerPanneau(element, rappels = {}) {
         // contredire : vide, elle reste calculée ; remplie, elle gagne.
         champTexte('generation', 'Génération (vide = calculée)', { type: 'number' }),
         champLieu(),
+        // La ville se saisit juste sous la région, comme elle se lit juste à
+        // côté d'elle sur la carte du plan (lot 21.D).
+        champTexte('ville', 'Ville'),
         champListe('titres', 'Titres'),
         champRang(),
         champListe('tags', 'Tags'),
@@ -696,6 +705,8 @@ export function creerPanneau(element, rappels = {}) {
     // clair, sur son quart bas. Sans lui, on tapait « Winterfell » et la fiche
     // continuait d'annoncer l'ancien lieu jusqu'au prochain rechargement.
     'lieu',
+    // Lot 21.D : les deux nouvelles cases de la carte, pour la même raison.
+    'role', 'ville',
   ]);
 
   const enAttente = () => Object.keys(aEnvoyer).length > 0;

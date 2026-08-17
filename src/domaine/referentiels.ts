@@ -33,12 +33,29 @@ export const CATEGORIES: Record<string, string> = {
 };
 
 /**
- * Types dont la sémantique est câblée dans la mise en page : la filiation
- * construit les générations, l'union dessine la barre de couple, la fratrie est
- * déduite des parents communs. On peut les renommer, les recolorer, les
- * restyler — pas les supprimer.
+ * Types dont l'*id* est câblé dans la mise en page : la filiation construit les
+ * générations, l'union dessine la barre de couple, la fratrie l'accolade.
+ *
+ * Jusqu'au lot 21.C ils étaient indestructibles. Ils ne le sont plus : c'est le
+ * monde de la table, pas le nôtre, et une campagne qui ne joue ni les liaisons
+ * ni les fratries doit pouvoir s'en débarrasser au lieu de traîner deux lignes
+ * mortes dans chaque menu. Ce qui reste n'est plus une interdiction mais un
+ * avertissement — `EFFETS_STRUCTURANTS` dit, pour chacun, ce que le plan perd.
+ *
+ * Supprimer n'est pas irréparable : recréer un type avec le même id lui rend
+ * exactement son rôle, la mise en page ne connaissant que la chaîne.
  */
 export const TYPES_STRUCTURANTS = ['parent', 'conjoint', 'amant', 'fratrie'] as const;
+
+/** Ce que le plan perd avec ce type. Lu tel quel avant de confirmer. */
+export const EFFETS_STRUCTURANTS: Record<string, string> = {
+  parent:
+    'les cartes cesseront de s’empiler par génération : c’est la filiation qui les range.',
+  conjoint: 'les couples ne seront plus côte à côte, et leur barre d’union disparaîtra.',
+  amant: 'les liaisons ne rapprocheront plus les deux fiches.',
+  fratrie:
+    'les frères et sœurs ne seront plus déduits d’un parent commun, ni reliés par une accolade.',
+};
 
 export const COULEUR_MAISON_DEFAUT = '#7a7f87';
 export const COULEUR_TYPE_DEFAUT = '#8a8f98';
@@ -532,6 +549,7 @@ export function decrireCatalogues(): Objet {
     styles: Object.entries(STYLES).map(([id, label]) => ({ id, label })),
     categories: Object.entries(CATEGORIES).map(([id, label]) => ({ id, label })),
     types_structurants: [...TYPES_STRUCTURANTS],
+    effets_structurants: { ...EFFETS_STRUCTURANTS },
     // Les sept ressources d'une maison : le front construit sa grille à partir
     // d'ici, il ne les recopie pas.
     caracteristiques_maison: CARACTERISTIQUES_MAISON.map((c) => ({ ...c })),

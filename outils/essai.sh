@@ -2068,6 +2068,107 @@ verifier "la vue descend les etats possibles" oui "$(contient '"etats_unite"')"
 verifier "  et les niveaux d'entrainement" oui "$(contient '"entrainements_unite"')"
 
 # ---------------------------------------------------------------------------
+# Lot 21 : le rail range, les liens repares, deux champs de plus
+#
+# Trois de ces quatre morceaux ne vivent que dans le navigateur, et un harnais
+# en ligne de commande ne peut pas les regarder tourner. Ce qu'il peut faire, et
+# ce qu'il fait ici, c'est verifier que le contrat tient : que la source porte
+# encore la correction, et que le serveur descend ce dont le rendu a besoin. Une
+# regression sur ces deux points-la est justement celle qu'on ne verrait pas.
+#
+#  1. Le rail (21.A) : deux onglets et trois blocs repliables. Le piege est
+#     qu'un bloc devienne inatteignable — range dans l'onglet cache, ou replie —
+#     pour le tiroir du telephone et pour la visite guidee, qui savent tous deux
+#     ouvrir « un bloc » sans savoir ou il vit.
+#  2. Les liens (21.B) : une fratrie explicite entre deux enfants d'un meme
+#     parent etait ecartee de la charpente **et** jamais dessinee. Elle doit
+#     desormais voyager dans le plan.
+#  3. Les types structurants (21.C) : l'interdiction a saute. Ce qui compte,
+#     c'est que la suppression requalifie au lieu de detruire, et que recreer le
+#     type avec le meme id lui rende son role.
+#  4. `role` et `ville` (21.D) : deux champs de plus sur une personne, donc le
+#     meme piege qu'au lot 20.B — qu'ils s'ecrivent toujours.
+# ---------------------------------------------------------------------------
+
+echo "-- 21.A le rail range"
+code - GET / > /dev/null
+verifier "le rail a deux onglets" oui "$(contient 'class="rail-onglets"')"
+verifier "  dont celui des reglages" oui "$(contient 'data-page="reglages"')"
+verifier "  qui a recueilli sauvegardes et options" oui "$(contient 'id="rail-page-reglages"')"
+verifier "trois blocs se replient" oui "$(contient 'class="rail-bloc rail-pliable"')"
+verifier "  avec un vrai bouton" oui "$(contient 'class="rail-plier"')"
+verifier "le bloc « Selection » a quitte le rail" non "$(contient '<h2>Sélection</h2>')"
+verifier "  et son compte-rendu est passe sur le plan" oui "$(contient 'class="stats-plan" id="stats"')"
+code - GET /css/app.css > /dev/null
+verifier "un bloc replie cache son contenu" oui "$(contient '.rail-bloc.plie > .rail-bloc-contenu { display: none; }')"
+verifier "  le chevron reste touchable au doigt" oui "$(contient '.rail .rail-plier,')"
+code - GET /js/rail.js > /dev/null
+verifier "une seule facon d'amener un bloc sous les yeux" oui "$(contient 'export function montrerBloc')"
+verifier "  et l'etat retenu est cloisonne par prefixe" oui "$(contient 'localStorage.setItem(cle(nom)')"
+code - GET /js/telephone.js > /dev/null
+verifier "le tiroir s'en sert avant de defiler" oui "$(contient 'montrerBloc(idBloc);')"
+code - GET /js/tutoriel.js > /dev/null
+verifier "la visite guidee aussi, sur tous les ecrans" oui "$(contient 'montrerBloc(idBloc);')"
+
+echo "-- 21.B la fleche de filiation et la fratrie qui s'affiche"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Pere","nom":"Fratrie"}' > /dev/null
+ID_PERE="$(lire personne.id)"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Ainee","nom":"Fratrie"}' > /dev/null
+ID_AINEE="$(lire personne.id)"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Cadet","nom":"Fratrie"}' > /dev/null
+ID_CADET="$(lire personne.id)"
+code "$BOCAL_A" POST /api/relations "{\"source\":\"$ID_PERE\",\"cible\":\"$ID_AINEE\",\"type\":\"parent\"}" > /dev/null
+code "$BOCAL_A" POST /api/relations "{\"source\":\"$ID_PERE\",\"cible\":\"$ID_CADET\",\"type\":\"parent\"}" > /dev/null
+verifier "une fratrie explicite entre deux enfants d'un meme pere" 201 "$(code "$BOCAL_A" POST /api/relations "{\"source\":\"$ID_AINEE\",\"cible\":\"$ID_CADET\",\"type\":\"fratrie\"}")"
+ID_FRATRIE="$(lire relation.id)"
+code "$BOCAL_A" GET /api/vue/sociogramme > /dev/null
+verifier "  elle voyage bien dans le plan" oui "$(contient "\"id\":\"$ID_FRATRIE\"")"
+verifier "  et la filiation s'y annonce orientee" oui "$(contient '"id":"parent"')"
+code - GET /js/views/cartes.js > /dev/null
+verifier "la descendance reclame une pointe de fleche" oui "$(contient 'couleursFleches.add(couleurFiliation)')"
+verifier "  posee par patte d'enfant, non sur le tronc" oui "$(contient 'marker-end="url(#fl-')"
+verifier "  et seulement si le type est oriente" oui "$(contient "typeDirige('parent')")"
+verifier "ce qu'on dessine n'est plus ce qui place" oui "$(contient 'const fratriesTracees')"
+verifier "  une fratrie explicite se voit toujours" oui "$(contient '!a.deduit || sansParentCommun(a)')"
+code - GET /js/main.js > /dev/null
+verifier "une fratrie deduite ne s'edite pas" oui "$(contient 'if (arete.deduit) {')"
+
+echo "-- 21.C supprimer un type structurant"
+code "$BOCAL_A" GET /api/referentiels > /dev/null
+verifier "le serveur dit ce qu'on y perd" oui "$(contient '"effets_structurants"')"
+verifier "  a commencer par la filiation" oui "$(contient '"parent":"les cartes cesseront')"
+verifier "« Liaison » se supprime desormais" 200 "$(code "$BOCAL_A" DELETE '/api/types-relations/amant?remplacement=ami')"
+verifier "  en requalifiant au lieu de detruire" 0 "$(lire liens_supprimes)"
+verifier "  et on peut lui rendre son role" 201 "$(code "$BOCAL_A" POST /api/types-relations '{"id":"amant","label":"Liaison","couleur":"#cf7fa5","style":"pointille","categorie":"famille"}')"
+verifier "  avec exactement le meme identifiant" amant "$(lire type.id)"
+code - GET /js/editeurs.js > /dev/null
+verifier "l'editeur ne le declare plus indestructible" non "$(contient 'mais ne se supprime pas')"
+verifier "  il avertit avant d'agir" oui "$(contient 'fl-aide fl-alerte')"
+
+echo "-- 21.D le role et la ville"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Sans","nom":"Poste"}' > /dev/null
+ID_POSTE="$(lire personne.id)"
+verifier "un profil neuf n'ecrit pas de role" "" "$(lire personne.role)"
+verifier "  ni de ville" "" "$(lire personne.ville)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_POSTE" '{"role":"  Capitaine des gardes  ","ville":"Winterfell"}' > /dev/null
+verifier "le role est garde, sans ses espaces" "Capitaine des gardes" "$(lire personne.role)"
+verifier "  et la ville aussi" Winterfell "$(lire personne.ville)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_POSTE" '{"role":""}' > /dev/null
+verifier "le vide efface le role" "" "$(lire personne.role)"
+verifier "  sans toucher a la ville" Winterfell "$(lire personne.ville)"
+code "$BOCAL_A" GET /api/vue/sociogramme > /dev/null
+verifier "la vue descend les deux champs aux fiches" oui "$(contient '"ville":"Winterfell"')"
+code "$BOCAL_A" GET /api/filtres > /dev/null
+verifier "on peut filtrer sur le role" oui "$(contient '"id":"role"')"
+verifier "  et sur la ville" oui "$(contient '"id":"ville"')"
+code - GET /js/views/cartes.js > /dev/null
+verifier "la carte montre le role a cote de la maison" oui "$(contient "fait('Rôle'")"
+verifier "  et la ville a cote de la region" oui "$(contient "fait('Ville'")"
+code - GET /css/app.css > /dev/null
+verifier "un trait separe les deux cases d'une rangee" oui "$(contient '.carte-fait + .carte-fait { border-left')"
+verifier "  et rien ne deborde de la fiche" oui "$(contient 'flex: 1 1 50%; min-width: 0; min-height: 0;')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

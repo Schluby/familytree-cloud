@@ -420,8 +420,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         <span class="carte-nom">${echapper(noeud.label)}</span>
       </div>
       <div class="carte-corps">
-        ${fait('Maison', noeud.maison_label)}
-        ${fait('Région', noeud.lieu)}
+        <div class="carte-rangee">
+          ${fait('Maison', noeud.maison_label)}
+          ${fait('Rôle', noeud.role)}
+        </div>
+        <div class="carte-rangee">
+          ${fait('Région', noeud.lieu)}
+          ${fait('Ville', noeud.ville)}
+        </div>
       </div>
       <button class="carte-poignee" type="button" tabindex="-1"
               title="Glisser vers une autre fiche pour créer un lien">+</button>`;
@@ -435,10 +441,11 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   }
 
   /**
-   * Un des deux quarts du bas : un intitulé discret, une valeur lisible.
+   * Une des quatre cases du bas : un intitulé discret, une valeur lisible.
    *
-   * Le bloc est rendu **même vide** — un tiret. Sans lui la carte n'aurait plus
-   * ses quatre quarts, et deux fiches côte à côte ne s'aligneraient plus.
+   * La case est rendue **même vide** — un tiret. Sans elle la carte perdrait sa
+   * grille, et deux fiches côte à côte ne s'aligneraient plus : « Ville » de
+   * l'une se retrouverait à la hauteur de « Région » de l'autre.
    */
   function fait(libelle, valeur) {
     return `
@@ -549,7 +556,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       if (arete.role === 'filiation') filiations.push(arete);
       else if (arete.role === 'union') unions.push(arete);
       else if (arete.role === 'social') sociaux.push(arete);
-      else if (arete.role === 'fratrie' && !arete.deduit) fratriesBrutes.push(arete);
+      else if (arete.role === 'fratrie') fratriesBrutes.push(arete);
     });
 
     const parentsDe = new Map();
@@ -558,13 +565,29 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       parentsDe.get(a.cible).add(a.source);
     });
 
-    // Fratrie utile = frère/sœur dont on ne connaît pas le parent commun :
-    // sans elle, un oncle sans ascendance connue finirait en satellite.
-    const fratries = fratriesBrutes.filter((arete) => {
+    /** Aucun parent **visible** ne leur est commun sur ce plan-ci. */
+    const sansParentCommun = (arete) => {
       const pa = parentsDe.get(arete.source) || new Set();
       const pb = parentsDe.get(arete.cible) || new Set();
       return ![...pa].some((parent) => pb.has(parent));
-    });
+    };
+
+    // Fratrie utile = frère/sœur dont on ne connaît pas le parent commun :
+    // sans elle, un oncle sans ascendance connue finirait en satellite. C'est
+    // la seule qui **place** les fiches ; on n'en déduit rien de plus.
+    const fratries = fratriesBrutes.filter((a) => !a.deduit && sansParentCommun(a));
+
+    // Ce qu'on **dessine** n'est pas ce qui **place**, et les deux listes
+    // divergent depuis le lot 21.B :
+    //
+    // — une fratrie explicite se voit toujours. Même entre deux enfants d'un
+    //   même parent, où elle ne déplace rien : quelqu'un l'a créée à la main,
+    //   et jusqu'ici elle disparaissait sans un mot ;
+    // — une fratrie déduite ne se voit que si aucun parent commun n'est
+    //   visible — filtré par maison, par statut, ou simplement absent. Les
+    //   dessiner toutes couvrirait le plan de n² accolades qui ne répètent
+    //   que ce que le connecteur de famille dit déjà.
+    const fratriesTracees = fratriesBrutes.filter((a) => !a.deduit || sansParentCommun(a));
 
     // --- 2. arbre / satellites -------------------------------------------
     const dansArbre = new Set();
@@ -592,18 +615,20 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     // Couples et fratries sans parents connus forment un même bloc : on veut
     // les voir côte à côte, avec leur barre de liaison.
     const voisinsUnion = new Map([...dansArbre].map((id) => [id, []]));
-    const fratriesAdjacentes = [];
     [...unions, ...fratries].forEach((a) => {
       if (generations.get(a.source) !== generations.get(a.cible)) return;
       pere.set(racine(a.source), racine(a.cible));
       voisinsUnion.get(a.source).push(a.cible);
       voisinsUnion.get(a.cible).push(a.source);
-      if (a.role === 'fratrie') fratriesAdjacentes.push(a);
     });
-    // Fratries entre générations différentes : tracées comme un lien souple.
-    const fratriesEloignees = fratries.filter(
-      (a) => generations.get(a.source) !== generations.get(a.cible)
-    );
+
+    // Sur un même rang, la fratrie se dessine en accolade au-dessus des deux
+    // fiches ; d'un rang à l'autre, en trait souple comme un lien social. Un
+    // satellite n'a pas de génération : deux satellites sont donc du même rang
+    // (`undefined === undefined`), ce qui est exactement ce qu'on veut d'eux.
+    const memeRang = (a) => generations.get(a.source) === generations.get(a.cible);
+    const fratriesAdjacentes = fratriesTracees.filter(memeRang);
+    const fratriesEloignees = fratriesTracees.filter((a) => !memeRang(a));
 
     const unites = new Map(); // id d'unité -> unité
     const uniteDe = new Map(); // personne -> unité
@@ -1131,6 +1156,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       prises.push(`<path class="lien-prise" data-relation="${arete.id}" d="${chemin}" />`);
     const couleurFiliation = couleurType('parent', '#8a94a0');
     const couleurUnion = couleurType('conjoint', '#b9836f');
+    // Les couleurs qui auront besoin d'une pointe de flèche. Déclaré ici et non
+    // près des liens sociaux : depuis le lot 21.B, la descendance en pose une
+    // aussi, et elle se dessine bien avant eux.
+    const couleursFleches = new Set();
+    const filiationDirigee = typeDirige('parent');
+    if (filiationDirigee) couleursFleches.add(couleurFiliation);
 
     // Pastilles : dessinées après les traits pour passer par-dessus, mais avant
     // les prises, qui doivent rester le dernier mot pour le survol et le clic.
@@ -1248,13 +1279,23 @@ export function creerRenduCartes(conteneur, contexte = {}) {
           `M${centresEnfants[0]},${barreEnfants}H${centresEnfants[centresEnfants.length - 1]}`
         );
       }
-      enfants.forEach((boite) => {
-        chemin.push(`M${boite.x + boite.l / 2},${barreEnfants}V${boite.y}`);
-      });
-
       morceaux.push(
         `<path class="lien-famille" d="${chemin.join(' ')}" stroke="${couleurFiliation}" />`
       );
+
+      // Les pattes qui descendent vers les enfants sont tracées **une par une**,
+      // et non ajoutées au tronc : c'est là que se pose la flèche, et un
+      // `marker-end` sur un chemin à plusieurs `M` ne marquerait que son tout
+      // dernier point — un seul enfant fléché sur toute une fratrie.
+      const pointe = filiationDirigee
+        ? ` marker-end="url(#fl-${couleurFiliation.replace('#', '')})"`
+        : '';
+      enfants.forEach((boite) => {
+        morceaux.push(
+          `<path class="lien-famille" d="M${boite.x + boite.l / 2},${barreEnfants}V${boite.y}"
+                 stroke="${couleurFiliation}"${pointe} />`
+        );
+      });
 
       // Le tronc (barres + tige) appartient à toute la fratrie : impossible d'y
       // lire une filiation précise, il porte donc la liste complète.
@@ -1351,7 +1392,6 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     });
 
     // --- liens sociaux ----------------------------------------------------
-    const couleursFleches = new Set();
     disposition.sociaux.forEach((arete) => {
       const a = boites.get(arete.source);
       const b = boites.get(arete.cible);
@@ -1415,6 +1455,15 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   function couleurType(type, defaut) {
     const entree = (payload?.legende?.types || []).find((t) => t.id === type);
     return entree ? entree.couleur : defaut;
+  }
+
+  /**
+   * Ce type est-il orienté ? La légende porte le drapeau du référentiel, donc
+   * décocher « Lien orienté » sur la filiation retire ses flèches — comme sur
+   * n'importe quel autre type, et sans rien de câblé ici.
+   */
+  function typeDirige(type) {
+    return Boolean((payload?.legende?.types || []).find((t) => t.id === type)?.dirige);
   }
 
   /** Point de sortie du segment a→b sur la bordure de la boîte a. */

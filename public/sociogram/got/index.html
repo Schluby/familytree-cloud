@@ -150,6 +150,33 @@
           <div class="rail-actions" id="accueil-telephone"></div>
         </section>
 
+        <!-- Deux onglets (lot 21.A).
+             Le rail portait neuf blocs à la file, et on descendait sur trois
+             écrans pour atteindre les options. Or ils ne répondent pas à la
+             même question : « Plan » dit **ce qu'on regarde** — les vues, les
+             joueurs, les liens, le filtre — et « Réglages » **avec quoi on
+             travaille** : quelle sauvegarde est ouverte, la démonstration, les
+             réglages d'affichage de la vue. On ouvre le second deux fois par
+             séance, le premier sans arrêt.
+
+             Les deux blocs de téléphone restent **au-dessus** des onglets :
+             `telephone.js` y déménage la barre du haut, et le 👤 ouvre le
+             tiroir dessus. Les enfermer dans un onglet voudrait dire qu'un
+             bouton de la barre du haut peut devenir invisible selon l'onglet
+             actif — la panne exacte qu'on a réparée au lot 12.A. -->
+        <div class="rail-onglets" id="rail-onglets" role="tablist">
+          <button class="rail-onglet actif" type="button" role="tab" data-page="plan"
+                  aria-selected="true" title="Vues, joueurs, liens et filtres">
+            <span class="ico">◫</span><span class="lib">Plan</span>
+          </button>
+          <button class="rail-onglet" type="button" role="tab" data-page="reglages"
+                  aria-selected="false" title="Sauvegardes, démonstration et options d’affichage">
+            <span class="ico">⚙</span><span class="lib">Réglages</span>
+          </button>
+        </div>
+
+        <div class="rail-page" id="rail-page-reglages" data-page="reglages" hidden>
+
         <!-- Lot 14. Bloc à part, et non mêlé aux siennes — pour la même raison
              que « Partagés avec moi » : cet arbre n'est pas à vous, ne compte
              pas dans votre plafond, et **ne se conserve pas**. Le ranger avec
@@ -192,63 +219,89 @@
         </section>
 
         <section class="rail-bloc">
-          <h2>Vues</h2>
-          <ul class="liste-vues" id="liste-vues"></ul>
-        </section>
-
-        <section class="rail-bloc bloc-joueurs" id="bloc-joueurs">
-          <h2>Joueurs</h2>
-          <p class="rail-aide">Un clic passe le plan dans son regard. Clic droit : modifier.</p>
-          <ul class="liste-joueurs" id="liste-joueurs"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouveau-joueur" title="Ajouter un joueur">＋ Nouveau joueur</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc" id="bloc-liens">
-          <h2>Liens</h2>
-          <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : modifier.</p>
-          <ul class="legende" id="legende-types"></ul>
-          <!-- Les liens révolus (ancien vassal, serment rompu) restent dessinés,
-               en pointillé serré. Cet interrupteur ne garde que le présent. -->
-          <label class="option option-revolus">
-            <input type="checkbox" id="bascule-revolus">
-            <span>Masquer les liens révolus</span>
-          </label>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouveau-type" title="Créer un type de lien">＋ Nouveau type</button>
-            <button class="bouton bouton-plat" id="btn-type-historique" hidden
-                    title="Créer le type « Événement historique » — batailles, sièges, serments rompus">＋ Événement</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc" id="bloc-maisons">
-          <div class="rail-bloc-entete">
-            <h2 id="titre-filtre">Filtre</h2>
-            <button class="bouton bouton-icone btn-entete" id="btn-nouveau-filtre"
-                    title="Créer un filtre sur mesure (variable, segments, dégradé, tests)">＋</button>
-          </div>
-          <div class="axes-filtre" id="axes-filtre"></div>
-          <p class="rail-aide" id="aide-filtre">Maisons — un clic isole une maison, un clic droit la modifie.</p>
-          <ul class="legende legende-maisons" id="legende-maisons"></ul>
-          <div class="rail-actions">
-            <button class="bouton bouton-plat" id="btn-nouvelle-maison" title="Créer une entrée sur cet axe">＋ Nouvelle maison</button>
-          </div>
-        </section>
-
-        <section class="rail-bloc">
           <h2>Options</h2>
           <div class="options" id="options-vue"></div>
         </section>
 
         <!-- Le bloc « Édition » est parti dans le dépliant ⌨ de la barre du
              haut (lot 16.D) : ces gestes se cherchent une fois, et occupaient
-             un écran entier du rail à chaque partie. -->
+             un écran entier du rail à chaque partie. Le bloc « Sélection » est
+             parti au lot 21.A : il redisait la fiche de droite, et son seul
+             renseignement propre — combien de fiches sont affichées, combien
+             le filtre en écarte — a rejoint la barre du bas, où il se lit sans
+             ouvrir quoi que ce soit. -->
+        </div>
+
+        <div class="rail-page" id="rail-page-plan" data-page="plan">
 
         <section class="rail-bloc">
-          <h2>Sélection</h2>
-          <div id="stats" class="stats">…</div>
+          <h2>Vues</h2>
+          <ul class="liste-vues" id="liste-vues"></ul>
         </section>
+
+        <!-- Les trois blocs qu'on replie (lot 21.A). Ils sont longs — une
+             légende de maisons fait la hauteur d'un écran à elle seule — et on
+             ne les consulte pas tous en même temps. Le chevron est un vrai
+             bouton de 30 px et non une flèche de 10 : c'est un geste qu'on
+             refait sans arrêt, y compris au doigt. L'état est retenu d'une
+             séance à l'autre. -->
+        <section class="rail-bloc rail-pliable" id="bloc-joueurs">
+          <div class="rail-bloc-entete">
+            <h2>Joueurs</h2>
+            <button class="rail-plier" type="button" aria-expanded="true"
+                    title="Replier ou déplier ce bloc">▾</button>
+          </div>
+          <div class="rail-bloc-contenu">
+            <p class="rail-aide">Un clic passe le plan dans son regard. Clic droit : modifier.</p>
+            <ul class="liste-joueurs" id="liste-joueurs"></ul>
+            <div class="rail-actions">
+              <button class="bouton bouton-plat" id="btn-nouveau-joueur" title="Ajouter un joueur">＋ Nouveau joueur</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="rail-bloc rail-pliable" id="bloc-liens">
+          <div class="rail-bloc-entete">
+            <h2>Liens</h2>
+            <button class="rail-plier" type="button" aria-expanded="true"
+                    title="Replier ou déplier ce bloc">▾</button>
+          </div>
+          <div class="rail-bloc-contenu">
+            <p class="rail-aide">Un clic isole un type, les suivants l’élargissent. Clic droit : modifier.</p>
+            <ul class="legende" id="legende-types"></ul>
+            <!-- Les liens révolus (ancien vassal, serment rompu) restent dessinés,
+                 en pointillé serré. Cet interrupteur ne garde que le présent. -->
+            <label class="option option-revolus">
+              <input type="checkbox" id="bascule-revolus">
+              <span>Masquer les liens révolus</span>
+            </label>
+            <div class="rail-actions">
+              <button class="bouton bouton-plat" id="btn-nouveau-type" title="Créer un type de lien">＋ Nouveau type</button>
+              <button class="bouton bouton-plat" id="btn-type-historique" hidden
+                      title="Créer le type « Événement historique » — batailles, sièges, serments rompus">＋ Événement</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="rail-bloc rail-pliable" id="bloc-maisons">
+          <div class="rail-bloc-entete">
+            <h2 id="titre-filtre">Filtre</h2>
+            <button class="bouton bouton-icone btn-entete" id="btn-nouveau-filtre"
+                    title="Créer un filtre sur mesure (variable, segments, dégradé, tests)">＋</button>
+            <button class="rail-plier" type="button" aria-expanded="true"
+                    title="Replier ou déplier ce bloc">▾</button>
+          </div>
+          <div class="rail-bloc-contenu">
+            <div class="axes-filtre" id="axes-filtre"></div>
+            <p class="rail-aide" id="aide-filtre">Maisons — un clic isole une maison, un clic droit la modifie.</p>
+            <ul class="legende legende-maisons" id="legende-maisons"></ul>
+            <div class="rail-actions">
+              <button class="bouton bouton-plat" id="btn-nouvelle-maison" title="Créer une entrée sur cet axe">＋ Nouvelle maison</button>
+            </div>
+          </div>
+        </section>
+
+        </div>
       </aside>
 
       <!-- Scène : la vue courante s'y monte -->
@@ -256,6 +309,13 @@
         <div class="scene-vide" id="scene-message" hidden></div>
         <div class="infobulle" id="infobulle" hidden></div>
         <div class="astuce-scene" id="astuce-scene" hidden></div>
+        <!-- Ce qui reste du bloc « Sélection » du rail, retiré au lot 21.A :
+             combien de fiches sont affichées, et surtout combien le filtre en
+             écarte. C'est la seule chose qui expliquait un plan à moitié vide,
+             et elle ne vaut que si on la lit sans rien ouvrir. Dans un coin, et
+             non dans la barre du bas : celle-ci est centrée et s'élargirait de
+             250 px pour une phrase qu'on ne regarde pas dix fois par heure. -->
+        <div class="stats-plan" id="stats"></div>
 
         <div class="barre-basse">
           <!-- Créer quelqu'un sans passer par le clic droit : c'est le geste le

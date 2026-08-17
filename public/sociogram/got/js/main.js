@@ -26,6 +26,7 @@ import {
   creerFormulairePersonne,
 } from './editeurs.js';
 import { amenerLaFiche, installerTelephone, surTelephone } from './telephone.js';
+import { installerRail } from './rail.js';
 import { lancerLeTutoriel, tutorielJamaisVu } from './tutoriel.js';
 import { creerCarnet } from './carnet.js';
 import { OUTILS as OUTILS_FORMES } from './formes.js';
@@ -1711,7 +1712,17 @@ function menuLien(aretes, evenement) {
 function modifierLien(aretes, evenement) {
   if (aretes.length > 1) return choisirLien(aretes, evenement, modifierLien);
   masquerInfobulle();
-  editeurLien.ouvrirModification(aretes[0], evenement.clientX, evenement.clientY);
+  const arete = aretes[0];
+  // Une fratrie déduite n'existe pas dans la sauvegarde : elle est recalculée
+  // à chaque plan depuis le parent commun, et n'a donc pas d'id à modifier.
+  // Elle est devenue cliquable au lot 21.B, quand on s'est mis à la dessiner.
+  if (arete.deduit) {
+    // Une seule chaîne, et non deux collées : le dictionnaire de `langue.js`
+    // cherche la phrase entière, et une concaténation ne s'y retrouverait pas.
+    message('Fratrie déduite d’un parent commun : elle n’est pas dans la sauvegarde. Créez un lien « Fratrie » entre ces deux fiches pour pouvoir l’annoter.');
+    return;
+  }
+  editeurLien.ouvrirModification(arete, evenement.clientX, evenement.clientY);
 }
 
 /** Les connecteurs se superposent : on demande lequel avant d'éditer. */
@@ -2378,11 +2389,12 @@ function menuType(type, evenement) {
     { label: 'Nouveau type de lien…', icone: '＋', onclick: () => editeurType.ouvrirCreation(x, y) },
     { separateur: true },
     {
+      // Plus grisé depuis le lot 21.C. Le détail reste : il prévient avant
+      // d'ouvrir, et l'écran de suppression dit ensuite ce qu'on perd.
       label: 'Supprimer ce type…',
       icone: '🗑',
       danger: true,
-      disabled: structurant,
-      detail: structurant ? 'structure l’arbre' : '',
+      detail: structurant ? 'structure le plan' : '',
       onclick: () => editeurType.ouvrirSuppression(type, x, y),
     },
   ]);
@@ -2639,31 +2651,27 @@ function dessinerOptions(vue) {
   );
 }
 
+/**
+ * Le compte-rendu du plan, sur **une ligne**, dans la barre du bas.
+ *
+ * Il tenait sur quatre lignes dans le bloc « Sélection » du rail, retiré au lot
+ * 21.A. Ce qui disait la personne sélectionnée est parti sans regret : la fiche
+ * de droite le dit mieux, et en entier. Ce qui reste est ce que rien d'autre ne
+ * dit — combien de fiches sont affichées, et combien le filtre en écarte.
+ */
 function majStats(info) {
   const stats = etat.payload?.stats;
   if (!stats) return;
-  const noeud = etat.selection ? trouverNoeud(etat.selection) : null;
-  if (noeud) {
-    elements.stats.innerHTML = `
-      <b>${echapper(noeud.label)}</b><br>
-      ${noeud.degre} lien(s) direct(s)<br>
-      <span style="color:var(--texte-faible)">${echapper(noeud.maison_label)} · génération ${
-      (noeud.generation ?? 0) + 1
-    }</span>`;
-    return;
-  }
   const masquees = [
     etat.typesMasques.size ? pluriel(etat.typesMasques.size, 'type') : '',
     etat.noeudsMasques.size ? pluriel(etat.noeudsMasques.size, 'fiche') : '',
   ].filter(Boolean);
   const masques = masquees.length
-    ? `<br><span style="color:var(--texte-faible)">${masquees.join(
-        ' et '
-      )} hors du filtre</span>`
+    ? ` · <span class="stats-filtre">${masquees.join(' et ')} hors du filtre</span>`
     : '';
-  elements.stats.innerHTML = `<b>${info?.personnes ?? stats.personnes}</b> personnes affichées<br><b>${
-    stats.liens
-  }</b> liens · densité ${stats.densite}${masques}`;
+  elements.stats.innerHTML =
+    `<b>${info?.personnes ?? stats.personnes}</b> fiches · ` +
+    `<b>${stats.liens}</b> liens${masques}`;
 }
 
 function echapper(texte) {
@@ -2831,6 +2839,10 @@ elements.btnFermerPanneau.addEventListener('click', () =>
 // descend dans le rail. Voir `telephone.js` : sans ça, ☰ lui-même était hors
 // de l'écran, et le rail devenait inatteignable.
 installerTelephone(elements);
+// Les deux onglets du rail et les blocs qu'on replie (lot 21.A). Après
+// `installerTelephone`, qui a déjà déménagé ce qui doit l'être : le rail est
+// alors dans sa forme définitive, et l'état retenu s'y applique une seule fois.
+installerRail();
 // Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
 // pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
 elements.btnNouveauProfil.addEventListener('click', (evenement) => {

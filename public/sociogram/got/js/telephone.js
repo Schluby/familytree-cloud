@@ -24,6 +24,8 @@
  * jamais qu'une vérité par bouton.
  */
 
+import { montrerBloc } from './rail.js';
+
 const POINT_DE_RUPTURE = '(max-width: 760px)';
 
 /** Sommes-nous sur un écran de téléphone, maintenant ? */
@@ -191,6 +193,10 @@ export function amenerLaFiche() {
  */
 function ouvrirLeRailSur(idBloc, bascule = true) {
   if (!volets) return;
+  // Le rail a deux onglets depuis le lot 21.A, et trois blocs qui se replient :
+  // ouvrir le tiroir sur un bloc rangé dans l'autre onglet, ou replié, ne
+  // montrerait rien. `montrerBloc` remet tout d'aplomb avant qu'on défile.
+  montrerBloc(idBloc);
   // Déjà ouvert **sur ce bloc-là** : le même geste referme. On compare le bloc
   // visé, pour que passer des filtres au compte n'exige pas de fermer d'abord.
   if (bascule && surTelephone() && volets.rail.classList.contains('ouvert') && volets.rail.dataset.sur === idBloc) {

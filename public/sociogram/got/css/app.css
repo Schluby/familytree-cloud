@@ -210,6 +210,31 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 }
 .rail.replie { margin-left: -246px; }
 
+/* --------------------------------------------- les deux onglets (lot 21.A) */
+
+/* Collants en haut : on replie un bloc au bas du rail, et il faut pouvoir
+   changer d'onglet sans remonter tout ce qu'on vient de parcourir. */
+.rail-onglets {
+  position: sticky; top: -14px; z-index: 3;
+  display: flex; gap: 4px;
+  margin: -14px -12px 14px; padding: 12px;
+  background: var(--fond-2); border-bottom: 1px solid var(--bord);
+}
+.rail-onglet {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 6px; min-height: 34px;
+  border: 1px solid var(--bord); border-radius: 8px;
+  background: var(--fond-3); color: var(--texte-faible);
+  cursor: pointer;
+}
+.rail-onglet:hover { color: var(--texte); border-color: var(--accent); }
+.rail-onglet.actif {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.rail-onglet .ico { font-size: 14px; }
+
 .rail-bloc { margin-bottom: 20px; }
 .rail-bloc h2 {
   font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
@@ -223,6 +248,28 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 }
 .rail-bloc-entete h2 { flex: 1; margin: 0; padding: 0; border-bottom: 0; }
 .btn-entete { padding: 1px 7px; font-size: 13px; line-height: 1.2; }
+
+/* ------------------------------------------- les blocs repliés (lot 21.A) */
+
+/* Tout l'en-tête est la cible, pas le seul chevron — 220 px au lieu de 30. */
+.rail-pliable > .rail-bloc-entete { cursor: pointer; user-select: none; }
+.rail-pliable > .rail-bloc-entete:hover h2 { color: var(--texte); }
+/* Un vrai bouton, pas une flèche de 10 px : c'est un geste qu'on refait sans
+   arrêt, au doigt comme à la souris. 30 px est le minimum qu'on vise sans y
+   penser. */
+.rail-plier {
+  flex: 0 0 auto;
+  width: 30px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 13px; line-height: 1;
+  border: 1px solid var(--bord); border-radius: 7px;
+  background: var(--fond-3); color: var(--texte-faible);
+  cursor: pointer;
+}
+.rail-plier:hover { border-color: var(--accent); color: var(--texte); }
+.rail-bloc.plie > .rail-bloc-contenu { display: none; }
+/* Replié, le bloc n'est plus qu'un titre : il n'a plus besoin de son écart. */
+.rail-bloc.plie { margin-bottom: 10px; }
 /* Les axes de filtre, en pastilles : de quoi rappeler un filtre sur mesure
    sans repasser par la liste déroulante du haut. */
 .axes-filtre { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
@@ -266,8 +313,20 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .option { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
 .option input { accent-color: var(--accent); }
 
-.stats { font-size: 11.5px; color: var(--texte-doux); line-height: 1.65; }
-.stats b { color: var(--texte); font-variant-numeric: tabular-nums; }
+/* Le compte-rendu du plan, dans le coin bas gauche de la scène (lot 21.A).
+   `pointer-events: none` : il flotte au-dessus du plan, et un clic qui tombe
+   dessus doit atteindre ce qu'il y a dessous — c'est un écriteau, pas un
+   bouton. */
+.stats-plan {
+  position: absolute; left: 14px; bottom: 22px; z-index: 5;
+  max-width: 250px; padding: 4px 9px;
+  border: 1px solid var(--bord); border-radius: 9px;
+  background: var(--fond-2);
+  font-size: 11px; line-height: 1.35; color: var(--texte-doux);
+  pointer-events: none;
+}
+.stats-plan b { color: var(--texte); font-variant-numeric: tabular-nums; }
+.stats-filtre { color: var(--texte-faible); }
 
 /* ----------------------------------------------------------------- scène */
 
@@ -501,7 +560,8 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   overflow: hidden;
 }
 
-/* La moitié basse : deux quarts, la maison puis le lieu du moment. */
+/* La moitié basse : deux rangées de deux cases — la maison et le rôle qu'on y
+   tient, puis la région et la ville où l'on se trouve (lot 21.D). */
 .carte-corps {
   flex: 0 0 50%; min-height: 0;
   display: flex; flex-direction: column;
@@ -513,16 +573,25 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   box-shadow: var(--carte-ombre);
   transition: opacity .2s ease;
 }
-/* Chacun des deux quarts. Le trait ne sépare que le second : posé sur les
-   deux, il doublerait la bordure du bandeau juste au-dessus. */
+/* Une rangée du corps : la moitié de sa hauteur, deux cases côte à côte. Le
+   trait ne sépare que la seconde rangée — posé sur les deux, il doublerait la
+   bordure du bandeau juste au-dessus. */
+.carte-rangee {
+  flex: 0 0 50%; min-height: 0;
+  display: flex;
+}
+.carte-rangee + .carte-rangee { border-top: 1px solid var(--bord); }
+/* Chacune des quatre cases. `min-width: 0` est indispensable : sans lui, la
+   taille minimale automatique d'un élément flex est celle de son contenu, et un
+   nom de ville un peu long pousserait sa voisine hors de la fiche au lieu de se
+   faire couper. */
 .carte-fait {
-  flex: 0 0 50%;   /* la moitié du corps, donc le quart de la fiche */
+  flex: 1 1 50%; min-width: 0; min-height: 0;
   display: flex; flex-direction: column; justify-content: center;
-  padding: 2px 9px;
-  min-height: 0;
+  padding: 2px 8px;
   overflow: hidden;
 }
-.carte-fait + .carte-fait { border-top: 1px solid var(--bord); }
+.carte-fait + .carte-fait { border-left: 1px solid var(--bord); }
 .carte-fait-lib {
   font-size: 8.5px; letter-spacing: .09em; text-transform: uppercase;
   color: var(--texte-faible); line-height: 1.2;
@@ -1035,6 +1104,13 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .fl-etat { flex: 1; font-size: 11px; color: var(--texte-faible); text-align: right; }
 .fl-etat.erreur { color: #c0392b; }
 .fl-aide { margin: 0; font-size: 11px; color: var(--texte-faible); line-height: 1.45; }
+/* Ce qu'on perd, et non ce qu'on fait : la seule aide qu'on veut lire avant
+   d'appuyer, donc la seule qui se distingue du gris (lot 21.C). */
+.fl-aide.fl-alerte {
+  color: var(--texte); border-left: 3px solid #c0392b;
+  padding: 6px 0 6px 9px; background: rgba(192, 57, 43, .08);
+  border-radius: 0 4px 4px 0;
+}
 
 /* ------------------------------------------------ raccourcis (lot 16.D) */
 
@@ -2176,7 +2252,14 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   .rail .liste-sauvegardes li { min-height: 44px; }
   .rail .axe-puce { min-height: 36px; padding: 6px 12px; font-size: 12px; }
   .rail .btn-entete,
+  .rail .rail-plier,
   .rail .joueur-rail-fiche { min-width: 40px; min-height: 40px; font-size: 16px; }
+  /* Les onglets du rail (lot 21.A) : au doigt aussi, et sans se coller au bord
+     supérieur du tiroir. */
+  .rail .rail-onglet { min-height: 44px; font-size: 13px; }
+  /* L'écriteau du plan disparaît : 375 px d'écran, et la barre du bas passe
+     déjà par-dessus le coin où il vit. */
+  .stats-plan { display: none; }
   .rail .option { min-height: 40px; }
   .rail .option input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 20px; }
   /* Les options numériques d'une vue (taille des cartes, écartement…). */

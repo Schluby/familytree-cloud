@@ -6,8 +6,8 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 20** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 17/08/2026.
+**Les sept lots du plan sont livrés, puis les lots 8 à 21** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 18/08/2026.
 
 **L'application n'est plus à la racine du domaine** (lot 18, 16/08). Elle est
 montée sous `/sociogram/got`, parce que `myschlub.com` porte désormais deux
@@ -26,6 +26,14 @@ un contour de couleur ; on pose des rectangles, des cercles et des zones de
 texte derrière les fiches ; et une maison compte ses unités de guerre. Voir
 « Le plan repensé (lot 20) » plus bas — surtout les deux pièges, qui se
 reproduiront à l'identique dans l'IRL.
+
+Le lot 21 (18/08) range le rail en **deux onglets** (Plan / ⚙ Réglages) avec
+trois blocs repliables, répare deux défauts du tracé des liens — **la flèche de
+filiation ne s'affichait pas, et les fratries explicites entre deux enfants d'un
+même parent non plus** —, lève l'interdiction de supprimer les quatre types
+structurants, et porte la carte du plan à quatre cases (maison, rôle, région,
+ville). Voir « Le rail et les liens (lot 21) » plus bas : la leçon transposable
+est que *placer* et *dessiner* ne doivent pas partager une liste.
 
 Le lot 17 ouvre une **seconde page d'administration**, `/collectif.html` : les
 mondes des membres superposés en un seul sociogramme, où l'on pilote par clic
@@ -949,9 +957,51 @@ dans tout le Nord ; le bouton « ▭ Formes » ouvre le mode dessin.
 
 **Trois champs nouveaux ne s'écrivent que s'ils portent quelque chose** :
 `bordure` sur une personne, `formes` sur le document, `unites` sur une maison.
-C'est la règle de tout ce dépôt — un monde qui ne s'en sert pas doit ressortir
-octet pour octet comme il est entré — et le harnais la vérifie dans les deux
-sens.
+Deux de plus au lot 21.D — `role` et `ville`. C'est la règle de tout ce dépôt —
+un monde qui ne s'en sert pas doit ressortir octet pour octet comme il est
+entré — et le harnais la vérifie dans les deux sens.
+
+## Le rail et les liens (lot 21)
+
+**Placer et dessiner sont deux listes, pas une.** C'était le défaut de 21.B, et
+c'est la chose à ne pas refaire. `calculerMiseEnPage` (`js/views/cartes.js`)
+tient maintenant deux listes de fratries : `fratries` **place** les fiches (donc
+seulement celles dont on ne connaît pas le parent commun — sans elles, un oncle
+sans ascendance finirait en satellite), `fratriesTracees` **dessine** (donc
+toutes les explicites, plus les déduites dont aucun parent commun n'est
+visible). Confondre les deux faisait disparaître, sans un mot, les fratries
+créées à la main entre deux enfants d'un même parent.
+
+**Un `marker-end` ne marque que le dernier point d'un chemin.** Le connecteur de
+descendance est un seul `<path>` à plusieurs `M` : pattes des parents, barre,
+tige, barre des enfants. Y poser une flèche n'en dessinait qu'une, sur le
+dernier enfant. Les pattes d'enfant sont donc tracées **une par une**. Même
+piège partout ailleurs où un chemin porte plusieurs sous-tracés.
+
+**Les fratries déduites sont cliquables mais pas éditables.** Elles n'existent
+pas dans la sauvegarde — elles se recalculent à chaque plan depuis le parent
+commun, avec un id `auto-fratrie-…`. Depuis qu'on les dessine, `modifierLien`
+(`js/main.js`) les refuse explicitement ; sans ce garde, on ouvrirait l'éditeur
+sur un lien que le serveur ne connaît pas.
+
+**Les types structurants se suppriment** (lot 21.C). `TYPES_STRUCTURANTS` ne
+bloque plus, il prévient : `EFFETS_STRUCTURANTS` (`src/domaine/referentiels.ts`)
+dit ce que le plan perd, et descend au front comme les autres catalogues. Ce qui
+rend la chose sûre : **recréer le type avec le même id lui rend son rôle**, la
+mise en page ne connaissant que la chaîne (`role()` dans `vues/sociogramme.ts`,
+`type === 'parent'` dans `genealogie.ts`).
+
+**`montrerBloc()` est la seule carte du rail** (`js/rail.js`). Le rail a deux
+onglets depuis 21.A, et trois blocs qui se replient. Trois appelants doivent
+amener un bloc sous les yeux sans savoir où il vit : le ⛨ du téléphone
+(`telephone.js`), la visite guidée (`tutoriel.js`), et le rail au démarrage.
+Tout ce qui vise un bloc du rail passe par là — sinon chaque appelant porterait
+sa propre carte, et se tromperait au premier déménagement.
+
+**Les blocs `#bloc-compte` et `#bloc-telephone` restent hors des onglets.**
+`telephone.js` y déménage la barre du haut sous 760 px. Les ranger dans un
+onglet voudrait dire qu'un bouton de la barre peut devenir invisible selon
+l'onglet actif — la panne réparée au lot 12.A.
 
 ## Pour repartir
 

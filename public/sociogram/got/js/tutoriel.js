@@ -28,16 +28,23 @@
  */
 
 import { surTelephone, derouler } from './telephone.js';
+import { montrerBloc } from './rail.js';
 
 const DEJA_VU = 'familytree-tutoriel-vu';
 
 /**
- * Ouvre le tiroir sur le bloc où vit la cible, quand l'écran est étroit.
+ * Amène le bloc où vit la cible — le bon onglet, le bloc déplié — puis ouvre le
+ * tiroir quand l'écran est étroit.
+ *
+ * `montrerBloc` sur **tous** les écrans depuis le lot 21.A : le rail a deux
+ * onglets, et trois de ces étapes visent un bloc rangé dans celui qu'on
+ * n'affiche pas. Un halo posé sur un bloc caché ne montre rien.
  *
  * `derouler` et non `ouvrirLesFiltres` : celui-ci est une bascule, et trois
  * étapes d'affilée dans le tiroir se refermaient l'une l'autre.
  */
 const dansLeTiroir = (idBloc) => () => {
+  montrerBloc(idBloc);
   if (surTelephone()) derouler(idBloc);
 };
 

@@ -2216,3 +2216,145 @@ première entrée plutôt que de faire échouer l'enregistrement.
   sait écrire les caractéristiques d'une maison chez plusieurs comptes ; il ne
   sait pas écrire ses unités. Elles changent de séance en séance et par table —
   c'est le contraire d'une donnée qu'on applique en masse.
+
+---
+
+# Lot 21 — Le rail rangé, les liens réparés, deux champs de plus  ☑
+
+*Demandé le 18/08/2026. Trois demandes, dont **une seule signale quelque chose
+de cassé** — et c'est par là qu'il fallait commencer.*
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 21.A | Deux onglets dans le rail (Plan / ⚙ Réglages), trois blocs repliables, « Sélection » retiré. | `index.html`, `js/rail.js`, `css/app.css` |
+| 21.B | La flèche de filiation, et les fratries qui ne se dessinaient pas. | `js/views/cartes.js` |
+| 21.C | Filiation, Union, Liaison et Fratrie se suppriment. | `referentiels.ts`, `routes.ts`, `js/editeurs.js` |
+| 21.D | `role` et `ville` : la carte du plan passe à quatre cases. | `models.ts`, `js/panel.js`, `js/views/cartes.js` |
+
+## Le défaut qu'on répare (21.B)
+
+Signalé ainsi : « les liens de fraternité ne s'affichent pas ». C'était vrai, et
+pour une raison précise. `calculerMiseEnPage` construisait **une** liste de
+fratries et s'en servait pour deux choses incompatibles :
+
+1. **placer** les fiches — et pour ça, seule compte la fratrie dont on ne
+   connaît pas le parent commun : sans elle, un oncle sans ascendance connue
+   finirait en satellite. Une fratrie entre deux enfants d'un même parent
+   n'apprend rien de plus, le connecteur de famille les a déjà rangés côte à
+   côte ;
+2. **dessiner** les traits — où celle-là compte, justement, parce que quelqu'un
+   l'a créée à la main.
+
+Une seule liste pour deux usages, et c'est le second qui perdait : sur les onze
+fratries explicites du monde de démonstration, **deux disparaissaient sans un
+mot** — Viserys ↔ Daenerys et Tyrion ↔ Jaime. Les deux listes sont maintenant
+séparées (`fratries` place, `fratriesTracees` dessine).
+
+Les fratries **déduites** suivent une règle différente, et c'est délibéré :
+elles ne se dessinent que si aucun parent commun n'est visible — filtré par
+maison, par statut, ou simplement absent. Toutes les tracer couvrirait le plan
+de n² accolades qui ne répètent que ce que l'arbre dit déjà. En contrepartie,
+elles sont devenues cliquables, donc `modifierLien` les refuse explicitement :
+une fratrie déduite n'a pas d'identifiant dans la sauvegarde, l'éditer voudrait
+dire écrire dans un lien qui n'existe pas.
+
+**La flèche de filiation**, elle, ne manquait pas par oubli : le connecteur de
+descendance est **un seul chemin** à plusieurs sous-tracés (les pattes des
+parents, la barre, la tige, la barre des enfants, les pattes des enfants), et en
+SVG un `marker-end` ne marque que le tout dernier point d'un chemin — un seul
+enfant fléché sur toute une fratrie. Les pattes d'enfant sont donc tracées **une
+par une**, chacune portant sa pointe. Elle n'apparaît que si le type est déclaré
+orienté : décocher « Lien orienté » sur la filiation les retire toutes, sans
+rien de câblé dans le rendu.
+
+## Ce qui n'est plus interdit (21.C)
+
+`TYPES_STRUCTURANTS` refusait la suppression de quatre types. L'argument tenait
+— la filiation construit les générations, l'union dessine la barre de couple —
+mais il décidait à la place de la table : une campagne qui ne joue ni les
+liaisons ni les fratries traînait deux lignes mortes dans chaque menu. La
+constante reste, son usage change : elle ne **bloque** plus, elle **prévient**.
+`EFFETS_STRUCTURANTS` dit pour chacun ce que le plan perdra, en une phrase
+descendue au front comme les autres catalogues.
+
+Ce qui rend la chose acceptable est vérifié par le harnais : **recréer un type
+avec le même identifiant lui rend exactement son rôle**, la mise en page ne
+connaissant que la chaîne. Supprimer n'est donc pas irréparable — et la
+suppression requalifie les liens existants au lieu de les détruire, par défaut.
+
+## La carte à quatre cases (21.D)
+
+Le corps de la fiche passe de deux quarts à deux rangées de deux cases : maison
+et rôle, région et ville. Mesuré sur les 67 fiches du monde de démonstration :
+**132 px = 66 (nom) + 33 + 33**, quatre cases de 92 px.
+
+`role` est le rôle tenu **dans sa maison** — mestre, capitaine des gardes,
+otage. Ce n'est pas un titre : les `titres` sont ce que le monde donne (« Ser »,
+« Gardien du Nord »), ils sont plusieurs et vivent dans la fiche ; le rôle est
+ce qu'on *fait* là où l'on sert, et il n'y en a qu'un parce que la carte n'a
+qu'un quart de ligne à lui offrir. Les deux champs suivent la règle du projet :
+**écrits seulement s'ils portent quelque chose**, et ils sont filtrables, parce
+que tout ce que la carte montre doit pouvoir servir d'axe.
+
+## Le rail (21.A)
+
+Neuf blocs à la file, c'était trois écrans pour atteindre les options. Le
+problème n'était pas la longueur mais le mélange : « quelle sauvegarde est
+ouverte » et « quelles maisons j'affiche » ne se demandent jamais dans la même
+minute. Deux pages, donc — **Plan** (vues, joueurs, liens, filtre) et **⚙
+Réglages** (démonstration, sauvegardes, partages, options).
+
+Trois choses méritent d'être sues :
+
+- **`montrerBloc()` est la seule façon d'amener un bloc sous les yeux.** Trois
+  appelants en ont besoin sans savoir dans quel onglet le bloc vit : le ⛨ du
+  téléphone, la visite guidée, et le rail au démarrage. Sans elle, chacun
+  porterait une carte du rail, et se tromperait le jour où un bloc déménage.
+- **Les deux blocs de téléphone restent hors des onglets.** `telephone.js` y
+  déménage la barre du haut ; les enfermer dans un onglet voudrait dire qu'un
+  bouton de la barre peut devenir invisible selon l'onglet actif — la panne
+  exacte réparée au lot 12.A.
+- **Tout l'en-tête d'un bloc est cliquable**, pas seulement le chevron : 220 px
+  de cible au lieu de 30. Le ＋ des filtres, lui, garde son clic.
+
+Le bloc « Sélection » est retiré. Il redisait la fiche de droite, en moins bien.
+Son seul renseignement propre — combien de fiches sont affichées, combien le
+filtre en écarte — a rejoint un écriteau dans le coin bas gauche du plan : c'est
+la seule chose qui expliquait un plan à moitié vide, et elle ne vaut que si on
+la lit sans rien ouvrir.
+
+## Vérification
+
+**828/828** au harnais, contre 785 à la fin du lot 20. Les 43 vérifications
+neuves couvrent notamment : la fratrie explicite entre deux enfants d'un même
+père qui doit voyager dans le plan, la suppression d'un type structurant qui
+requalifie au lieu de détruire, sa recréation sous le même identifiant, les deux
+nouveaux champs qui **ne s'écrivent pas** quand ils sont vides, et le fait que
+`montrerBloc` est bien appelée par le tiroir *et* par la visite guidée.
+
+Une note pour la prochaine fois : le premier passage a rendu **827/828**, sur
+« l'année de campagne se relit » — une vérification du lot 8, qu'aucun de ces
+changements ne touche. Reproduite à la main sur un compte neuf, elle passe ;
+rejouée dans le harnais, elle passe aussi. C'était le serveur de développement,
+qui venait de redémarrer. Le réflexe utile est celui-là : **reproduire l'échec
+tout seul avant de le croire**, parce qu'un harnais de 828 requêtes contre un
+`wrangler dev` local en produit de temps en temps.
+
+**0 chaîne sans traduction sur 963 relevées** (`outils/relever-textes.mjs`).
+
+## Ce qui n'est pas fait, et pourquoi
+
+- **Les fratries déduites ne se dessinent pas quand le parent commun est
+  visible.** C'est un choix, pas un oubli (voir plus haut) : six enfants d'un
+  même couple feraient quinze accolades pour zéro information neuve. Si le
+  besoin apparaît, la bonne forme serait un interrupteur dans « Options », pas
+  un changement de règle.
+- **La suppression d'un type structurant n'est pas rejouable.** Recréer
+  `parent` lui rend son rôle, mais les liens détruits — si on a choisi de les
+  détruire plutôt que de les requalifier — ne reviennent pas. C'est vrai de
+  toute suppression dans l'application, et l'instantané (📸) est la réponse.
+- **`role` et `ville` ne sont pas dans les lots d'administration.** Comme les
+  unités du lot 20.E : ce sont des données de table, pas des données qu'on
+  applique en masse à douze comptes.
+- **L'écriteau du plan disparaît sous 760 px.** Sur 375 px d'écran, la barre du
+  bas passe déjà par-dessus le coin où il vit.

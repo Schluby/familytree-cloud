@@ -931,6 +931,8 @@ export function creerEditeurType(rappels = {}) {
     catalogues().categories ||
     Object.entries(LIBELLES_CATEGORIE).map(([id, label]) => ({ id, label }));
   const structurant = (id) => (catalogues().types_structurants || []).includes(id);
+  /** Ce que le plan perdra sans ce type. Vient du serveur, pas d'ici. */
+  const effetStructurant = (id) => (catalogues().effets_structurants || {})[id] || '';
   const autres = () => (rappels.types?.() || []).filter((type) => type.id !== brouillon.id);
 
   function ouvrirCreation(x, y) {
@@ -973,7 +975,10 @@ export function creerEditeurType(rappels = {}) {
 
   function ouvrirSuppression(type, x, y) {
     charger(type);
-    mode = structurant(type.id) ? 'edition' : 'suppression';
+    // Un type structurant ne renvoyait plus ici vers l'édition depuis le lot
+    // 21.C : il se supprime comme les autres, et c'est l'écran de suppression
+    // qui dit ce que le plan y perdra.
+    mode = 'suppression';
     monter(x, y);
   }
 
@@ -1077,7 +1082,7 @@ export function creerEditeurType(rappels = {}) {
     refs.fleche = h('span', { class: 'ap-fleche', texte: '▶' });
     refs.apercuNom = h('span', {});
 
-    const verrouille = !creation && structurant(brouillon.id);
+    const charpente = !creation && structurant(brouillon.id);
 
     const panneau = h('div', { class: 'flottant editeur-referentiel' }, [
       entete(creation ? 'Nouveau type de lien' : 'Modifier le type de lien', socle.fermer),
@@ -1101,14 +1106,12 @@ export function creerEditeurType(rappels = {}) {
           refs.categorie,
         ]),
         h('div', { class: 'fl-apercu' }, [refs.trait, refs.fleche, refs.apercuNom]),
-        verrouille &&
+        charpente &&
           h('p', {
             class: 'fl-aide',
-            texte:
-              'Ce type structure l’arbre (générations, couples, fratries) : il se renomme et se recolore, mais ne se supprime pas.',
+            texte: 'Ce type structure le plan — son nom se change, son id non.',
           }),
         !creation &&
-          !verrouille &&
           h('p', {
             class: 'fl-aide',
             texte: `${brouillon.liens} lien${
@@ -1119,7 +1122,7 @@ export function creerEditeurType(rappels = {}) {
       pied(refs, {
         valider,
         libelle: creation ? '＋ Créer' : 'Enregistrer',
-        supprimer: !creation && !verrouille && basculerSuppression,
+        supprimer: !creation && basculerSuppression,
       }),
     ]);
 
@@ -1166,9 +1169,18 @@ export function creerEditeurType(rappels = {}) {
       refs.repli.value = liste.some((type) => type.id === 'autre') ? 'autre' : liste[0].id;
     }
 
+    const effet = effetStructurant(brouillon.id);
+
     return h('div', { class: 'flottant editeur-referentiel' }, [
       entete(`Supprimer « ${brouillon.label} » ?`, socle.fermer),
       h('div', { class: 'fl-corps' }, [
+        // L'avertissement d'abord : combien de liens tombent, on le lit après
+        // avoir décidé si on veut encore de ce type-là.
+        !!effet &&
+          h('p', {
+            class: 'fl-aide fl-alerte',
+            texte: `Ce type structure le plan : ${effet} Le recréer plus tard avec le même identifiant lui rendra son rôle.`,
+          }),
         h('p', {
           class: 'fl-aide',
           texte: brouillon.liens

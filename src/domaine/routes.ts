@@ -778,7 +778,15 @@ routesDomaine.patch('/types-relations/:id', async (c) => {
   }
 });
 
-/** Sans `?remplacement=`, les liens de ce type disparaissent avec lui. */
+/**
+ * Sans `?remplacement=`, les liens de ce type disparaissent avec lui.
+ *
+ * Y compris pour un type structurant (filiation, union, liaison, fratrie) :
+ * l'interdiction a sauté au lot 21.C. Le seul garde-fou qui reste est qu'il
+ * doit rester un type — un catalogue vide n'aurait plus rien à proposer pour
+ * créer le lien suivant. L'avertissement, lui, est dans l'interface : c'est là
+ * qu'on peut dire *ce qu'on perd* avant que la main ne parte.
+ */
 routesDomaine.delete('/types-relations/:id', async (c) => {
   const courant = await monde(c);
   if (courant instanceof Response) return courant;
@@ -790,12 +798,6 @@ routesDomaine.delete('/types-relations/:id', async (c) => {
   }
 
   try {
-    if ((referentiels.TYPES_STRUCTURANTS as readonly string[]).includes(identifiant)) {
-      throw new ErreurReferentiel(
-        `« ${dataset.typeRelation(identifiant).label ?? identifiant} » structure l'arbre ` +
-          '(générations, couples, fratries) : renommez-le ou changez sa couleur, mais gardez-le'
-      );
-    }
     if (Object.keys(dataset.types_relations).length <= 1) {
       throw new ErreurReferentiel("c'est le dernier type de lien : il en faut au moins un");
     }

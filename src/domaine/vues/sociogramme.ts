@@ -230,6 +230,11 @@ export class VueSociogramme extends Vue {
         decalage: personne.decalage,
         titres: personne.titres,
         lieu: personne.lieu,
+        // Les deux autres quarts de la carte (lot 21.D). Ils voyagent avec
+        // `lieu` et non dans `noeudMinimal` : seule la vue en cartes les
+        // affiche, et un payload de liste n'a rien à en faire.
+        role: personne.role,
+        ville: personne.ville,
         notes: personne.notes,
         notes_joueurs: personne.relations_joueurs,
         note_joueurs_moyenne: noteJoueursMoyenne(personne.relations_joueurs),

@@ -77,6 +77,10 @@ export function variables(dataset: Dataset): FicheVariable[] {
     { id: 'importance', label: 'Importance', genre: 'nombre' },
     { id: 'liens', label: 'Nombre de liens', genre: 'nombre' },
     { id: 'lieu', label: 'Lieu', genre: 'texte' },
+    // Lot 21.D. Ce que la carte du plan montre doit pouvoir servir d'axe : les
+    // quatre faits d'une fiche sont maintenant maison, rôle, région et ville.
+    { id: 'role', label: 'Rôle dans la maison', genre: 'texte' },
+    { id: 'ville', label: 'Ville', genre: 'texte' },
     { id: 'genre', label: 'Genre', genre: 'texte' },
     { id: 'tags', label: 'Tags', genre: 'liste' },
     { id: 'titres', label: 'Titres', genre: 'liste' },
@@ -117,6 +121,8 @@ function estFlottante(identifiant: string): boolean {
 const CHAMPS_DIRECTS = new Set([
   'statut',
   'lieu',
+  'role',
+  'ville',
   'genre',
   'tags',
   'titres',
