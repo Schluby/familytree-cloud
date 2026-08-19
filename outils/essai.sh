@@ -2269,6 +2269,34 @@ code - GET /js/editeurs.js > /dev/null
 verifier "un profil cree tombe sous le curseur" oui "$(contient 'Math.round(surLePlan.x - 93)')"
 
 # ---------------------------------------------------------------------------
+# Lot 23.A : un panneau flottant ne sort jamais de l'ecran
+#
+# Signale sur l'editeur de filtre : son bouton « Enregistrer » passait sous le
+# bord de la fenetre. Deux causes, et il fallait les deux corrections.
+#
+#  1. Seul `.fl-corps` etait borne (62vh), pas le panneau : l'entete et le pied
+#     s'ajoutaient par-dessus, et le total depassait la hauteur de l'ecran.
+#  2. `placer` mesure au montage, or cet editeur se remplit **ensuite** — son
+#     apercu vient du serveur. Il grandissait apres avoir ete place, et rien ne
+#     le rattrapait.
+#
+# Le harnais ne mesure pas des hauteurs ; il verifie que les deux corrections
+# sont bien dans ce qui est servi.
+# ---------------------------------------------------------------------------
+
+echo "-- 23.A le panneau qui ne deborde plus"
+code - GET /css/app.css > /dev/null
+verifier "le panneau entier est borne a l'ecran" oui "$(contient 'max-height: calc(100vh - 20px)')"
+verifier "  l'entete et le pied ne se font pas rogner" oui "$(contient '.fl-entete, .fl-pied { flex: 0 0 auto; }')"
+verifier "  c'est le corps qui se retrecit" oui "$(contient '.fl-corps { flex: 1 1 auto; min-height: 0; }')"
+code - GET /js/dom.js > /dev/null
+verifier "un panneau qui grandit est replace" oui "$(contient 'requestAnimationFrame(replacer)')"
+verifier "  y compris quand il se remplit du reseau" oui "$(contient 'setTimeout(replacer, 500)')"
+verifier "  et quand la fenetre change de taille" oui "$(contient "window.addEventListener('resize', replacer)")"
+verifier "  sans dependre d'un observateur qui peut dormir" oui "$(contient "typeof ResizeObserver === 'function'")"
+verifier "  celui qui tient a sa place la garde" oui "$(contient 'if (exactement) poser(element')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

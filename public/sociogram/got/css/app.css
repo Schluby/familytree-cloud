@@ -1189,12 +1189,23 @@ body.sombre .menu-item.danger { color: #e8776b; }
 body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .menu-separateur { height: 1px; background: var(--bord); margin: 4px 2px; }
 
+/* Un panneau ne dépasse jamais de l'écran (lot 23.A).
+   `.fl-corps` était seul borné, à 62vh — mais l'entête et le pied s'ajoutaient
+   par-dessus, si bien qu'un éditeur chargé (celui des filtres : variable,
+   segments, dégradé, tests) montait à 565 px et poussait son bouton
+   « Enregistrer » sous le bord de la fenêtre, hors d'atteinte. On borne donc le
+   panneau **entier**, et c'est le corps qui se rétrécit et défile. */
 .flottant {
   position: fixed; z-index: 60; width: 322px;
   display: flex; flex-direction: column; overflow: hidden;
+  max-height: calc(100vh - 20px);
   background: var(--fond-2); border: 1px solid var(--bord-clair);
   border-radius: 12px; box-shadow: var(--ombre-panneau);
 }
+/* L'entête et le pied gardent leur taille : ce sont le titre et les boutons,
+   les deux choses qu'on ne veut jamais voir rognées. */
+.fl-entete, .fl-pied { flex: 0 0 auto; }
+.fl-corps { flex: 1 1 auto; min-height: 0; }
 .fl-entete {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 10px 9px 9px 12px; border-bottom: 1px solid var(--bord);

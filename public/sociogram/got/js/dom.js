@@ -198,6 +198,11 @@ export function poser(element, x, y, { marge = 8 } = {}) {
  */
 export function creerFlottant({ surFermeture, persistant = false } = {}) {
   let element = null;
+  /** L'endroit visé au montage : il sert à replacer le panneau s'il grandit. */
+  let ancre = { x: 0, y: 0 };
+  let exactement = false;
+  let surveillant = null;
+  let relances = [];
 
   function surClicExterieur(evenement) {
     if (element && !element.contains(evenement.target)) fermer();
@@ -241,21 +246,81 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
 
   function fermer() {
     if (!element) return;
+    surveillant?.disconnect();
+    surveillant = null;
+    relances.forEach(clearTimeout);
+    relances = [];
     element.remove();
     element = null;
     document.removeEventListener('mousedown', surClicExterieur, true);
     document.removeEventListener('keydown', surTouche, true);
     document.removeEventListener('keydown', surEntree);
     window.removeEventListener('blur', fermer);
+    window.removeEventListener('resize', replacer);
     surFermeture?.();
+  }
+
+  /**
+   * `poser` comme `placer` ramènent dans l'écran ce qui en sortirait : les
+   * rappeler suffit. On garde le mode de pose d'origine — l'éditeur de filtre
+   * tient à ce que son panneau ne bouge pas d'un pixel pendant qu'on le règle
+   * (`exact: true`), et ce vœu-là reste exaucé tant qu'il tient dans la
+   * fenêtre.
+   */
+  function replacer() {
+    if (!element) return;
+    if (exactement) poser(element, ancre.x, ancre.y);
+    else placer(element, ancre.x, ancre.y);
   }
 
   function monter(contenu, x, y, { exact = false } = {}) {
     fermer();
     element = contenu;
+    ancre = { x, y };
+    exactement = exact;
     document.body.append(element);
     if (exact) poser(element, x, y);
     else placer(element, x, y);
+
+    /**
+     * Un panneau grandit **après** avoir été placé (lot 23.A).
+     *
+     * `placer` mesure au moment du montage. Or plusieurs éditeurs se remplissent
+     * ensuite — l'éditeur de filtre ajoute ses segments et sa bande de dégradé,
+     * l'éditeur d'une forme se reconstruit quand on change sa portée. Le panneau
+     * gagne alors cent pixels vers le bas, et son pied — donc son bouton
+     * « Enregistrer » — passe sous le bord de l'écran, sans que rien ne le
+     * rattrape : c'est exactement ce qu'on nous a signalé sur le filtre.
+     *
+     * On le replace donc à chaque changement de taille. `placer` sait déjà
+     * remonter ce qui dépasse ; il lui manquait seulement d'être rappelé.
+     */
+    /**
+     * Un panneau grandit **après** avoir été placé (lot 23.A).
+     *
+     * `placer` mesure au montage. Or plusieurs éditeurs se remplissent ensuite :
+     * celui des filtres calcule son aperçu — variable, segments, bande de
+     * dégradé — par un aller-retour avec le serveur, et gagne alors cent
+     * cinquante pixels vers le bas. Son pied, donc son bouton « Enregistrer »,
+     * passait sous le bord de l'écran sans que rien ne le rattrape. C'est ce
+     * qu'on nous a signalé.
+     *
+     * Trois filets, parce qu'aucun ne suffit seul :
+     *  - la frame suivante attrape ce qui se remplit dans la foulée du montage ;
+     *  - deux relances courtes attrapent ce qui arrive du réseau ;
+     *  - `ResizeObserver` attrape tout le reste — quand il fonctionne. Il est
+     *    inerte dans un onglet qui ne peint pas (navigateur d'inspection, onglet
+     *    d'arrière-plan), d'où les deux premiers, qui ne dépendent que des
+     *    minuteurs.
+     */
+    requestAnimationFrame(replacer);
+    relances = [setTimeout(replacer, 120), setTimeout(replacer, 500)];
+    if (typeof ResizeObserver === 'function') {
+      surveillant = new ResizeObserver(replacer);
+      surveillant.observe(element);
+    }
+    window.addEventListener('resize', replacer);
+
     if (!persistant) {
       document.addEventListener('mousedown', surClicExterieur, true);
       window.addEventListener('blur', fermer);
