@@ -11,11 +11,10 @@ import { enregistrerRendu, obtenirRendu } from './registry.js';
 import { creerPanneau } from './panel.js';
 import { creerMenu } from './menu.js';
 import { curseurHumeur, definirTable, tableHumeur } from './humeur.js';
-import { ageAffiche, formaterAge } from './calendrier.js';
+import { ageAffiche, formaterAge, decalerAnnee } from './calendrier.js';
 import { RANGS, basculerRang, porteLeRang } from './rangs.js';
 import { surMenuContextuel, telecharger } from './dom.js';
 import {
-  creerEditeurAnnee,
   creerEditeurCategorie,
   creerEditeurJoueur,
   creerEditeurFiltre,
@@ -88,7 +87,10 @@ const elements = {
   zoomMoins: document.getElementById('zoom-moins'),
   zoomPlus: document.getElementById('zoom-plus'),
   lienDocument: document.getElementById('lien-document'),
-  btnAnnee: document.getElementById('btn-annee'),
+  champAnnee: document.getElementById('champ-annee'),
+  saisieAnnee: document.getElementById('saisie-annee'),
+  btnAnneeMoins: document.getElementById('btn-annee-moins'),
+  btnAnneePlus: document.getElementById('btn-annee-plus'),
   blocJoueurs: document.getElementById('bloc-joueurs'),
   listeJoueurs: document.getElementById('liste-joueurs'),
   btnNouveauJoueur: document.getElementById('btn-nouveau-joueur'),
@@ -364,19 +366,29 @@ const editeurCategorieRapide = creerEditeurCategorie({
   },
 });
 
-// Changer l'année recalcule tous les âges : la vue et la fiche ouverte
-// repartent du serveur, sinon on lirait des âges d'avant la bascule.
-const editeurAnnee = creerEditeurAnnee({
-  annee: () => anneeCourante(),
-  document: () => etat.referentiels.meta?.document || '',
-  surChangement: async (meta) => {
+/**
+ * Écrire l'année, depuis la barre du haut (lot 22.A).
+ *
+ * Changer l'année recalcule tous les âges : la vue et la fiche ouverte repartent
+ * du serveur, sinon on lirait des âges d'avant la bascule. C'est pour ça que ce
+ * champ n'envoie pas à chaque frappe — on attend qu'on le quitte ou qu'on
+ * valide, sinon « 300 » ferait trois rechargements complets en chemin.
+ */
+async function enregistrerAnnee(valeur) {
+  const annee = String(valeur || '').trim();
+  if (annee === anneeCourante()) return;
+  try {
+    const { meta } = await Api.majMeta({ annee_courante: annee });
     etat.referentiels = { ...etat.referentiels, meta };
     dessinerAnnee();
     await rechargerVue({ conserverFocus: true });
     if (etat.selection) await panneau.afficher(etat.selection, { secrets: !!etat.parametres.secrets });
     astuce(`Nous sommes en ${meta.annee_courante || '—'} : les âges ont suivi.`);
-  },
-});
+  } catch (erreur) {
+    message(`Année non enregistrée : ${erreur.message}`);
+    dessinerAnnee(); // on remet ce que le serveur dit, pas ce qu'on a tapé
+  }
+}
 
 const editeurType = creerEditeurType({
   types: () => etat.referentiels.types_relations || [],
@@ -384,10 +396,9 @@ const editeurType = creerEditeurType({
   surChangement: surReferentielChange,
 });
 
-const editeurCategorie = creerEditeurCategorie({
-  categories: () => etat.referentiels.categories_maisons || [],
-  surChangement: surReferentielChange,
-});
+/* L'éditeur « plein » de catégories est parti avec l'axe (lot 22.A) : il
+   n'était atteignable que depuis le bloc du rail. `editeurCategorieRapide`,
+   lui, reste — c'est celui qu'ouvre la fiche d'une maison. */
 
 const editeurJoueur = creerEditeurJoueur({
   joueurs: () => etat.referentiels.joueurs || [],
@@ -639,11 +650,10 @@ const anneeCourante = () => etat.referentiels.meta?.annee_courante || '';
 
 function dessinerAnnee() {
   const annee = anneeCourante();
-  elements.btnAnnee.textContent = annee ? `📅 ${annee}` : '📅 Année…';
-  elements.btnAnnee.title = annee
-    ? `Année courante de la campagne : ${annee}. Les âges des fiches en découlent — cliquez pour l’avancer.`
-    : 'Aucune année de campagne : les fiches n’affichent que leur année de naissance. Cliquez pour la régler.';
-  elements.btnAnnee.classList.toggle('sans-annee', !annee);
+  // Ne pas écraser ce qu'on est en train de taper : ce champ est réécrit à
+  // chaque rechargement de vue, et il y en a un par édition.
+  if (document.activeElement !== elements.saisieAnnee) elements.saisieAnnee.value = annee;
+  elements.champAnnee.classList.toggle('sans-annee', !annee);
 }
 
 function message(texte) {
@@ -1013,7 +1023,11 @@ function dessinerListeVues() {
 function listeAxes() {
   return [
     { id: 'maison', label: 'Maison', court: 'Maison' },
-    { id: 'categorie', label: 'Catégorie de maison', court: 'Catégorie' },
+    // « Catégorie de maison » est partie au lot 22.A : personne ne savait ce
+    // qu'elle désignait. Le champ existe encore sur une maison (fiche de
+    // maison) et dans les filtres sur mesure, mais il n'est plus un axe de
+    // couleur, et le bloc « Catégories » du rail disparaît avec lui — c'était
+    // le même code.
     { id: 'generation', label: 'Génération', court: 'Génération' },
     { id: 'statut', label: 'Statut (vivant / mort)', court: 'Statut' },
     { id: 'joueurs', label: 'Humeur envers les joueurs (moyenne)', court: 'Humeur' },
@@ -1143,18 +1157,23 @@ async function rechargerVue({ conserverFocus = false } = {}) {
       },
       surDisposition: (info) => majStats(info),
       surMenuCarte: (id, evenement) => menuCarte(id, evenement),
-      surMenuFond: (evenement) => menuFond(evenement),
+      surMenuFond: (evenement, point) => menuFond(evenement, point),
       surMenuLien: (aretes, evenement) => menuLien(aretes, evenement),
       surClicLien: (aretes, evenement) => modifierLien(aretes, evenement),
       surLiaison: ({ source, cible }, evenement) => {
         masquerInfobulle();
         if (cible) editeurLien.ouvrirCreation({ source, cible }, evenement.clientX, evenement.clientY);
         else
-          formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { lierA: source });
+          formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, {
+            lierA: source,
+            // Lâché dans le vide : la nouvelle fiche naît là où on a lâché.
+            position: etat.moteur?.pointDuPlan?.(evenement),
+          });
       },
       surLiaisonRapide: (id, evenement) => liaisonRapide(id, evenement),
-      surDeport: (id, decalage) => enregistrerDeport(id, decalage),
-      surFormeCreee: (donnees) => creerForme(donnees),
+      surPositions: (positions) => enregistrerPositions(positions),
+      surSelectionMultiple: (combien) => majSelectionMultiple(combien),
+      surFormeCreee: (donnees, point) => creerForme(donnees, point),
       surFormeModifiee: (id, patch) => enregistrerForme(id, patch),
       surFormeSupprimee: (id) => supprimerForme(id),
       surOutilForme: () => majBarreFormes(),
@@ -1167,7 +1186,6 @@ async function rechargerVue({ conserverFocus = false } = {}) {
 
   etat.moteur.rendre(payload, {
     couleurPar: etat.couleurPar,
-    couleursCategories: couleursCategories(),
     couleursNoeuds: couleursNoeuds(),
     recherche: etat.recherche,
     typesMasques: etat.typesMasques,
@@ -1193,6 +1211,10 @@ async function rechargerVue({ conserverFocus = false } = {}) {
   if (etat.carnetPlace === 'volet') carnet.charger();
 
   if (conserverFocus && etat.selection) etat.moteur.focus(etat.selection, { animer: false });
+
+  // Après le rendu, et sans l'attendre : le plan est déjà juste à l'écran, on
+  // ne fait qu'inscrire ce qu'il montre pour qu'il ne bouge plus (lot 22.D).
+  figerLesPositions();
 }
 
 /**
@@ -1449,14 +1471,57 @@ function annulerLiaisonRapide() {
   astuce('');
 }
 
-/** Ctrl + glisser : on mémorise l'écart à la position calculée. */
-async function enregistrerDeport(id, decalage) {
+/**
+ * Ctrl + glisser : on enregistre où les fiches ont été posées (lot 22.D).
+ *
+ * Une position absolue, et non plus un écart : c'est ce qui fait qu'ajouter un
+ * lien ou quelqu'un ne déplace plus rien. Plusieurs d'un coup, parce qu'on peut
+ * en tenir toute une main.
+ */
+async function enregistrerPositions(positions) {
   try {
-    await Api.majPersonne(id, { decalage });
-    const noeud = trouverNoeud(id);
-    if (noeud) noeud.decalage = decalage;
+    await Api.majPositions(positions);
+    Object.entries(positions).forEach(([id, position]) => {
+      const noeud = trouverNoeud(id);
+      if (noeud) {
+        noeud.position = position;
+        noeud.decalage = null;
+      }
+    });
   } catch (erreur) {
     message(`Position non enregistrée : ${erreur.message}`);
+  }
+}
+
+/**
+ * Figer la mise en page la première fois qu'on ouvre un monde.
+ *
+ * Tant qu'une fiche n'a pas de position à elle, c'est le calcul qui la place, et
+ * le calcul se refait à chaque changement — d'où des fiches qui sautent après un
+ * lien ou une naissance. On inscrit donc une bonne fois ce que le calcul vient
+ * de trouver : le plan devient un plan, et plus une proposition.
+ *
+ * Une seule requête pour tout le monde : soixante-sept `PATCH` réécriraient
+ * soixante-sept fois le document entier.
+ */
+async function figerLesPositions() {
+  if (PARTAGE) return; // une vue partagée se lit, elle n'écrit rien
+  if ((etat.vueCourante?.rendu || '') !== 'cartes') return;
+  const positions = etat.moteur?.positionsAFiger?.();
+  if (!positions) return;
+  try {
+    await Api.majPositions(positions);
+    etat.moteur.confirmerPositions(positions);
+    (etat.payload?.noeuds || []).forEach((noeud) => {
+      if (positions[noeud.id]) {
+        noeud.position = positions[noeud.id];
+        noeud.decalage = null;
+      }
+    });
+  } catch (erreur) {
+    // Sans bruit : le plan est juste à l'écran, il l'est simplement moins
+    // durablement. La prochaine ouverture réessaiera.
+    console.warn('Positions non figées :', erreur.message);
   }
 }
 
@@ -1470,11 +1535,19 @@ async function enregistrerDeport(id, decalage) {
  * des formes change — une création, une suppression.
  */
 
-async function creerForme(donnees) {
+async function creerForme(donnees, point) {
   try {
-    await Api.creerForme(donnees);
+    const reponse = await Api.creerForme(donnees);
     await rechargerVue({ conserverFocus: true });
-    astuce('Forme ajoutée — cliquez-la pour la modifier.');
+    // On l'ouvre tout de suite, curseur dans le texte : une forme qu'on vient
+    // de tracer, on veut la nommer. Attendre que l'utilisateur devine qu'il
+    // faut recliquer dessus, c'était la moitié du « on ne peut pas écrire ».
+    const ouverte = etat.moteur?.formes?.ouvrirPour?.(
+      reponse?.forme?.id,
+      point?.x ?? window.innerWidth / 2,
+      point?.y ?? window.innerHeight / 2
+    );
+    if (!ouverte) astuce('Forme ajoutée — cliquez-la pour la modifier.');
   } catch (erreur) {
     message(`Forme non créée : ${erreur.message}`);
   }
@@ -1530,11 +1603,21 @@ function majBarreFormes() {
   }
 }
 
+/**
+ * Rendre **une** fiche à la mise en page automatique (lot 22.D).
+ *
+ * L'équivalent pour tout le plan a disparu du clic droit : replacer une fiche
+ * qu'on a mal posée est un geste réparateur, tout replacer était un geste qui
+ * défaisait une soirée de rangement.
+ */
 async function reinitialiserDeport(id) {
   const noeud = trouverNoeud(id);
-  if (noeud) noeud.decalage = null;
+  if (noeud) {
+    noeud.position = null;
+    noeud.decalage = null;
+  }
   try {
-    await Api.majPersonne(id, { decalage: null });
+    await Api.majPersonne(id, { position: null, decalage: null });
   } catch (erreur) {
     message(`Échec : ${erreur.message}`);
   }
@@ -1588,7 +1671,7 @@ function menuCarte(id, evenement) {
         onclick: () => definirRang(id, rang.id),
       };
     }),
-    noeud?.decalage && {
+    (noeud?.position || noeud?.decalage) && {
       label: 'Replacer automatiquement',
       icone: '⌖',
       detail: 'Ctrl + glisser',
@@ -1651,28 +1734,24 @@ function confirmerSuppressionPersonne(id, evenement) {
   ]);
 }
 
-function menuFond(evenement) {
-  const deplacees = (etat.payload?.noeuds || []).filter((noeud) => noeud.decalage);
+/**
+ * Le menu du vide. `point` est l'endroit cliqué **en coordonnées du plan** — le
+ * moteur le calcule déjà, il n'y a qu'à ne pas le perdre en route : c'est là que
+ * naîtra le profil, et non dans la rangée du bas (lot 22.D).
+ *
+ * « Replacer toutes les fiches » n'y est plus. L'entrée existait quand une
+ * position était un écart à un calcul qu'on pouvait vouloir retrouver ; les
+ * positions étant maintenant le plan lui-même, tout replacer voudrait dire
+ * défaire son rangement d'un clic, sans le vouloir et sans retour.
+ */
+function menuFond(evenement, point) {
   menu.ouvrir(evenement.clientX, evenement.clientY, [
     { titre: etat.referentiels.meta?.sauvegarde || etat.referentiels.meta?.titre || 'Plan' },
     {
       label: 'Nouveau profil…',
       icone: '＋',
-      onclick: () => formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, {}),
-    },
-    deplacees.length && {
-      label: 'Replacer toutes les fiches',
-      icone: '⌖',
-      detail: `${deplacees.length} déplacée${deplacees.length > 1 ? 's' : ''}`,
-      onclick: async () => {
-        await Promise.all(
-          deplacees.map((noeud) => {
-            noeud.decalage = null;
-            return Api.majPersonne(noeud.id, { decalage: null });
-          })
-        );
-        await rechargerVue({ conserverFocus: true });
-      },
+      onclick: () =>
+        formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { position: point }),
     },
     { separateur: true },
     { label: 'Vue générale', icone: '⇱', onclick: () => vueGenerale() },
@@ -1999,15 +2078,6 @@ function quitterJoueur() {
   appliquerCouleurPar('maison');
 }
 
-/** id de catégorie -> couleur, pour que le moteur n'ait pas à lire l'API. */
-function couleursCategories() {
-  const table = {};
-  (etat.referentiels.categories_maisons || []).forEach((categorie) => {
-    table[categorie.id] = categorie.couleur;
-  });
-  return table;
-}
-
 /**
  * id de personne -> couleur de son segment, pour l'axe « filtre sur mesure ».
  * Le moteur ne saura jamais ce qu'est un segment : il reçoit des couleurs.
@@ -2052,7 +2122,6 @@ async function appliquerCouleurPar(mode) {
   majMasques();
   etat.moteur?.majOptions({
     couleurPar: mode,
-    couleursCategories: couleursCategories(),
     couleursNoeuds: couleursNoeuds(),
     noeudsMasques: etat.noeudsMasques,
   });
@@ -2224,27 +2293,10 @@ function critereCourant() {
     };
   }
 
-  if (mode === 'categorie') {
-    return {
-      cle: 'categorie',
-      titre: 'Catégories',
-      aide: 'Regroupements de maisons. Clic droit : renommer, recolorer.',
-      classeDe: (noeud) => noeud.categorie || '',
-      entrees: [
-        ...(etat.referentiels.categories_maisons || []).map((categorie) => ({
-          id: categorie.id,
-          label: categorie.label,
-          couleur: categorie.couleur,
-          fiche: categorie,
-        })),
-        { id: '', label: 'Sans catégorie', couleur: '#8a8f98' },
-      ],
-      menu: (entree, evenement) =>
-        entree.fiche ? menuCategorie(entree.fiche, evenement) : menuCategories(evenement),
-      creer: (evenement) => editeurCategorie.ouvrirCreation(evenement.clientX, evenement.clientY),
-      libelleCreer: '＋ Nouvelle catégorie',
-    };
-  }
+  // Le critère « categorie » a été retiré au lot 22.A. Il portait à lui seul les
+  // deux endroits qu'on nous a demandé d'enlever : l'entrée « Catégorie de
+  // maison » du sélecteur du haut **et** le bloc « Catégories » du rail — c'est
+  // le même objet qui remplissait les deux.
 
   return {
     cle: 'maison',
@@ -2524,18 +2576,10 @@ function dessinerFiltre() {
 // Compatibilité : plusieurs endroits appelaient encore l'ancien nom.
 const dessinerLegendeMaisons = dessinerFiltre;
 
-function menuCategories(evenement) {
-  const { clientX: x, clientY: y } = evenement;
-  menu.ouvrir(x, y, [
-    { titre: 'Sans catégorie' },
-    { texte: 'Les maisons qu’on n’a pas encore rangées.' },
-    {
-      label: 'Nouvelle catégorie…',
-      icone: '＋',
-      onclick: () => editeurCategorie.ouvrirCreation(x, y),
-    },
-  ]);
-}
+/* `menuCategories` et `menuCategorie` sont partis avec l'axe « Catégorie de
+   maison » (lot 22.A) : le bloc du rail était leur seule porte d'entrée. Le
+   champ reste sur la fiche d'une maison, et `editeurCategorieRapide` sait
+   encore en créer une depuis ce formulaire. */
 
 function menuFiltrePersonnalise(fiche, evenement) {
   const { clientX: x, clientY: y } = evenement;
@@ -2566,38 +2610,6 @@ function menuFiltrePersonnalise(fiche, evenement) {
       danger: true,
       detail: 'aucune donnée n’est touchée',
       onclick: () => editeurFiltre.ouvrirSuppression(fiche, x, y),
-    },
-  ]);
-}
-
-function menuCategorie(categorie, evenement) {
-  const { clientX: x, clientY: y } = evenement;
-  menu.ouvrir(x, y, [
-    { titre: categorie.label, couleur: categorie.couleur },
-    {
-      texte: `${pluriel(categorie.maisons ?? 0, 'maison')} · ${pluriel(
-        categorie.personnes ?? 0,
-        'personne'
-      )}`,
-    },
-    {
-      label: 'Modifier cette catégorie…',
-      icone: '✎',
-      detail: 'nom, couleur',
-      onclick: () => editeurCategorie.ouvrirModification(categorie, x, y),
-    },
-    {
-      label: 'Nouvelle catégorie…',
-      icone: '＋',
-      onclick: () => editeurCategorie.ouvrirCreation(x, y),
-    },
-    { separateur: true },
-    {
-      label: 'Supprimer cette catégorie…',
-      icone: '🗑',
-      danger: true,
-      detail: 'les maisons restent, sans catégorie',
-      onclick: () => editeurCategorie.ouvrirSuppression(categorie, x, y),
     },
   ]);
 }
@@ -2659,6 +2671,80 @@ function dessinerOptions(vue) {
  * de droite le dit mieux, et en entier. Ce qui reste est ce que rien d'autre ne
  * dit — combien de fiches sont affichées, et combien le filtre en écarte.
  */
+/* ------------------------------------------------- la fiche qu'on peut étirer
+ *
+ * Lot 22.B. Une largeur fixe convient à la moitié des tables : celles qui
+ * écrivent trois lignes de notes la trouvent trop large, celles qui en écrivent
+ * trente la trouvent trop étroite. On la fait tirer, et on la retient.
+ *
+ * Bornes : jamais moins de 300 px (sous quoi la grille à deux colonnes de la
+ * fiche se casse), jamais plus de la moitié de l'écran (au-delà, c'est le plan
+ * qu'on n'a plus).
+ */
+const FICHE_LARGEUR = cle('familytree-fiche-largeur');
+const FICHE_MIN = 300;
+
+function largeurFicheMax() {
+  return Math.max(FICHE_MIN, Math.round(window.innerWidth / 2));
+}
+
+function appliquerLargeurFiche(pixels) {
+  const borne = Math.min(largeurFicheMax(), Math.max(FICHE_MIN, Math.round(pixels)));
+  document.documentElement.style.setProperty('--fiche-largeur', `${borne}px`);
+  return borne;
+}
+
+function installerEtirementFiche() {
+  const retenue = Number(localStorage.getItem(FICHE_LARGEUR));
+  if (retenue) appliquerLargeurFiche(retenue);
+
+  const poignee = document.createElement('div');
+  poignee.className = 'pn-poignee';
+  poignee.title = 'Étirer la fiche';
+  elements.panneauVolet.prepend(poignee);
+
+  poignee.addEventListener('mousedown', (evenement) => {
+    if (evenement.button !== 0) return;
+    evenement.preventDefault();
+    document.body.classList.add('fiche-en-etirement');
+
+    // La fiche est collée à droite : sa largeur, c'est la distance du curseur
+    // au bord droit de la fenêtre. Rien à mémoriser, rien à accumuler.
+    const suivre = (mouvement) =>
+      appliquerLargeurFiche(window.innerWidth - mouvement.clientX);
+
+    const lacher = (mouvement) => {
+      document.removeEventListener('mousemove', suivre, true);
+      document.removeEventListener('mouseup', lacher, true);
+      document.body.classList.remove('fiche-en-etirement');
+      localStorage.setItem(
+        FICHE_LARGEUR,
+        String(appliquerLargeurFiche(window.innerWidth - mouvement.clientX))
+      );
+    };
+
+    document.addEventListener('mousemove', suivre, true);
+    document.addEventListener('mouseup', lacher, true);
+  });
+}
+
+/**
+ * Combien de fiches sont prises en main (lot 22.D).
+ *
+ * Écrit dans le même écriteau que le compte de fiches et de liens : deux
+ * pastilles dans le même coin se disputeraient la place, et celle-ci ne dit
+ * quelque chose que pendant les quelques secondes où l'on déplace un groupe.
+ */
+function majSelectionMultiple(combien) {
+  if (!combien) {
+    majStats();
+    return;
+  }
+  elements.stats.innerHTML =
+    `<b>${combien}</b> fiche${combien > 1 ? 's' : ''} en main · ` +
+    '<span class="stats-filtre">Ctrl + glisser pour les déplacer</span>';
+}
+
 function majStats(info) {
   const stats = etat.payload?.stats;
   if (!stats) return;
@@ -2805,10 +2891,32 @@ elements.btnNouveauFiltre.addEventListener('click', (evenement) =>
   editeurFiltre.ouvrirCreation(evenement.clientX, evenement.clientY)
 );
 
-elements.btnAnnee.addEventListener('click', (evenement) => {
-  const boite = evenement.currentTarget.getBoundingClientRect();
-  editeurAnnee.ouvrir(boite.left, boite.bottom + 6);
+// L'année s'écrit dans la barre (lot 22.A). Entrée valide sans attendre ; sortir
+// du champ vaut aussi validation, parce qu'on ne pense pas à appuyer sur Entrée
+// quand on va cliquer ailleurs de toute façon.
+elements.saisieAnnee.addEventListener('keydown', (evenement) => {
+  if (evenement.key === 'Enter') {
+    evenement.preventDefault();
+    // On enregistre nous-mêmes plutôt que de compter sur le `change` que le
+    // `blur` déclenchera : `change` ne part que si le navigateur juge le champ
+    // « sali », ce qui n'est pas vrai de toutes les façons d'y écrire.
+    // `enregistrerAnnee` ne fait rien si la valeur n'a pas bougé.
+    enregistrerAnnee(evenement.currentTarget.value);
+    evenement.currentTarget.blur();
+  } else if (evenement.key === 'Escape') {
+    dessinerAnnee();
+    evenement.currentTarget.blur();
+  }
 });
+elements.saisieAnnee.addEventListener('change', (evenement) =>
+  enregistrerAnnee(evenement.target.value)
+);
+elements.btnAnneeMoins.addEventListener('click', () =>
+  enregistrerAnnee(decalerAnnee(anneeCourante(), -1))
+);
+elements.btnAnneePlus.addEventListener('click', () =>
+  enregistrerAnnee(decalerAnnee(anneeCourante(), 1))
+);
 elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
 elements.btnCarnet.addEventListener('click', () => basculerLeCarnet());
 
@@ -2843,11 +2951,16 @@ installerTelephone(elements);
 // `installerTelephone`, qui a déjà déménagé ce qui doit l'être : le rail est
 // alors dans sa forme définitive, et l'état retenu s'y applique une seule fois.
 installerRail();
+installerEtirementFiche();
 // Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
 // pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
 elements.btnNouveauProfil.addEventListener('click', (evenement) => {
   const boite = evenement.currentTarget.getBoundingClientRect();
-  formulairePersonne.ouvrir(boite.left, boite.top - 12, {});
+  // Personne n'a visé : la fiche naît au milieu de ce qu'on regarde, ce qui
+  // reste le seul endroit où l'on est sûr de la voir apparaître (lot 22.D).
+  formulairePersonne.ouvrir(boite.left, boite.top - 12, {
+    position: etat.moteur?.centreVisible?.(),
+  });
 });
 elements.btnAjuster.addEventListener('click', () => etat.moteur?.recentrer());
 elements.btnFocus.addEventListener('click', () => {

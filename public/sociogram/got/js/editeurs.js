@@ -460,11 +460,17 @@ export function creerFormulairePersonne(rappels = {}) {
   const socle = creerFlottant();
   let position = { x: 0, y: 0 };
   let lierA = null;
+  /**
+   * Où poser la fiche **sur le plan** — à ne pas confondre avec `position`, qui
+   * est l'endroit de l'écran où s'affiche ce formulaire (lot 22.D).
+   */
+  let surLePlan = null;
   let refs = {};
 
-  function ouvrir(x, y, { lierA: ancre = null } = {}) {
+  function ouvrir(x, y, { lierA: ancre = null, position: point = null } = {}) {
     position = { x, y };
     lierA = ancre;
+    surLePlan = point;
     socle.monter(construire(), x, y);
     refs.prenom.focus();
   }
@@ -577,6 +583,12 @@ export function creerFormulairePersonne(rappels = {}) {
         maison: refs.maison.value,
         statut: refs.statut.value,
         notes: refs.notes.value.trim(),
+        // La fiche naît là où on a cliqué, et pas dans la rangée du bas. La
+        // carte étant posée par son coin, on retranche une demi-carte pour que
+        // ce soit son **milieu** qui tombe sous le curseur (lot 22.D).
+        ...(surLePlan
+          ? { position: [Math.round(surLePlan.x - 93), Math.round(surLePlan.y - 66)] }
+          : {}),
       });
       socle.fermer();
       rappels.surCreation?.(reponse.personne, { lierA, ...position });
@@ -1265,136 +1277,14 @@ function definirEtat(refs, texte, classe = '') {
 }
 
 // ==========================================================================
-//  Année courante de la campagne
+//  L'année courante a quitté ce fichier (lot 22.A)
 //
-//  Une date, une seule, d'où découlent tous les âges. Elle s'avance entre deux
-//  séances : c'est le seul champ à toucher pour que la campagne entière
-//  vieillisse — aucun âge n'est stocké, donc aucun ne peut rester en arrière.
-//
-//  Le format est libre (« 300 AC », « 1482 ») : il suffit qu'un nombre s'y
-//  trouve. Ce qui l'entoure est conservé tel quel quand on avance d'un an.
+//  Elle s'écrit maintenant dans la barre du haut, sans fenêtre à ouvrir : voir
+//  `enregistrerAnnee` dans `main.js`. Le champ « Document de campagne » qui
+//  l'accompagnait est parti avec elle — `meta.document` existe toujours, le
+//  bouton 📜 le lit encore, mais il ne se règle plus que par les lots
+//  d'administration.
 // ==========================================================================
-
-export function creerEditeurAnnee(rappels = {}) {
-  const socle = creerFlottant();
-  let brouillon = '';
-  let brouillonDocument = '';
-  let refs = {};
-
-  function ouvrir(x, y) {
-    brouillon = rappels.annee?.() || '';
-    brouillonDocument = rappels.document?.() || '';
-    socle.monter(construire(), x, y);
-    refs.annee.select();
-  }
-
-  /** Avance ou recule, en gardant l'habillage (« 300 AC » → « 301 AC »). */
-  function decaler(pas) {
-    refs.annee.value = decalerAnnee(refs.annee.value, pas);
-    brouillon = refs.annee.value;
-    majApercu();
-  }
-
-  function majApercu() {
-    const annee = anneeDe(brouillon);
-    refs.apercu.textContent =
-      annee === null
-        ? 'Aucun nombre lisible : les âges resteront vides.'
-        : `Quelqu’un né en ${naissanceDepuisAge(20, brouillon)} aura 20 ans.`;
-  }
-
-  function construire() {
-    refs = { etat: h('span', { class: 'fl-etat' }) };
-
-    refs.annee = h('input', {
-      type: 'text',
-      value: brouillon,
-      placeholder: '300 AC',
-      oninput: (evenement) => {
-        brouillon = evenement.target.value;
-        majApercu();
-      },
-      onkeydown: (evenement) => {
-        if (evenement.key === 'Enter') {
-          evenement.preventDefault();
-          valider();
-        }
-      },
-    });
-    refs.apercu = h('span', {});
-    refs.document = h('input', {
-      type: 'url',
-      value: brouillonDocument,
-      placeholder: 'https://…',
-      oninput: (evenement) => {
-        brouillonDocument = evenement.target.value;
-      },
-    });
-
-    const panneau = h('div', { class: 'flottant editeur-referentiel' }, [
-      entete('Campagne', socle.fermer),
-      h('div', { class: 'fl-corps' }, [
-        h('div', { class: 'champ-edit' }, [
-          h('label', { texte: 'Nous sommes en' }),
-          h('div', { class: 'annee-reglage' }, [
-            h('button', {
-              class: 'bouton bouton-icone',
-              type: 'button',
-              texte: '−1',
-              title: 'Reculer d’un an',
-              onclick: () => decaler(-1),
-            }),
-            refs.annee,
-            h('button', {
-              class: 'bouton bouton-icone',
-              type: 'button',
-              texte: '+1',
-              title: 'Avancer d’un an — toute la campagne vieillit',
-              onclick: () => decaler(1),
-            }),
-          ]),
-        ]),
-        h('p', { class: 'fl-aide' }, [refs.apercu]),
-        h('p', {
-          class: 'fl-aide',
-          texte:
-            'Les âges ne sont enregistrés nulle part : ils se déduisent de cette date et de l’année de naissance de chacun. Avancer la date les avance tous.',
-        }),
-        // Le document de campagne appartient à la sauvegarde, pas à
-        // l'application : chaque table a le sien, et une sauvegarde partagée
-        // ne doit pas renvoyer vers celui de quelqu'un d'autre.
-        h('div', { class: 'champ-edit' }, [
-          h('label', { texte: 'Document de campagne (facultatif)' }),
-          refs.document,
-        ]),
-        h('p', {
-          class: 'fl-aide',
-          texte:
-            'L’adresse ouverte par le bouton 📜. Vide, le bouton disparaît — personne ne tombe sur les notes d’une autre table.',
-        }),
-      ]),
-      pied(refs, { valider, libelle: 'Enregistrer' }),
-    ]);
-    majApercu();
-    return panneau;
-  }
-
-  async function valider() {
-    definirEtat(refs, 'Enregistrement…');
-    try {
-      const reponse = await Api.majMeta({
-        annee_courante: brouillon.trim(),
-        document: brouillonDocument.trim(),
-      });
-      socle.fermer();
-      rappels.surChangement?.(reponse.meta || {});
-    } catch (erreur) {
-      definirEtat(refs, erreur.message, 'erreur');
-    }
-  }
-
-  return { ouvrir, fermer: socle.fermer };
-}
 
 // ==========================================================================
 //  Catégories de maisons

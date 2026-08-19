@@ -59,6 +59,19 @@ export function creerPanneau(element, rappels = {}) {
   const MEMOIRE_JOUEURS = cle('familytree-fiche-joueurs');
   let joueursOuverts = localStorage.getItem(MEMOIRE_JOUEURS) !== '0';
 
+  /**
+   * Une zone de texte qui suit ce qu'on y met (lot 22.B).
+   *
+   * `scrollHeight` ne redescend jamais tout seul : il faut d'abord rendre la
+   * hauteur au navigateur, sinon un texte qu'on raccourcit garde la taille du
+   * texte long. Bornée à 200 px — au-delà, c'est une note, et les notes ont
+   * leur bloc en haut de la fiche.
+   */
+  function ajusterHauteur(zone) {
+    zone.style.height = 'auto';
+    zone.style.height = `${Math.min(200, zone.scrollHeight)}px`;
+  }
+
   function definirEtat(texte, classe = '') {
     if (elementEtat) {
       elementEtat.textContent = texte;
@@ -119,6 +132,11 @@ export function creerPanneau(element, rappels = {}) {
       sectionIdentite(personne),
       pied()
     );
+
+    // Les commentaires déjà écrits doivent s'ouvrir à leur taille, et non
+    // attendre qu'on les touche : `scrollHeight` n'a de sens qu'une fois
+    // l'élément dans le document (lot 22.B).
+    element.querySelectorAll('.joueur-commentaire textarea').forEach(ajusterHauteur);
   }
 
   /* ------------------------------------------------------ cité dans le carnet
@@ -608,11 +626,17 @@ export function creerPanneau(element, rappels = {}) {
           surChangement: (valeur) => changer(joueur.id, { note: valeur }),
         }),
         h('div', { class: 'joueur-commentaire' }, [
-          h('input', {
-            type: 'text',
+          // Une zone de texte, et non plus une ligne (lot 22.B) : ce qu'on
+          // écrit ici tient rarement en trente caractères, et ce qui dépassait
+          // n'était plus jamais relu. Elle grandit avec son contenu.
+          h('textarea', {
+            rows: 2,
             placeholder: 'Commentaire (dernière rencontre, service rendu…)',
-            value: actuel.commentaire || '',
-            oninput: (evenement) => changer(joueur.id, { commentaire: evenement.target.value }),
+            texte: actuel.commentaire || '',
+            oninput: (evenement) => {
+              ajusterHauteur(evenement.target);
+              changer(joueur.id, { commentaire: evenement.target.value });
+            },
           }),
         ]),
       ]);

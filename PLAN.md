@@ -2358,3 +2358,151 @@ tout seul avant de le croire**, parce qu'un harnais de 828 requêtes contre un
   applique en masse à douze comptes.
 - **L'écriteau du plan disparaît sous 760 px.** Sur 375 px d'écran, la barre du
   bas passe déjà par-dessus le coin où il vit.
+
+---
+
+# Lot 22 — Le ménage, le confort, les formes vivantes, et le plan qui obéit  ☑
+
+*Demandé le 20/08/2026. Quatorze demandes, dont **trois signalent quelque chose
+de cassé** — et l'une d'elles l'était depuis le lot 20, sans que personne puisse
+s'en servir entre-temps.*
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 22.A | Ce qui part de l'écran : l'axe « Catégorie de maison », le bloc « Catégories », la fenêtre de l'année, « Replacer toutes les fiches ». | `js/main.js`, `js/editeurs.js`, `index.html` |
+| 22.B | Ce qui se lit : la typographie d'un cran au-dessus, la fiche de droite qu'on étire, le correcteur coupé, Entrée qui enregistre. | `css/app.css`, `js/dom.js`, `js/panel.js` |
+| 22.C | Les formes : on écrit dedans, on les supprime, on les règle, et elles appartiennent à une vue. | `src/domaine/formes.ts`, `js/formes.js` |
+| 22.D | Le plan ne bouge plus tout seul. | `models.ts`, `routes.ts`, `js/views/cartes.js` |
+
+## Une position n'est plus un écart : c'est tout le lot 22.D
+
+Ce changement de nature mérite d'être dit lentement, parce que tout le reste en
+découle.
+
+Une fiche déplacée à la main portait un `decalage` : **un écart à la position
+calculée**. Le raisonnement d'origine se défend — quand le plan se recompose, la
+fiche garde sa place *relative* au lieu d'atterrir n'importe où. Mais il a une
+conséquence qu'on ne voit qu'à l'usage : une fiche rangée à la main bouge quand
+même, parce que sa base bouge. Or `calculerMiseEnPage` se rejoue **intégralement**
+à chaque édition — un lien créé, une naissance, un filtre — et son étape 12
+retranslate le monde entier pour que la boîte englobante reparte de la marge.
+Ajouter quelqu'un à gauche décalait donc soixante-six fiches à droite.
+
+D'où `position` : `[x, y]` **absolus**, qui *remplacent* le calcul au lieu de s'y
+ajouter. Et la conséquence qu'il fallait accepter : **plus de normalisation dès
+qu'une fiche est ancrée**. Recaler le monde ferait mentir toutes les positions
+enregistrées — la fiche posée à (400, 200) s'y retrouverait à chaque ouverture,
+mais ailleurs à l'écran. Le plan a donc une origine, et les glissers sont bornés
+à zéro.
+
+**Le plan se fige à la première ouverture.** Tant qu'une seule fiche n'a pas de
+position à elle, c'est encore le calcul qui la place — et le problème revient à
+moitié. `main.js` inscrit donc, une fois, ce que le calcul vient de trouver, en
+**une** requête (`PATCH /personnes/positions`) : soixante-sept `PATCH`
+réécriraient soixante-sept fois le document entier. `decalage` est replié dans la
+position au passage, et n'est plus jamais lu ensuite.
+
+Deux détails qui piquent, et qui sont au harnais :
+
+- **`[0, 0]` est une position valable** — c'est le coin du plan. Pour un écart,
+  `[0, 0]` voulait dire « aucun » et se rangeait en `null`. Les deux
+  normalisateurs se ressemblent et ne disent pas la même chose.
+- **La position ne s'écrit que si elle vaut quelque chose**, comme `bordure` au
+  lot 20.B : un monde qu'on n'a jamais rangé doit ressortir comme il est entré.
+
+## Les formes étaient injouables, et pour une raison d'une ligne
+
+« On ne peut pas écrire dans les zones de texte » et « on ne peut pas supprimer
+les formes » ne sont **pas deux bogues** : les deux commandes vivent dans le même
+panneau, et ce panneau ne s'affichait pas.
+
+`ouvrirEditeur` construisait `<div class="forme-editeur">` — sans la classe
+`flottant`, la seule de l'application qui porte `position: fixed` et le
+`z-index`. Le panneau était donc bien construit, bien ajouté au document, et posé
+**en flux normal** sous une application en `height: 100vh; overflow: hidden` :
+hors de l'écran, injoignable, et silencieux. C'est le seul des neuf panneaux
+flottants du projet à qui la classe manquait.
+
+Trois choses ont été ajoutées par-dessus la réparation, parce que la réparation
+seule laissait le geste à deviner : la forme **s'ouvre toute seule** au tracé,
+curseur dans le texte ; on écrit **dans la forme elle-même** (`contenteditable`,
+avec envoi différé — c'était une requête par frappe) ; et `Suppr` efface celle
+qu'on tient.
+
+**Une forme appartient maintenant à une vue** (`vue` + `profils`). Une forme hors
+de sa vue est **retirée du rendu**, et non rendue transparente : « invisible » et
+« intouchable » ne sont pas deux réglages, c'est le même — une forme transparente
+garderait sa surface, donc ses clics.
+
+Au passage, un piège du lot 20.D qui dormait : `.formes-capture` (z-index 7)
+couvrait `.barre-basse` (z-index 6). Un outil armé posait donc une surface de
+tracé invisible **par-dessus la barre du bas** : cliquer « ◯ » ou ressortir du
+mode dessinait un rectangle au lieu d'appuyer sur le bouton.
+
+## Deux endroits qui n'en font qu'un
+
+« Enlever *Catégorie de maison* du menu du haut » et « enlever la partie
+*catégories* du filtre » se lisaient comme deux demandes. C'est **un seul objet** :
+le critère `categorie` de `critereCourant()` remplit à la fois l'entrée du
+sélecteur et le bloc du rail. L'enlever une fois les enlève tous les deux — et
+emporte les menus de renommage, qui n'avaient pas d'autre porte d'entrée.
+
+## Ce que la typographie a coûté
+
+Monter les 223 tailles d'un cran (8,5 → 10, 12 → 13,5, plancher à 10 px) a deux
+conséquences, toutes deux mesurées :
+
+- **La carte du plan passe de 132 à 144 px.** Les deux quarts du bas portent un
+  intitulé et une valeur ; à 33 px ils ne tenaient plus. `mesurer()` relisant
+  cette hauteur sur une fiche réelle, la géométrie des connecteurs a suivi seule.
+- **La barre du haut débordait de l'écran.** Quinze commandes 12 % plus larges
+  sortaient du cadre sur 1280 px — et `html` étant en `overflow: hidden`, ce qui
+  dépasse n'est pas rattrapable au défilement : le compte connecté était
+  simplement perdu. La barre passe donc à la ligne **et** garde sa taille
+  d'avant. Ce qu'on demandait de grossir, c'est ce qu'on **lit** ; là, ce sont
+  des commandes qu'on reconnaît à leur place et à leur icône.
+
+Vérifié dans le navigateur : `debordEntete` et `debordCorps` à 0 sur la carte,
+`bodyDeborde` à 0 en 1280 comme en 1920, une seule ligne de barre en 1920.
+
+## Vérification
+
+**876/876** au harnais, contre 828 à la fin du lot 21. Les 48 vérifications
+neuves couvrent notamment : `[0, 0]` accepté comme position, une position qui ne
+s'écrit pas quand elle est vide, le rangement en lot qui ignore un identifiant
+inconnu sans faire échouer le reste, un profil répété dans `profils` qui ne
+compte qu'une fois, une opacité nulle ramenée au minimum lisible, une portée
+inventée qui retombe sur le plan.
+
+**0 chaîne sans traduction sur 952 relevées** (13 ajoutées).
+
+Sept des huit échecs du premier passage étaient des **vérifications mal écrites**,
+pas du code cassé : `lire` rend `String(tableau)` — « 420,260 » et non
+« [420,260] » — et le commentaire qui explique le retrait de « Replacer toutes
+les fiches » contenait la chaîne que la vérification cherchait à ne plus trouver.
+Elles interrogent maintenant le corps brut de la réponse.
+
+## Ce qui n'est pas fait, et pourquoi
+
+- **Une catégorie ne se renomme ni ne se supprime plus depuis l'application.**
+  Le champ reste sur la fiche d'une maison, et le formulaire sait encore en
+  **créer** une ; les menus de renommage et de suppression sont partis avec le
+  bloc du rail, qui était leur seule porte. Les données, elles, sont intactes —
+  exports, filtres sur mesure et lots d'administration les voient toujours. Si le
+  concept doit disparaître pour de bon, c'est une demande à part.
+- **`meta.document` ne se règle plus depuis l'application.** Le champ est parti
+  avec la fenêtre de l'année, comme demandé. Le bouton 📜 le lit encore pour les
+  mondes qui en ont un, et les lots d'administration savent l'écrire.
+- **Le commentaire d'un joueur n'a pas déménagé dans les notes.** La demande
+  offrait les deux ; le déplacer aurait rendu la donnée **illisible ailleurs**
+  — elle a sa colonne dans les exports et dans la vue Tableau, et une ligne par
+  joueur y a un sens que les notes n'ont pas. Il est devenu une zone de texte qui
+  grandit avec ce qu'on écrit.
+- **La sélection multiple est à la souris seulement.** Maj + glisser dans le
+  vide, Ctrl + clic pour ajouter ou retirer. Au doigt, rien — même dette qu'au
+  lot 20.D pour les formes, et le même conflit à traiter avec le panoramique à un
+  doigt.
+- **Une forme ne se rattache pas à une vue depuis le clic droit.** Il faut ouvrir
+  son panneau, donc être en mode dessin. Les rendre cliquables au repos rouvrirait
+  ce que le lot 20.D avait tranché : un rectangle qui attrape les clics empêche
+  de faire glisser le plan là où il est posé.

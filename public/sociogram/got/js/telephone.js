@@ -83,7 +83,7 @@ const A_DESCENDRE = [
       '#selecteur-couleur',
       '#lien-document',
       '#lien-regles',
-      '#btn-annee',
+      '#champ-annee',
       '#btn-theme',
       '#btn-langue',
       // `#btn-raccourcis` descend comme le reste, mais il parle surtout d'un

@@ -360,6 +360,12 @@ export const Api = {
   personne: (id, parametres) => requete(`${DOMAINE}/personnes/${id}${versQuery(parametres)}`),
   majPersonne: (id, patch) =>
     requete(`${DOMAINE}/personnes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  /** `{ id: [x, y] | null, … }` — ranger plusieurs fiches en une écriture. */
+  majPositions: (positions) =>
+    requete(`${DOMAINE}/personnes/positions`, {
+      method: 'PATCH',
+      body: JSON.stringify(positions),
+    }),
   creerPersonne: (donnees) =>
     requete(`${DOMAINE}/personnes`, { method: 'POST', body: JSON.stringify(donnees) }),
   supprimerPersonne: (id) => requete(`${DOMAINE}/personnes/${id}`, { method: 'DELETE' }),

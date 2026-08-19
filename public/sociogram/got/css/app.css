@@ -60,7 +60,11 @@
    * maison, un lieu — donc la hauteur ne dépend plus de leur contenu et se
    * déclare ici, une fois. C'est elle qui se partage en 1/2 + 1/4 + 1/4 ;
    * `views/cartes.js` la relit sur une fiche rendue pour tracer les liens. */
-  --carte-hauteur: 132px;
+  /* 144 et non 132 depuis le lot 22.B : la typographie a monté d'un cran
+     partout, et les deux quarts du bas (un intitulé + une valeur) n'avaient
+     plus leurs 33 px. `mesurer()` relisant cette hauteur sur une fiche réelle,
+     la géométrie des connecteurs suit toute seule. */
+  --carte-hauteur: 144px;
   --rayon: 9px;
   --police: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --police-titre: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
@@ -94,7 +98,7 @@ html, body {
   background: var(--fond);
   color: var(--texte);
   font-family: var(--police);
-  font-size: 14px;
+  font-size: 15px;
   overflow: hidden;
 }
 
@@ -105,10 +109,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------- barre haut */
 
+/* La barre du haut passe à la ligne plutôt que de sortir de l'écran (lot 22.B).
+   Elle porte une quinzaine de commandes, et la typographie ayant monté d'un
+   cran, la dernière tombait hors du cadre sur un écran de 1280 : `html` est en
+   `overflow: hidden`, donc ce qui dépasse n'est pas défilable — il est perdu.
+   Le compte connecté et le thème valent mieux qu'une seconde ligne évitée. */
 .barre-haut {
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 8px 18px;
   padding: 9px 16px;
   background: var(--fond-2);
   border-bottom: 1px solid var(--bord);
@@ -116,34 +126,49 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .marque { display: flex; align-items: center; gap: 10px; min-width: 190px; }
-.marque-icone { font-size: 20px; color: var(--accent); }
-.marque-titre { font-family: var(--police-titre); font-size: 16px; letter-spacing: .03em; }
-.marque-univers { font-size: 11px; color: var(--texte-faible); }
+.marque-icone { font-size: 21px; color: var(--accent); }
+.marque-titre { font-family: var(--police-titre); font-size: 17px; letter-spacing: .03em; }
+.marque-univers { font-size: 12.5px; color: var(--texte-faible); }
 
 .fil-ariane {
   display: flex; align-items: center; gap: 9px;
   margin: 0 auto;
   font-family: var(--police-titre);
-  font-size: 15px;
+  font-size: 16px;
 }
 .fil-vue { color: var(--texte-doux); }
 .fil-separateur { color: var(--texte-faible); }
 .fil-focus { color: var(--texte); font-weight: 600; }
 
-.barre-controles { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+/* `flex-wrap` ici aussi : sur un écran étroit, c'est ce groupe-là qui est trop
+   long à lui seul, et il doit pouvoir se replier sans pousser les autres. */
+.barre-controles {
+  display: flex; align-items: center; gap: 9px;
+  margin-left: auto; flex-wrap: wrap; justify-content: flex-end;
+}
+
+/* La barre du haut garde la taille d'avant le lot 22.B, à un demi-point près.
+   Ce n'est pas un oubli : ce qu'on nous demandait de grossir, c'est ce qu'on
+   **lit** — les notes, les fiches, les cartes du plan. Ici ce sont quinze
+   commandes qu'on reconnaît à leur place et à leur icône, et les grossir de
+   12 % les faisait déborder de l'écran sur 1280 px, où `overflow: hidden`
+   ne laisse même pas défiler pour les rattraper. */
+.barre-haut .bouton { font-size: 12.5px; padding: 6px 10px; }
+.barre-haut .champ { font-size: 12px; }
+.barre-haut .champ select { font-size: 12.5px; }
 
 /* Enregistrement : le bouton force l'écriture, l'état dit où on en est. */
 .groupe-enregistrement { display: flex; align-items: center; gap: 6px; }
 .badge-attente {
   display: inline-block; margin-left: 6px; min-width: 16px; padding: 0 4px;
   border-radius: 8px; background: var(--accent); color: #fff;
-  font-size: 10px; line-height: 15px; text-align: center;
+  font-size: 11.5px; line-height: 15px; text-align: center;
 }
-.etat-ecriture { font-size: 10.5px; color: var(--texte-faible); white-space: nowrap; }
+.etat-ecriture { font-size: 12px; color: var(--texte-faible); white-space: nowrap; }
 .etat-ecriture.attente { color: #b8842a; }
 .etat-ecriture.erreur { color: #c0392b; }
 
-.champ { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--texte-faible); }
+.champ { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texte-faible); }
 .champ select,
 .champ-recherche input {
   background: var(--fond-3);
@@ -189,8 +214,22 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
    de cadrage, qui ne font que regarder. */
 /* L'année de campagne : lue souvent, changée rarement. Quand elle manque, elle
    se signale — sans elle, aucune fiche n'affiche d'âge. */
-#btn-annee { font-variant-numeric: tabular-nums; white-space: nowrap; }
-#btn-annee.sans-annee { color: var(--texte-faible); font-style: italic; }
+/* L'année dans la barre du haut (lot 22.A) : un champ, pas un bouton qui ouvre
+   une fenêtre. Les deux flèches l'encadrent — avancer d'un an est le geste le
+   plus fréquent d'une campagne, et il ne mérite pas d'être tapé. */
+.champ-annee {
+  display: inline-flex; align-items: center; gap: 2px;
+  border: 1px solid var(--bord); border-radius: 8px;
+  background: var(--fond-2); padding: 1px 4px 1px 6px;
+}
+.annee-icone { font-size: 14.5px; line-height: 1; margin-right: 1px; }
+.champ-annee .annee-pas { width: 22px; min-width: 22px; padding: 2px 0; font-size: 14.5px; }
+#saisie-annee {
+  width: 64px; border: 0; background: transparent; color: inherit;
+  font: inherit; font-variant-numeric: tabular-nums; text-align: center;
+  outline: none; padding: 3px 0;
+}
+.champ-annee.sans-annee #saisie-annee::placeholder { color: var(--texte-faible); font-style: italic; }
 .annee-reglage { display: flex; align-items: center; gap: 6px; }
 .annee-reglage input { flex: 1; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
 
@@ -223,7 +262,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .rail-onglet {
   flex: 1;
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  font: inherit; font-size: 12px; font-weight: 600;
+  font: inherit; font-size: 13.5px; font-weight: 600;
   padding: 7px 6px; min-height: 34px;
   border: 1px solid var(--bord); border-radius: 8px;
   background: var(--fond-3); color: var(--texte-faible);
@@ -233,11 +272,11 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .rail-onglet.actif {
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
-.rail-onglet .ico { font-size: 14px; }
+.rail-onglet .ico { font-size: 15px; }
 
 .rail-bloc { margin-bottom: 20px; }
 .rail-bloc h2 {
-  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible); margin: 0 0 8px; padding-bottom: 5px;
   border-bottom: 1px solid var(--bord);
 }
@@ -247,7 +286,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   margin: 0 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--bord);
 }
 .rail-bloc-entete h2 { flex: 1; margin: 0; padding: 0; border-bottom: 0; }
-.btn-entete { padding: 1px 7px; font-size: 13px; line-height: 1.2; }
+.btn-entete { padding: 1px 7px; font-size: 14.5px; line-height: 1.2; }
 
 /* ------------------------------------------- les blocs repliés (lot 21.A) */
 
@@ -261,7 +300,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   flex: 0 0 auto;
   width: 30px; height: 26px;
   display: flex; align-items: center; justify-content: center;
-  font: inherit; font-size: 13px; line-height: 1;
+  font: inherit; font-size: 14.5px; line-height: 1;
   border: 1px solid var(--bord); border-radius: 7px;
   background: var(--fond-3); color: var(--texte-faible);
   cursor: pointer;
@@ -274,7 +313,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
    sans repasser par la liste déroulante du haut. */
 .axes-filtre { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
 .axe-puce {
-  font: inherit; font-size: 10.5px; line-height: 1.5;
+  font: inherit; font-size: 12px; line-height: 1.5;
   padding: 2px 8px; border-radius: 11px; cursor: pointer;
   border: 1px solid var(--bord); background: var(--fond-3); color: var(--texte-faible);
 }
@@ -284,33 +323,33 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   font-weight: 600;
 }
 .axe-puce.sur-mesure::before { content: '⚙ '; opacity: .7; }
-.rail-aide { font-size: 10.5px; color: var(--texte-faible); margin: -2px 0 7px; }
+.rail-aide { font-size: 12px; color: var(--texte-faible); margin: -2px 0 7px; }
 
 .liste-vues { list-style: none; margin: 0; padding: 0; }
 .liste-vues li {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14.5px;
 }
 .liste-vues li:hover { background: var(--fond-3); }
 .liste-vues li.actif { background: var(--accent); color: #fff; }
 .liste-vues li.actif .vue-icone { color: #fff; }
-.vue-icone { font-size: 15px; color: var(--accent); width: 18px; text-align: center; }
+.vue-icone { font-size: 16px; color: var(--accent); width: 18px; text-align: center; }
 
 .legende { list-style: none; margin: 0; padding: 0; }
 .legende li {
   display: flex; align-items: center; gap: 8px;
   padding: 4px 6px; border-radius: 6px; cursor: pointer;
-  font-size: 12px; user-select: none;
+  font-size: 13.5px; user-select: none;
 }
 .legende li:hover { background: var(--fond-3); }
 .legende li.eteint { opacity: .35; }
-.legende li .nombre { margin-left: auto; color: var(--texte-faible); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.legende li .nombre { margin-left: auto; color: var(--texte-faible); font-size: 12px; font-variant-numeric: tabular-nums; }
 .legende-trait { width: 20px; height: 0; border-top-width: 3px; border-top-style: solid; border-radius: 2px; flex: 0 0 20px; }
 .legende-pastille { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 11px; }
-.legende li .fleche { color: var(--texte-faible); font-size: 10px; }
+.legende li .fleche { color: var(--texte-faible); font-size: 11.5px; }
 
 .options { display: flex; flex-direction: column; gap: 7px; }
-.option { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.option { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
 .option input { accent-color: var(--accent); }
 
 /* Le compte-rendu du plan, dans le coin bas gauche de la scène (lot 21.A).
@@ -322,7 +361,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   max-width: 250px; padding: 4px 9px;
   border: 1px solid var(--bord); border-radius: 9px;
   background: var(--fond-2);
-  font-size: 11px; line-height: 1.35; color: var(--texte-doux);
+  font-size: 12.5px; line-height: 1.35; color: var(--texte-doux);
   pointer-events: none;
 }
 .stats-plan b { color: var(--texte); font-variant-numeric: tabular-nums; }
@@ -378,7 +417,13 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .forme-texte {
   padding: 6px 10px; text-align: center; line-height: 1.25;
   white-space: pre-wrap; word-break: break-word;
+  outline: none; /* `contenteditable` pose un cadre système par-dessus */
 }
+/* Le texte ne se saisit que sur la forme **déjà choisie** : sinon le premier
+   clic poserait un curseur au lieu de la sélectionner, et on ne pourrait plus
+   l'attraper par le milieu pour la déplacer (lot 22.C). */
+.formes.actives .forme .forme-texte { pointer-events: none; }
+.formes.actives .forme.choisie .forme-texte { pointer-events: auto; cursor: text; }
 .formes.actives .forme { pointer-events: auto; cursor: move; }
 .formes.actives .forme:hover { outline: 1px dashed var(--accent); outline-offset: 2px; }
 .formes.actives .forme.choisie { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -406,7 +451,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 .scene-vide {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  color: var(--texte-faible); font-size: 13px; pointer-events: none; z-index: 4;
+  color: var(--texte-faible); font-size: 14.5px; pointer-events: none; z-index: 4;
 }
 
 .barre-basse {
@@ -417,7 +462,10 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   border-radius: 12px;
   padding: 5px 8px;
   box-shadow: var(--ombre-panneau);
-  z-index: 6;
+  /* Au-dessus de `.formes-capture` (7) : sinon, un outil armé pose une surface
+     de tracé invisible par-dessus la barre, et cliquer « ◯ » ou ressortir du
+     mode dessine un rectangle au lieu d'appuyer sur le bouton (lot 22.C). */
+  z-index: 8;
 }
 .separateur-vertical { width: 1px; height: 20px; background: var(--bord); margin: 0 3px; }
 #zoom-curseur { width: 116px; accent-color: var(--accent); }
@@ -428,18 +476,18 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   border: 1px solid var(--bord-clair);
   border-radius: 8px; padding: 8px 11px;
   box-shadow: var(--ombre-panneau);
-  max-width: 280px; font-size: 12px; line-height: 1.45;
+  max-width: 280px; font-size: 13.5px; line-height: 1.45;
 }
 .astuce-scene {
   position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
   z-index: 7; pointer-events: none;
   background: var(--accent-doux); color: var(--accent-fonce);
   border: 1px solid var(--accent); border-radius: 20px;
-  padding: 6px 14px; font-size: 12px; line-height: 1.3;
+  padding: 6px 14px; font-size: 13.5px; line-height: 1.3;
   box-shadow: var(--ombre-panneau); max-width: 82%; text-align: center;
 }
 
-.infobulle .ib-titre { font-weight: 600; font-size: 12.5px; }
+.infobulle .ib-titre { font-weight: 600; font-size: 14px; }
 .infobulle .ib-sous { color: var(--texte-faible); }
 .infobulle .ib-ligne { margin-top: 3px; color: var(--texte-doux); }
 
@@ -509,7 +557,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   text-align: center;
   padding: 6px 9px;
   border-radius: 6px 6px 0 0;
-  font-size: 17px; font-weight: 700; line-height: 1.15;
+  font-size: 18px; font-weight: 700; line-height: 1.15;
   letter-spacing: -.01em;
   box-shadow: var(--carte-ombre);
 }
@@ -524,7 +572,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .carte.joueur .carte-entete::after {
   content: '♛';
   position: absolute; top: 2px; right: 6px;
-  font-size: 11px; opacity: .85;
+  font-size: 12.5px; opacity: .85;
 }
 .carte.joueur .carte-entete { position: relative; }
 
@@ -547,7 +595,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   display: flex; align-items: center; justify-content: center;
   background: var(--carte-fond); color: var(--rang-couleur);
   border: 1px solid var(--rang-couleur);
-  font-size: 10px; line-height: 1;
+  font-size: 11.5px; line-height: 1;
   box-shadow: var(--carte-ombre);
 }
 /* De loin, les corps de fiche s'effacent : les rangs, eux, restent lisibles —
@@ -593,11 +641,11 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 }
 .carte-fait + .carte-fait { border-left: 1px solid var(--bord); }
 .carte-fait-lib {
-  font-size: 8.5px; letter-spacing: .09em; text-transform: uppercase;
+  font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
   color: var(--texte-faible); line-height: 1.2;
 }
 .carte-fait-val {
-  font-size: 12px; color: var(--texte); line-height: 1.25;
+  font-size: 13.5px; color: var(--texte); line-height: 1.25;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -612,7 +660,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
   width: 20px; height: 20px; border-radius: 50%; padding: 0;
   border: 1px solid var(--bord-clair); background: var(--carte-fond);
-  color: var(--texte-doux); font-size: 14px; line-height: 1; font-weight: 600;
+  color: var(--texte-doux); font-size: 15px; line-height: 1; font-weight: 600;
   display: flex; align-items: center; justify-content: center;
   cursor: crosshair; opacity: 0; z-index: 3;
   /* Pas d'ombre : ce bouton est transparent au repos, et il y en avait une par
@@ -650,6 +698,17 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .carte.en-deport { z-index: 5; }
 .carte.en-deport .carte-entete,
 .carte.en-deport .carte-corps { box-shadow: var(--carte-ombre-forte); }
+
+/* Plusieurs fiches en main (lot 22.D). Un `outline`, comme le liseré du lot
+   20.B et pour la même raison : une bordure décalerait la fiche de deux pixels
+   alors que les connecteurs sont tracés d'après des boîtes calculées en
+   JavaScript, qui, elles, ne bougeraient pas. */
+.carte.selectionnee { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.bande-selection {
+  position: absolute; z-index: 6; pointer-events: none;
+  border: 1px solid var(--accent); border-radius: 4px;
+  background: rgba(47, 158, 143, .10);
+}
 
 /* niveau de détail : au loin, seuls les bandeaux restent lisibles */
 /* Niveau de détail : de loin, on ne dessine plus ce qu'on ne peut pas lire.
@@ -691,7 +750,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
    `pointer-events: none` n'est pas cosmétique — la pastille est dessinée
    au-dessus du trait, et sans ça elle percerait un trou dans sa zone de survol. */
 .lien-pastille {
-  font-size: 12.5px;
+  font-size: 14px;
   pointer-events: none;
   user-select: none;
 }
@@ -706,10 +765,10 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .ligne-emoji { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .champ-emoji {
   width: 44px; flex: 0 0 44px; text-align: center;
-  font-size: 15px; padding: 4px 2px;
+  font-size: 16px; padding: 4px 2px;
 }
 .bouton-emoji {
-  font-size: 14px; line-height: 1; padding: 4px 5px; min-width: 0;
+  font-size: 15px; line-height: 1; padding: 4px 5px; min-width: 0;
 }
 .bouton-emoji.actif { border-color: var(--accent); background: var(--accent-doux); }
 
@@ -740,18 +799,35 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 /* --------------------------------------------------------------- panneau */
 
+/* La fiche de droite (lot 22.B).
+   Elle part plus large qu'avant — 330 px pour un bloc de notes de six lignes,
+   c'était trop peu — et surtout elle s'étire : `--fiche-largeur` est écrite par
+   `js/panel.js` quand on tire la poignée de son bord gauche, et retenue d'une
+   séance à l'autre. La valeur par défaut vit ici pour que la page s'affiche
+   juste avant même que le JavaScript ait parlé. */
 .panneau {
-  width: 330px; flex: 0 0 330px;
+  width: var(--fiche-largeur, 400px);
+  flex: 0 0 var(--fiche-largeur, 400px);
   background: var(--fond-2);
   border-left: 1px solid var(--bord);
   display: flex; flex-direction: column;
   min-height: 0;
+  position: relative;
 }
+/* Six pixels de large, débordant de trois sur le plan : de quoi l'attraper
+   sans viser. Invisible au repos — c'est le bord du panneau. */
+.pn-poignee {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 6px;
+  cursor: col-resize; z-index: 3; background: transparent;
+}
+.pn-poignee:hover,
+body.fiche-en-etirement .pn-poignee { background: var(--accent); opacity: .55; }
+body.fiche-en-etirement { cursor: col-resize; user-select: none; }
 
 .pn-onglets { display: flex; border-bottom: 1px solid var(--bord); flex: 0 0 auto; }
 .onglet {
   flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent;
-  padding: 10px 8px; cursor: pointer; color: var(--texte-faible); font-size: 12.5px;
+  padding: 10px 8px; cursor: pointer; color: var(--texte-faible); font-size: 14px;
 }
 .onglet:hover:not(:disabled) { color: var(--texte); }
 .onglet.actif { color: var(--accent-fonce); border-bottom-color: var(--accent); font-weight: 600; }
@@ -767,7 +843,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 }
 .champ-recherche { position: relative; display: flex; align-items: center; }
 .champ-recherche .loupe {
-  position: absolute; left: 9px; color: var(--texte-faible); font-size: 14px; pointer-events: none;
+  position: absolute; left: 9px; color: var(--texte-faible); font-size: 15px; pointer-events: none;
 }
 .champ-recherche input { width: 100%; padding-left: 26px; }
 .champ-groupe { justify-content: space-between; }
@@ -775,7 +851,7 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 .liste-personnes { padding: 6px; }
 .groupe-titre {
-  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--texte-faible); padding: 10px 8px 5px; display: flex; align-items: center; gap: 7px;
 }
 .groupe-titre .barre-couleur { width: 10px; height: 10px; border-radius: 3px; }
@@ -795,8 +871,8 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   display: flex; flex-direction: column; gap: 1px;
 }
 .suggestions li:hover, .suggestions li.survol { background: var(--accent-doux); }
-.sug-valeur { font-size: 12px; }
-.sug-detail { font-size: 10px; color: var(--texte-faible); }
+.sug-valeur { font-size: 13.5px; }
+.sug-detail { font-size: 11.5px; color: var(--texte-faible); }
 
 /* Le rail des joueurs : encadré à part, ce ne sont pas des personnages. */
 .bloc-joueurs {
@@ -813,19 +889,19 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .joueur-rail:hover { background: var(--fond); }
 .joueur-rail.actif { background: var(--accent-doux); box-shadow: inset 0 0 0 1px var(--accent); }
 .joueur-rail-corps { flex: 1; min-width: 0; }
-.joueur-rail-nom { font-size: 12px; }
-.joueur-rail-perso { font-size: 10px; color: var(--texte-faible); }
+.joueur-rail-nom { font-size: 13.5px; }
+.joueur-rail-perso { font-size: 11.5px; color: var(--texte-faible); }
 /* Raccourci vers le personnage joué : discret, net au survol de la ligne. */
 .joueur-rail-fiche { flex: 0 0 auto; opacity: .45; padding: 0 5px; line-height: 1.6; }
 .joueur-rail:hover .joueur-rail-fiche, .joueur-rail.actif .joueur-rail-fiche { opacity: 1; }
-.liste-joueurs .vide { font-size: 11px; color: var(--texte-faible); font-style: italic; padding: 4px 6px; }
+.liste-joueurs .vide { font-size: 12.5px; color: var(--texte-faible); font-style: italic; padding: 4px 6px; }
 
 /* Mode « regard d'un joueur » : la ligne porte son curseur d'humeur. */
 .item-personne.avec-humeur { align-items: flex-start; flex-wrap: wrap; }
 .item-personne.avec-humeur .humeur { margin-left: auto; }
 .item-personne.avec-humeur .humeur-points { gap: 3px; }
 .item-personne.avec-humeur .humeur-point { width: 13px; height: 13px; }
-.item-personne.avec-humeur .humeur-mot { font-size: 10px; margin-top: 3px; text-align: right; }
+.item-personne.avec-humeur .humeur-mot { font-size: 11.5px; margin-top: 3px; text-align: right; }
 .item-personne.avec-humeur .humeur-modificateurs { justify-content: flex-end; }
 
 .item-personne {
@@ -837,11 +913,11 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .item-avatar {
   width: 27px; height: 27px; border-radius: 50%; flex: 0 0 27px;
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 10px; font-weight: 600;
+  color: #fff; font-size: 11.5px; font-weight: 600;
 }
 .item-corps { min-width: 0; flex: 1; }
-.item-nom { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-meta { font-size: 10.5px; color: var(--texte-faible); }
+.item-nom { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { font-size: 12px; color: var(--texte-faible); }
 .item-personne.mort .item-avatar { filter: saturate(.5) brightness(.95); }
 
 /* fiche */
@@ -853,14 +929,14 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .pn-avatar {
   width: 44px; height: 44px; border-radius: 50%; flex: 0 0 44px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; color: #fff; font-size: 15px;
+  font-weight: 700; color: #fff; font-size: 16px;
 }
-.pn-nom { font-family: var(--police-titre); font-size: 18px; line-height: 1.2; }
-.pn-surnom { color: var(--texte-faible); font-size: 11.5px; font-style: italic; }
+.pn-nom { font-family: var(--police-titre); font-size: 19px; line-height: 1.2; }
+.pn-surnom { color: var(--texte-faible); font-size: 13px; font-style: italic; }
 .pn-fermer { margin-left: auto; }
 .pn-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .badge {
-  font-size: 10px; padding: 3px 8px; border-radius: 20px;
+  font-size: 11.5px; padding: 3px 8px; border-radius: 20px;
   border: 1px solid var(--bord); color: var(--texte-doux); background: var(--fond-3);
 }
 .badge-vivant { color: #1d7a5f; border-color: #a9dcc9; background: #e6f6f0; }
@@ -879,14 +955,14 @@ body.sombre .badge-rang-heritier { color: #a9c3dc; border-color: #3d4f63; backgr
 /* Détails d'un lien : repliés tant qu'ils sont vides. */
 .fl-details { margin-top: 4px; }
 .fl-details > summary {
-  cursor: pointer; font-size: 11px; color: var(--texte-faible);
+  cursor: pointer; font-size: 12.5px; color: var(--texte-faible);
   padding: 3px 0; user-select: none;
 }
 .fl-details > summary:hover { color: var(--texte); }
 .fl-details .champ-edit { margin-top: 6px; }
 
 .rangs-puces { display: flex; flex-wrap: wrap; gap: 6px; }
-.puce-rang { font-size: 11px; padding: 5px 9px; }
+.puce-rang { font-size: 12.5px; padding: 5px 9px; }
 .puce-rang.actif { font-weight: 600; }
 .puce-rang-chef.actif { color: #8a6d0b; border-color: #d9be62; background: #fbf3d9; }
 .puce-rang-heritier.actif { color: #4a637d; border-color: #a8bed4; background: #eaf1f8; }
@@ -897,17 +973,17 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
 
 .pn-section { padding: 13px 14px; border-bottom: 1px solid var(--bord); }
 .pn-section > h3 {
-  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible); margin: 0 0 10px;
 }
 
 .grille-champs { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .grille-champs .pleine { grid-column: 1 / -1; }
 .champ-edit { display: flex; flex-direction: column; gap: 3px; }
-.champ-edit > label { font-size: 10px; color: var(--texte-faible); text-transform: uppercase; letter-spacing: .07em; }
+.champ-edit > label { font-size: 11.5px; color: var(--texte-faible); text-transform: uppercase; letter-spacing: .07em; }
 .champ-edit input, .champ-edit select, .champ-edit textarea {
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 6px 8px; outline: none; width: 100%; font-size: 12px;
+  padding: 6px 8px; outline: none; width: 100%; font-size: 13.5px;
 }
 .champ-edit textarea { resize: vertical; min-height: 86px; line-height: 1.5; }
 .champ-edit input:focus, .champ-edit select:focus, .champ-edit textarea:focus { border-color: var(--accent); }
@@ -947,40 +1023,66 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
  * éditeurs : un seul ouvert à la fois, fermeture au clic extérieur ou à Échap.
  * Il n'a pas de bouton « Enregistrer » — comme partout ici, chaque champ part
  * quand on le touche. */
-.forme-editeur {
-  width: 268px; padding: 11px 12px 10px;
+/* `.flottant` porte le `position: fixed` et le `z-index` ; la largeur, elle, se
+   redit ici, comme pour tous les autres panneaux (`.flottant.flottant-langue`
+   et consorts) — sinon les 322px de `.flottant`, déclarés plus bas, gagnent. */
+.flottant.forme-editeur {
+  width: 286px; padding: 11px 12px 10px;
   display: flex; flex-direction: column; gap: 9px;
 }
 .fe-entete { display: flex; align-items: center; justify-content: space-between; }
+.fe-actions { display: flex; align-items: center; gap: 4px; }
+
+/* La portée : sur le plan général, ou en centrant sur certains profils. */
+.fe-bloc-portee { gap: 6px; }
+.fe-portee { flex: 1; font-size: 12.5px; padding: 4px 6px; }
+.fe-portee.actif { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fe-profils { display: flex; flex-wrap: wrap; gap: 4px; }
+.fe-jeton {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 4px 2px 7px; border-radius: 999px;
+  background: var(--fond-3); border: 1px solid var(--bord);
+  font-size: 12.5px;
+}
+.fe-jeton-retrait {
+  border: 0; background: transparent; color: var(--texte-faible);
+  cursor: pointer; font: inherit; line-height: 1; padding: 0 2px;
+}
+.fe-jeton-retrait:hover { color: var(--danger, #c0392b); }
+.fe-ajout-profil {
+  width: 100%; background: var(--fond-3); color: inherit;
+  border: 1px solid var(--bord); border-radius: 7px;
+  padding: 4px 6px; font: inherit; font-size: 13px;
+}
 .fe-ligne { display: flex; flex-direction: column; gap: 4px; }
 .fe-lib {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--texte-faible);
 }
 .forme-editeur textarea {
   width: 100%; resize: vertical; line-height: 1.45; font-family: inherit;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 6px 8px; font-size: 12px; outline: none; color: inherit;
+  padding: 6px 8px; font-size: 13.5px; outline: none; color: inherit;
 }
 .forme-editeur textarea:focus { border-color: var(--accent); }
 .fe-styles { display: flex; align-items: center; gap: 6px; }
-.fe-bascule { width: 30px; padding: 3px 0; font-size: 13px; }
+.fe-bascule { width: 30px; padding: 3px 0; font-size: 14.5px; }
 .fe-gras { font-weight: 800; }
 .fe-italique { font-style: italic; font-family: var(--police-titre); }
 .fe-bascule.actif { background: var(--accent); border-color: var(--accent); color: #fff; }
 .fe-taille {
   width: 58px; text-align: center;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 4px 6px; font-size: 12px; outline: none; color: inherit;
+  padding: 4px 6px; font-size: 13.5px; outline: none; color: inherit;
 }
 .forme-editeur input[type="range"] { width: 100%; accent-color: var(--accent); }
-.fe-aide { font-size: 10.5px; color: var(--texte-faible); line-height: 1.45; margin: 0; }
+.fe-aide { font-size: 12px; color: var(--texte-faible); line-height: 1.45; margin: 0; }
 
 /* Les trois outils, dans la barre du bas, à côté de l'interrupteur « Formes ».
    Ils n'apparaissent qu'une fois le mode ouvert : hors de lui, ils ne
    pourraient rien tracer. */
 .outils-formes { display: flex; align-items: center; gap: 3px; }
-.outil-forme { width: 28px; font-size: 14px; }
+.outil-forme { width: 28px; font-size: 15px; }
 .outil-forme.actif, #btn-formes.actif {
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
@@ -991,14 +1093,23 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
 .joueur-ligne:last-child { border-bottom: 0; }
 .joueur-entete { display: flex; align-items: center; gap: 8px; }
 .joueur-pastille { width: 9px; height: 9px; border-radius: 50%; }
-.joueur-nom { font-size: 12px; }
-.joueur-perso { color: var(--texte-faible); font-size: 10.5px; }
+.joueur-nom { font-size: 13.5px; }
+.joueur-perso { color: var(--texte-faible); font-size: 12px; }
+/* Le commentaire d'un joueur sur quelqu'un (lot 22.B).
+   C'était une ligne unique de 11 px dans un panneau étroit : « il nous a
+   vendus aux Lannister à Vivesaigues » y tenait sur un tiers, le reste
+   défilait hors du champ et ne se relisait jamais. C'est maintenant une zone
+   de texte qui grandit avec ce qu'on écrit — deux lignes au repos pour ne pas
+   pousser l'humeur du joueur suivant hors de l'écran. */
 .joueur-commentaire { margin-top: 6px; }
-.joueur-commentaire input {
-  width: 100%; background: transparent; border: 0; border-bottom: 1px dashed var(--bord-clair);
-  padding: 3px 2px; font-size: 11px; color: var(--texte-doux); outline: none;
+.joueur-commentaire textarea {
+  width: 100%; background: transparent; border: 0;
+  border-bottom: 1px dashed var(--bord-clair);
+  padding: 3px 2px; color: var(--texte-doux); outline: none;
+  font: inherit; font-size: 14px; line-height: 1.45;
+  resize: vertical; min-height: 36px; overflow: hidden;
 }
-.joueur-commentaire input:focus { border-bottom-color: var(--accent); color: var(--texte); }
+.joueur-commentaire textarea:focus { border-bottom-color: var(--accent); color: var(--texte); }
 /* Humeur : 7 crans, un seul plein — c'est un cran, pas une jauge. */
 .humeur { margin: 6px 0 2px; }
 .humeur-points { display: flex; gap: 5px; }
@@ -1009,51 +1120,51 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
 }
 .humeur-point:hover { transform: scale(1.18); }
 .humeur-point.actif { box-shadow: 0 0 0 3px var(--fond-3); }
-.humeur-mot { font-size: 11px; margin-top: 5px; }
+.humeur-mot { font-size: 12.5px; margin-top: 5px; }
 .humeur-mot.vide { color: var(--texte-faible); font-style: italic; }
 .humeur-modificateurs { display: flex; gap: 8px; margin-top: 2px; }
 .humeur-mod {
-  font-size: 10px; color: var(--texte-faible);
+  font-size: 11.5px; color: var(--texte-faible);
   font-variant-numeric: tabular-nums; cursor: help;
 }
 .humeur-mod.vide { font-style: italic; cursor: default; }
 
-.echelle-aide { font-size: 10px; color: var(--texte-faible); margin: -4px 0 7px; }
+.echelle-aide { font-size: 11.5px; color: var(--texte-faible); margin: -4px 0 7px; }
 
 .groupe-liens { margin-bottom: 12px; }
 .groupe-liens > h4 {
-  font-size: 10px; color: var(--texte-faible); margin: 0 0 5px;
+  font-size: 11.5px; color: var(--texte-faible); margin: 0 0 5px;
   text-transform: uppercase; letter-spacing: .1em;
 }
 .lien { display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 7px; cursor: pointer; }
 .lien:hover { background: var(--fond-3); }
 .lien-trait { width: 13px; height: 0; border-top-width: 3px; border-top-style: solid; flex: 0 0 13px; }
 .lien-corps { min-width: 0; flex: 1; }
-.lien-nom { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lien-type { font-size: 10px; color: var(--texte-faible); }
-.lien-notes { font-size: 10px; color: var(--texte-faible); font-style: italic; }
-.puce-secret { font-size: 9px; color: #a9762a; border: 1px solid #e0c79a; border-radius: 4px; padding: 0 4px; }
-.puce-deduit { font-size: 9px; color: var(--texte-faible); border: 1px solid var(--bord); border-radius: 4px; padding: 0 4px; }
+.lien-nom { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lien-type { font-size: 11.5px; color: var(--texte-faible); }
+.lien-notes { font-size: 11.5px; color: var(--texte-faible); font-style: italic; }
+.puce-secret { font-size: 10.5px; color: #a9762a; border: 1px solid #e0c79a; border-radius: 4px; padding: 0 4px; }
+.puce-deduit { font-size: 10.5px; color: var(--texte-faible); border: 1px solid var(--bord); border-radius: 4px; padding: 0 4px; }
 
 .pn-pied {
   position: sticky; bottom: 0;
   background: var(--fond-2); border-top: 1px solid var(--bord);
   padding: 10px 14px; display: flex; align-items: center; gap: 9px;
 }
-.pn-pied-aide { font-size: 10px; color: var(--texte-faible); margin-left: auto; text-align: right; }
-.etat-sauvegarde { font-size: 11px; color: var(--texte-faible); }
+.pn-pied-aide { font-size: 11.5px; color: var(--texte-faible); margin-left: auto; text-align: right; }
+.etat-sauvegarde { font-size: 12.5px; color: var(--texte-faible); }
 .etat-sauvegarde.modifie { color: #b8842a; }
 .etat-sauvegarde.ok { color: var(--accent-fonce); }
 .etat-sauvegarde.erreur { color: #c0392b; }
 
-.vide { color: var(--texte-faible); font-size: 12px; font-style: italic; }
+.vide { color: var(--texte-faible); font-size: 13.5px; font-style: italic; }
 
 /* ------------------------------------------------- menus & éditeurs flottants */
 
 .menu-contextuel {
   position: fixed; z-index: 60; min-width: 210px; max-width: 280px; padding: 5px;
   background: var(--fond-2); border: 1px solid var(--bord-clair);
-  border-radius: 10px; box-shadow: var(--ombre-panneau); font-size: 12.5px;
+  border-radius: 10px; box-shadow: var(--ombre-panneau); font-size: 14px;
 }
 .menu-titre {
   display: flex; align-items: center; gap: 7px; padding: 6px 9px 8px;
@@ -1071,7 +1182,7 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
 .menu-item:disabled { opacity: .45; cursor: default; background: transparent; }
 .menu-icone { width: 15px; flex: 0 0 15px; text-align: center; opacity: .8; }
 .menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu-detail { color: var(--texte-faible); font-size: 11px; }
+.menu-detail { color: var(--texte-faible); font-size: 12.5px; }
 .menu-item.danger { color: #c0392b; }
 .menu-item.danger:hover { background: #fdecea; }
 body.sombre .menu-item.danger { color: #e8776b; }
@@ -1088,7 +1199,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: flex-start; gap: 8px;
   padding: 10px 9px 9px 12px; border-bottom: 1px solid var(--bord);
 }
-.fl-titre { flex: 1; font-size: 12.5px; line-height: 1.45; }
+.fl-titre { flex: 1; font-size: 14px; line-height: 1.45; }
 .fl-nom { font-weight: 600; }
 .fl-fleche { color: var(--texte-faible); }
 .fl-fermer { flex: 0 0 auto; }
@@ -1101,9 +1212,9 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: center; gap: 7px;
   padding: 9px 12px; border-top: 1px solid var(--bord); background: var(--fond-3);
 }
-.fl-etat { flex: 1; font-size: 11px; color: var(--texte-faible); text-align: right; }
+.fl-etat { flex: 1; font-size: 12.5px; color: var(--texte-faible); text-align: right; }
 .fl-etat.erreur { color: #c0392b; }
-.fl-aide { margin: 0; font-size: 11px; color: var(--texte-faible); line-height: 1.45; }
+.fl-aide { margin: 0; font-size: 12.5px; color: var(--texte-faible); line-height: 1.45; }
 /* Ce qu'on perd, et non ce qu'on fait : la seule aide qu'on veut lire avant
    d'appuyer, donc la seule qui se distingue du gris (lot 21.C). */
 .fl-aide.fl-alerte {
@@ -1117,16 +1228,16 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .flottant.flottant-raccourcis { width: 342px; }
 .rc-groupe { display: flex; flex-direction: column; gap: 4px; }
 .rc-titre {
-  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible); margin-bottom: 2px;
 }
 /* Les touches d'abord, à largeur fixe : l'œil descend une colonne de touches
    et s'arrête sur la bonne, au lieu de relire chaque phrase. */
-.rc-ligne { display: flex; align-items: baseline; gap: 9px; font-size: 11.5px; }
+.rc-ligne { display: flex; align-items: baseline; gap: 9px; font-size: 13px; }
 .rc-touches { flex: 0 0 106px; display: flex; flex-wrap: wrap; gap: 3px; }
 .rc-quoi { flex: 1; color: var(--texte-doux); line-height: 1.4; }
 .rc-touches kbd {
-  font: inherit; font-size: 10.5px; line-height: 1.5;
+  font: inherit; font-size: 12px; line-height: 1.5;
   padding: 1px 5px; border-radius: 5px;
   background: var(--fond-3); border: 1px solid var(--bord);
   border-bottom-width: 2px; color: var(--texte);
@@ -1141,10 +1252,10 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: center; gap: 9px;
   padding: 8px 10px; border: 0; border-radius: 8px;
   background: transparent; color: var(--texte);
-  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  font: inherit; font-size: 14px; text-align: left; cursor: pointer;
 }
 .lg-choix:hover { background: var(--fond-3); }
-.lg-drapeau { font-size: 15px; line-height: 1; }
+.lg-drapeau { font-size: 16px; line-height: 1; }
 .lg-nom { flex: 1; }
 .lg-coche { color: var(--accent); width: 12px; }
 .lg-choix.actif .lg-nom { font-weight: 600; }
@@ -1163,14 +1274,14 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   padding: 10px 11px; background: var(--fond-3);
   display: flex; flex-direction: column; gap: 5px;
 }
-.of-de { font-size: 11.5px; }
+.of-de { font-size: 13px; }
 .of-origine { color: var(--texte-faible); }
-.of-titre { font-size: 12.5px; font-weight: 600; }
-.of-meta { font-size: 10.5px; color: var(--texte-faible); }
+.of-titre { font-size: 14px; font-weight: 600; }
+.of-meta { font-size: 12px; color: var(--texte-faible); }
 /* L'aperçu est du Markdown brut, volontairement : ce qui compte ici est de
    reconnaître la note, pas de la lire en beauté avant de l'avoir acceptée. */
 .of-apercu {
-  margin: 2px 0 0; font-size: 11px; line-height: 1.5; color: var(--texte-doux);
+  margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--texte-doux);
   white-space: pre-wrap; overflow-wrap: anywhere;
   max-height: 92px; overflow: hidden;
   border-left: 2px solid var(--bord); padding-left: 8px;
@@ -1188,9 +1299,9 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 
 .bloc-tests { gap: 6px; }
-.jointure select { font-size: 11px; }
+.jointure select { font-size: 12.5px; }
 .ligne-test { display: flex; align-items: center; gap: 5px; }
-.ligne-test select, .ligne-test input { font-size: 11px; padding: 4px 6px; }
+.ligne-test select, .ligne-test input { font-size: 12.5px; padding: 4px 6px; }
 .ligne-test select:first-child { flex: 1.2; min-width: 0; }
 .ligne-test select:nth-child(2) { flex: 1; min-width: 0; }
 .ligne-test input { flex: 1; min-width: 0; }
@@ -1205,18 +1316,18 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .valeur-observee {
   display: flex; align-items: center; gap: 7px;
-  font-size: 11.5px; padding: 2px 0; cursor: pointer;
+  font-size: 13px; padding: 2px 0; cursor: pointer;
 }
 .valeur-observee input { width: auto; flex: 0 0 auto; }
 .puces-valeurs { display: flex; flex-wrap: wrap; gap: 4px; }
 .puce-valeur {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; padding: 2px 4px 2px 7px; border-radius: 11px;
+  font-size: 12.5px; padding: 2px 4px 2px 7px; border-radius: 11px;
   background: var(--accent-doux); border: 1px solid var(--bord);
 }
 .puce-retirer {
   border: 0; background: none; cursor: pointer; color: var(--texte-faible);
-  font-size: 11px; line-height: 1; padding: 1px 2px;
+  font-size: 12.5px; line-height: 1; padding: 1px 2px;
 }
 .puce-retirer:hover { color: #c0392b; }
 
@@ -1226,12 +1337,12 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .apercu-resume {
   display: flex; justify-content: space-between; gap: 8px;
-  font-size: 11px; color: var(--texte-faible); margin-bottom: 5px;
+  font-size: 12.5px; color: var(--texte-faible); margin-bottom: 5px;
 }
 .apercu-exclus { color: #c0392b; }
 .apercu-segments { list-style: none; margin: 0; padding: 0; }
 .apercu-segments li {
-  display: flex; align-items: center; gap: 7px; font-size: 11.5px; padding: 2px 0;
+  display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 2px 0;
 }
 .apercu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1264,11 +1375,11 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .sauvegarde.actif .sv-pastille { background: var(--accent); border-color: var(--accent); }
 .sv-corps { min-width: 0; }
-.sv-nom { font-size: 12.5px; color: var(--texte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-nom { font-size: 14px; color: var(--texte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sauvegarde.actif .sv-nom { font-weight: 600; }
-.sv-meta { font-size: 10px; color: var(--texte-faible); font-variant-numeric: tabular-nums; }
+.sv-meta { font-size: 11.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums; }
 .rail-actions { display: flex; gap: 4px; margin-top: 6px; }
-.rail-actions .bouton { flex: 1; font-size: 11px; padding: 5px 4px; }
+.rail-actions .bouton { flex: 1; font-size: 12.5px; padding: 5px 4px; }
 .rail-actions .bouton:hover { background: var(--fond-3); border-color: var(--bord); }
 
 .groupe-cadrage { display: contents; }
@@ -1300,7 +1411,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 
 .segments { display: flex; gap: 4px; }
 .segment {
-  flex: 1; padding: 5px 4px; font-size: 11px; cursor: pointer;
+  flex: 1; padding: 5px 4px; font-size: 12.5px; cursor: pointer;
   border: 1px solid var(--bord); border-radius: 6px;
   background: var(--fond-3); color: var(--texte-doux);
 }
@@ -1311,14 +1422,14 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: center; gap: 8px;
   padding: 9px 11px; border-radius: 7px;
   background: var(--fond-3); border: 1px solid var(--bord);
-  font-size: 12.5px; color: var(--texte);
+  font-size: 14px; color: var(--texte);
 }
 .ap-pastille { width: 13px; height: 13px; border-radius: 4px; flex: 0 0 13px; }
 .ap-trait {
   width: 44px; height: 0; flex: 0 0 44px;
   border-top-width: 3px; border-top-style: solid; border-radius: 2px;
 }
-.ap-fleche { font-size: 10px; margin-left: -6px; }
+.ap-fleche { font-size: 11.5px; margin-left: -6px; }
 .ap-fleche[hidden] { display: none; }
 
 /* ------------------------------------------------------------- photos */
@@ -1328,14 +1439,14 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   position: relative; overflow: hidden;
   width: 44px; height: 44px; border-radius: 50%; flex: 0 0 44px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; color: #fff; font-size: 15px;
+  font-weight: 700; color: #fff; font-size: 16px;
   cursor: pointer; user-select: none;
 }
 .pn-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pn-photo-voile {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, .5); color: #fff; font-size: 16px;
+  background: rgba(0, 0, 0, .5); color: #fff; font-size: 17px;
   opacity: 0; transition: opacity .15s ease;
 }
 .pn-photo:hover .pn-photo-voile,
@@ -1343,7 +1454,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .pn-photo.survol { box-shadow: 0 0 0 2px var(--accent); }
 .pn-photo-retirer {
   position: absolute; top: -5px; right: -7px;
-  width: 19px; height: 19px; padding: 0; font-size: 10px; line-height: 1;
+  width: 19px; height: 19px; padding: 0; font-size: 11.5px; line-height: 1;
   border-radius: 50%; background: var(--fond-2); border: 1px solid var(--bord);
   opacity: 0; transition: opacity .15s ease;
 }
@@ -1377,7 +1488,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: center; gap: 7px;
   background: none; border: 1px solid transparent; border-bottom: none;
   border-radius: 8px 8px 0 0; padding: 7px 13px; cursor: pointer;
-  color: var(--texte-doux); font-size: 12px; font-family: inherit;
+  color: var(--texte-doux); font-size: 13.5px; font-family: inherit;
 }
 .mz-onglet:hover { color: var(--texte); background: var(--fond-3); }
 .mz-onglet.actif {
@@ -1388,7 +1499,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   width: 9px; height: 9px; border-radius: 50%; background: var(--couleur-maison);
 }
 .mz-onglet .nombre {
-  font-size: 10px; color: var(--texte-faible); background: var(--fond-3);
+  font-size: 11.5px; color: var(--texte-faible); background: var(--fond-3);
   border-radius: 9px; padding: 0 6px;
 }
 
@@ -1398,27 +1509,27 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-fiche { background: var(--fond); }
 
 .mz-entete { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-.mz-entete h2 { font-size: 15px; margin: 0; }
+.mz-entete h2 { font-size: 16px; margin: 0; }
 .mz-entete-bloc { display: flex; align-items: baseline; gap: 10px; }
 .mz-entete-bloc h3 { margin: 0; }
 .mz-entete .bouton { margin-left: auto; }
-.mz-etat { margin-left: auto; font-size: 10.5px; color: var(--texte-faible); }
+.mz-etat { margin-left: auto; font-size: 12px; color: var(--texte-faible); }
 .mz-etat.erreur { color: #c0392b; }
-.mz-devise { margin: -6px 0 14px; font-style: italic; color: var(--texte-doux); font-size: 12px; }
-.mz-sous-titre { font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+.mz-devise { margin: -6px 0 14px; font-style: italic; color: var(--texte-doux); font-size: 13.5px; }
+.mz-sous-titre { font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--texte-faible); margin: 22px 0 4px; }
-.mz-aide { font-size: 11px; color: var(--texte-faible); line-height: 1.5; margin: 6px 0 0; }
+.mz-aide { font-size: 12.5px; color: var(--texte-faible); line-height: 1.5; margin: 6px 0 0; }
 .mz-vide { padding: 10px 0; line-height: 1.6; }
 
 .mz-bloc { padding: 14px 0; border-bottom: 1px solid var(--bord); }
 .mz-bloc:last-child { border-bottom: 0; }
 .mz-bloc h3 {
-  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible); margin: 0 0 10px;
 }
 .mz-bloc textarea {
   width: 100%; background: var(--fond-3); border: 1px solid var(--bord);
-  border-radius: 7px; padding: 7px 9px; font-size: 12px; line-height: 1.5;
+  border-radius: 7px; padding: 7px 9px; font-size: 13.5px; line-height: 1.5;
   resize: vertical; outline: none; font-family: inherit; color: inherit;
 }
 .mz-bloc textarea:focus { border-color: var(--accent); }
@@ -1432,16 +1543,16 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-evenement-lie.revolu { opacity: .6; }
 .mz-evenement-haut { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .mz-annee {
-  font-variant-numeric: tabular-nums; font-size: 10.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600;
   color: var(--texte-faible); background: var(--fond-3);
   border-radius: 9px; padding: 1px 7px; white-space: nowrap;
 }
-.mz-evenement-titre { font-size: 12.5px; font-weight: 600; }
-.mz-lieu { font-size: 10.5px; color: var(--texte-faible); }
+.mz-evenement-titre { font-size: 14px; font-weight: 600; }
+.mz-lieu { font-size: 12px; color: var(--texte-faible); }
 .mz-modifier { margin-left: auto; opacity: 0; padding: 2px 6px; }
 .mz-evenement:hover .mz-modifier, .mz-lien:hover .mz-modifier { opacity: 1; }
 .mz-evenement-texte {
-  margin: 5px 0 0; font-size: 12px; line-height: 1.55; color: var(--texte-doux);
+  margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--texte-doux);
   white-space: pre-wrap;
 }
 
@@ -1450,7 +1561,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-personne {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 20px;
-  padding: 3px 9px; font-size: 11px; color: var(--texte-doux);
+  padding: 3px 9px; font-size: 12.5px; color: var(--texte-doux);
   cursor: pointer; font-family: inherit;
 }
 .mz-personne:hover { border-color: var(--couleur-personne); color: var(--texte); }
@@ -1462,7 +1573,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-personne-retirable { cursor: default; }
 .mz-retirer {
   background: none; border: 0; cursor: pointer; color: var(--texte-faible);
-  padding: 0 0 0 2px; font-size: 11px; font-family: inherit;
+  padding: 0 0 0 2px; font-size: 12.5px; font-family: inherit;
 }
 .mz-retirer:hover { color: #c0392b; }
 
@@ -1470,7 +1581,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
    deux maisons d'un coup d'œil ; le chiffre reste ce qu'on écrit. */
 .mz-caracs { display: flex; flex-direction: column; gap: 7px; }
 .mz-carac { display: flex; align-items: center; gap: 10px; }
-.mz-carac-nom { flex: 0 0 92px; font-size: 11.5px; }
+.mz-carac-nom { flex: 0 0 92px; font-size: 13px; }
 .mz-jauge {
   flex: 1; height: 6px; background: var(--fond-3); border-radius: 4px;
   overflow: hidden; min-width: 40px;
@@ -1479,7 +1590,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-carac input {
   flex: 0 0 58px; text-align: center; font-variant-numeric: tabular-nums;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 4px 6px; font-size: 12px; outline: none; color: inherit;
+  padding: 4px 6px; font-size: 13.5px; outline: none; color: inherit;
 }
 .mz-carac input:focus { border-color: var(--accent); }
 
@@ -1499,7 +1610,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-unite-haut input {
   flex: 1; min-width: 0;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 5px 8px; font-size: 12px; outline: none; color: inherit;
+  padding: 5px 8px; font-size: 13.5px; outline: none; color: inherit;
 }
 .mz-unite-haut input.mz-unite-large { flex: 1.6; font-weight: 600; }
 .mz-unite-haut input:focus { border-color: var(--accent); }
@@ -1513,18 +1624,18 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .mz-unite-champ { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .mz-unite-champ.pleine { grid-column: 1 / -1; }
 .mz-unite-champ > span {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--texte-faible);
 }
 .mz-unite-champ input, .mz-unite-champ select {
   width: 100%; min-width: 0;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 4px 7px; font-size: 12px; outline: none; color: inherit;
+  padding: 4px 7px; font-size: 13.5px; outline: none; color: inherit;
 }
 .mz-unite-champ input:focus, .mz-unite-champ select:focus { border-color: var(--accent); }
 /* Le pourcentage : le signe suit le champ au lieu d'occuper une colonne. */
 .mz-unite-pourcent { display: flex; align-items: center; gap: 4px; }
-.mz-unite-pourcent > span { font-size: 11px; color: var(--texte-faible); }
+.mz-unite-pourcent > span { font-size: 12.5px; color: var(--texte-faible); }
 
 /* L'état colore sa propre liste : sur douze unités en pleine bataille, c'est
    la seule colonne qu'on relit, et on la relit de loin. */
@@ -1538,33 +1649,33 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 
 .mz-unite-notes { margin-top: 8px; }
 .mz-unite-notes summary {
-  font-size: 10.5px; color: var(--texte-faible); cursor: pointer;
+  font-size: 12px; color: var(--texte-faible); cursor: pointer;
   text-transform: uppercase; letter-spacing: .07em;
 }
 .mz-unite-notes textarea {
   width: 100%; margin-top: 6px; resize: vertical; line-height: 1.5;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 6px 8px; font-size: 12px; outline: none; color: inherit;
+  padding: 6px 8px; font-size: 13.5px; outline: none; color: inherit;
   font-family: inherit;
 }
 .mz-unite-notes textarea:focus { border-color: var(--accent); }
 
 .mz-rang-ligne { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.mz-rang-titre { flex: 0 0 92px; font-size: 11.5px; color: var(--texte-doux); }
-.mz-rang-vide { font-size: 11px; color: var(--texte-faible); font-style: italic; }
+.mz-rang-titre { flex: 0 0 92px; font-size: 13px; color: var(--texte-doux); }
+.mz-rang-vide { font-size: 12.5px; color: var(--texte-faible); font-style: italic; }
 .mz-rang-ligne .mz-personnes { margin-top: 0; }
 
 .mz-lien {
   display: flex; align-items: center; gap: 8px; padding: 5px 0;
-  border-bottom: 1px dashed var(--bord); font-size: 12px;
+  border-bottom: 1px dashed var(--bord); font-size: 13.5px;
 }
 .mz-lien:last-child { border-bottom: 0; }
 .mz-lien.revolu { opacity: .58; }
 .mz-lien.orphelin .mz-personne { text-decoration: line-through; }
-.mz-lien-type { font-size: 11px; font-weight: 600; }
+.mz-lien-type { font-size: 12.5px; font-weight: 600; }
 .mz-lien-fleche { color: var(--texte-faible); }
 .mz-revolu {
-  font-size: 10px; color: var(--texte-faible); border: 1px solid var(--bord);
+  font-size: 11.5px; color: var(--texte-faible); border: 1px solid var(--bord);
   border-radius: 9px; padding: 0 6px;
 }
 
@@ -1588,7 +1699,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   display: flex; align-items: center; gap: 7px;
   background: none; border: 1px solid transparent; border-bottom: none;
   border-radius: 8px 8px 0 0; padding: 7px 13px; cursor: pointer;
-  font-size: 12.5px; color: var(--texte-doux); margin-bottom: -1px;
+  font-size: 14px; color: var(--texte-doux); margin-bottom: -1px;
 }
 .tb-onglet:hover { background: var(--fond-3); }
 .tb-onglet.actif {
@@ -1596,7 +1707,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   font-weight: 600;
 }
 .tb-onglet .nombre {
-  font-size: 10px; color: var(--texte-faible); background: var(--fond-3);
+  font-size: 11.5px; color: var(--texte-faible); background: var(--fond-3);
   border-radius: 20px; padding: 1px 7px; font-variant-numeric: tabular-nums;
 }
 .tb-barre {
@@ -1605,16 +1716,16 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .tb-espace { flex: 1; }
 .tb-filtre {
-  width: 240px; padding: 6px 10px; font-size: 12px; font-family: inherit;
+  width: 240px; padding: 6px 10px; font-size: 13.5px; font-family: inherit;
   background: var(--fond-3); border: 1px solid var(--bord);
   border-radius: 8px; color: var(--texte);
 }
 .tb-filtre:focus { outline: none; border-color: var(--accent); }
-.tb-info { font-size: 11px; color: var(--texte-faible); font-variant-numeric: tabular-nums; }
+.tb-info { font-size: 12.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums; }
 /* La barre flottante du bas passe par-dessus : on garde de quoi faire
    défiler la dernière ligne au-dessus d'elle. */
 .tb-zone { flex: 1; overflow: auto; padding: 0 0 72px; }
-.tb-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; }
+.tb-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13.5px; }
 .tb-table th {
   position: sticky; top: 0; z-index: 2;
   background: var(--fond-3); color: var(--texte-doux);
@@ -1624,7 +1735,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 }
 .tb-table th:hover { color: var(--texte); }
 .tb-table th.trie { color: var(--accent); }
-.tb-fleche { font-size: 9px; }
+.tb-fleche { font-size: 10.5px; }
 .tb-table td {
   padding: 6px 12px; border-bottom: 1px solid var(--bord);
   max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1633,7 +1744,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
 .tb-table tbody tr:hover td { background: var(--fond-3); }
 .tb-table tr.cliquable { cursor: pointer; }
 .tb-table td.nombre, .tb-table th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
-.tb-table td:first-child { color: var(--texte-faible); font-size: 11px; }
+.tb-table td:first-child { color: var(--texte-faible); font-size: 12.5px; }
 .tb-plus { display: block; margin: 14px auto; }
 
 /* ------------------------------------------------- édition par procuration
@@ -1645,7 +1756,7 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
  */
 .bandeau-procuration {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  padding: 7px 14px; font-size: 13.5px; line-height: 1.4;
   background: #fdf3d8; color: #7a5c12; border-bottom: 1px solid #e0c169;
 }
 .bandeau-procuration .bouton { margin-left: auto; }
@@ -1671,7 +1782,7 @@ body.sombre.en-partage .bandeau-procuration {
 body.en-partage #btn-telecharger,
 body.en-partage #btn-instantane,
 body.en-partage #btn-nouveau-profil,
-body.en-partage #btn-annee,
+body.en-partage #champ-annee,
 body.en-partage .rail-actions,
 body.en-partage #btn-nouveau-filtre,
 body.en-partage .etat-ecriture { display: none; }
@@ -1687,7 +1798,7 @@ body.en-partage .sauvegarde { cursor: default; }
  */
 .bandeau-essai {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  padding: 7px 14px; font-size: 13.5px; line-height: 1.4;
   background: var(--fond-3); color: var(--texte-faible);
   border-bottom: 1px solid var(--bord);
 }
@@ -1716,7 +1827,7 @@ body.en-essai #btn-instantane { display: none; }
  */
 .bandeau-demo {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 7px 14px; font-size: 12px; line-height: 1.4;
+  padding: 7px 14px; font-size: 13.5px; line-height: 1.4;
   background: #eef0f7; color: #4b4f6b; border-bottom: 1px solid #c3c8e0;
 }
 .bandeau-demo-texte { flex: 1; min-width: 200px; }
@@ -1749,9 +1860,9 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   border: 1px solid var(--bord); border-radius: var(--rayon);
   box-shadow: var(--carte-ombre-forte); padding: 14px 16px 12px;
 }
-.tuto-compteur { font-size: 11px; color: var(--texte-faible); letter-spacing: .04em; }
-.tuto-titre { margin: 2px 0 6px; font-family: var(--police-titre); font-size: 16px; }
-.tuto-texte { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--texte-doux); }
+.tuto-compteur { font-size: 12.5px; color: var(--texte-faible); letter-spacing: .04em; }
+.tuto-titre { margin: 2px 0 6px; font-family: var(--police-titre); font-size: 17px; }
+.tuto-texte { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--texte-doux); }
 .tuto-texte b { color: var(--texte); }
 .tuto-actions { display: flex; gap: 6px; align-items: center; }
 /* « Plus tard » à gauche, seul : une sortie ne se cherche pas parmi les
@@ -1788,12 +1899,12 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 }
 .cn-fil {
   flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 5px;
-  font-size: 12.5px; white-space: nowrap; overflow: hidden;
+  font-size: 14px; white-space: nowrap; overflow: hidden;
 }
 .cn-fil-chapitre { color: var(--texte-faible); }
 .cn-fil-sep { color: var(--texte-faible); }
 .cn-fil-note { color: var(--texte); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.cn-etat { font-size: 11px; color: var(--texte-faible); white-space: nowrap; }
+.cn-etat { font-size: 12.5px; color: var(--texte-faible); white-space: nowrap; }
 .cn-etat.modifie { color: var(--texte-doux); }
 .cn-etat.ok { color: var(--accent-fonce); }
 .cn-etat.erreur { color: #b4483a; }
@@ -1804,7 +1915,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .cn-avertissement {
   flex: 0 0 auto; margin: 0; padding: 5px 10px;
   background: var(--accent-doux); border-bottom: 1px solid var(--bord);
-  font-size: 11px; line-height: 1.4; color: var(--accent-fonce);
+  font-size: 12.5px; line-height: 1.4; color: var(--accent-fonce);
 }
 
 .cn-corps { flex: 1; display: flex; min-height: 0; min-width: 0; position: relative; }
@@ -1832,20 +1943,20 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 
 .cn-sommaire-entete { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .cn-sommaire-entete h3 {
-  flex: 1; margin: 0; font-size: 10.5px; letter-spacing: .14em;
+  flex: 1; margin: 0; font-size: 12px; letter-spacing: .14em;
   text-transform: uppercase; color: var(--texte-faible);
 }
 .cn-groupe { margin-bottom: 10px; }
 .cn-groupe-titre { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
 .cn-groupe-titre .nombre {
-  font-size: 10.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
+  font-size: 12px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
 }
 .cn-hors-chapitre {
-  font-size: 11px; color: var(--texte-faible); text-transform: uppercase; letter-spacing: .08em;
+  font-size: 12.5px; color: var(--texte-faible); text-transform: uppercase; letter-spacing: .08em;
 }
 .cn-chap-titre {
   flex: 1; min-width: 0; background: transparent; border: 1px solid transparent;
-  border-radius: 5px; padding: 3px 5px; font-size: 12px; font-weight: 600;
+  border-radius: 5px; padding: 3px 5px; font-size: 13.5px; font-weight: 600;
 }
 .cn-chap-titre:hover:not([readonly]) { border-color: var(--bord); }
 .cn-chap-titre:focus { background: var(--fond-2); border-color: var(--accent); outline: none; }
@@ -1854,12 +1965,12 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   display: flex; align-items: center; gap: 6px; width: 100%;
   background: transparent; border: 0; border-radius: 6px;
   padding: 6px 8px; text-align: left; cursor: pointer; color: var(--texte-doux);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .cn-ligne:hover { background: var(--fond-2); color: var(--texte); }
 .cn-ligne.actif { background: var(--accent-doux); color: var(--accent-fonce); font-weight: 600; }
 .cn-ligne-titre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cn-ligne-cites { font-size: 10.5px; color: var(--texte-faible); white-space: nowrap; }
+.cn-ligne-cites { font-size: 12px; color: var(--texte-faible); white-space: nowrap; }
 .cn-nouvelle-note { width: 100%; margin-top: 4px; }
 .cn-danger:hover { color: #b4483a; border-color: #e0b4ac; }
 
@@ -1868,7 +1979,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .cn-titre {
   flex: 0 0 auto; margin: 10px 12px 6px; padding: 4px 6px;
   background: transparent; border: 1px solid transparent; border-radius: 6px;
-  font-family: var(--police-titre); font-size: 17px; font-weight: 600;
+  font-family: var(--police-titre); font-size: 18px; font-weight: 600;
 }
 .cn-titre:hover:not([readonly]) { border-color: var(--bord); }
 .cn-titre:focus { background: var(--fond-3); border-color: var(--accent); outline: none; }
@@ -1877,7 +1988,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   flex: 0 0 auto; display: flex; align-items: center; gap: 2px;
   padding: 0 10px 6px; overflow-x: auto; scrollbar-width: thin;
 }
-.cn-outil { min-width: 26px; height: 26px; font-size: 11.5px; padding: 0 5px; flex: 0 0 auto; }
+.cn-outil { min-width: 26px; height: 26px; font-size: 13px; padding: 0 5px; flex: 0 0 auto; }
 .cn-outil-gras { font-weight: 800; }
 .cn-outil-italique { font-style: italic; font-family: var(--police-titre); }
 .cn-outil-barre { text-decoration: line-through; }
@@ -1888,24 +1999,24 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   flex: 1; min-height: 0; resize: none;
   margin: 0 10px; padding: 10px 12px;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: var(--rayon);
-  font-size: 13.5px; line-height: 1.65; tab-size: 2;
+  font-size: 15px; line-height: 1.65; tab-size: 2;
 }
 .cn-source:focus { outline: none; border-color: var(--accent); background: var(--fond-2); }
 
 .cn-rendu {
   flex: 1; min-height: 0; overflow-y: auto;
-  padding: 2px 14px 10px; font-size: 13.5px; line-height: 1.65; color: var(--texte);
+  padding: 2px 14px 10px; font-size: 15px; line-height: 1.65; color: var(--texte);
 }
 
 .cn-pied {
   flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
   padding: 7px 10px; border-top: 1px solid var(--bord);
 }
-.cn-pied-aide { flex: 1; min-width: 0; font-size: 10.5px; color: var(--texte-faible); }
-.cn-chapitre-choix { font-size: 11.5px; max-width: 45%; }
+.cn-pied-aide { flex: 1; min-width: 0; font-size: 12px; color: var(--texte-faible); }
+.cn-chapitre-choix { font-size: 13px; max-width: 45%; }
 
-.cn-vide { padding: 26px 20px; color: var(--texte-doux); font-size: 12.5px; line-height: 1.6; }
-.cn-vide-titre { font-family: var(--police-titre); font-size: 16px; color: var(--texte); margin: 0 0 8px; }
+.cn-vide { padding: 26px 20px; color: var(--texte-doux); font-size: 14px; line-height: 1.6; }
+.cn-vide-titre { font-family: var(--police-titre); font-size: 17px; color: var(--texte); margin: 0 0 8px; }
 .cn-vide .bouton { margin-top: 12px; }
 
 /* complétion « / » */
@@ -1917,12 +2028,12 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 }
 .cn-suggestions li {
   display: flex; align-items: baseline; gap: 6px;
-  padding: 5px 7px; border-radius: 5px; cursor: pointer; font-size: 12.5px;
+  padding: 5px 7px; border-radius: 5px; cursor: pointer; font-size: 14px;
 }
 .cn-suggestions li.survol { background: var(--accent-doux); }
-.cn-sug-ico { flex: 0 0 auto; font-size: 11px; }
+.cn-sug-ico { flex: 0 0 auto; font-size: 12.5px; }
 .cn-sug-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cn-sug-detail { font-size: 10.5px; color: var(--texte-faible); white-space: nowrap; }
+.cn-sug-detail { font-size: 12px; color: var(--texte-faible); white-space: nowrap; }
 
 /* --------------------------------------------------------------- markdown */
 
@@ -1930,10 +2041,10 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .cn-rendu h4, .cn-rendu h5, .cn-rendu h6 {
   font-family: var(--police-titre); margin: 16px 0 6px; line-height: 1.3;
 }
-.cn-rendu h1 { font-size: 19px; }
-.cn-rendu h2 { font-size: 16.5px; }
-.cn-rendu h3 { font-size: 14.5px; }
-.cn-rendu h4, .cn-rendu h5, .cn-rendu h6 { font-size: 13.5px; color: var(--texte-doux); }
+.cn-rendu h1 { font-size: 20px; }
+.cn-rendu h2 { font-size: 17.5px; }
+.cn-rendu h3 { font-size: 15.5px; }
+.cn-rendu h4, .cn-rendu h5, .cn-rendu h6 { font-size: 15px; color: var(--texte-doux); }
 .cn-rendu p { margin: 8px 0; }
 .cn-rendu ul, .cn-rendu ol { margin: 8px 0; padding-left: 22px; }
 .cn-rendu li { margin: 2px 0; }
@@ -1944,7 +2055,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .cn-rendu hr { border: 0; border-top: 1px solid var(--bord); margin: 14px 0; }
 .cn-rendu code {
   background: var(--fond-3); border: 1px solid var(--bord);
-  border-radius: 4px; padding: 0 4px; font-size: 12px;
+  border-radius: 4px; padding: 0 4px; font-size: 13.5px;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 .cn-rendu pre.md-code {
@@ -1956,7 +2067,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 /* Un tableau large défile **dans sa boîte** : sans ça, c'est la note entière
    qui se met à glisser latéralement, et le texte autour part avec. */
 .md-table-boite { overflow-x: auto; margin: 10px 0; }
-.md-table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.md-table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
 .md-table th, .md-table td {
   border: 1px solid var(--bord); padding: 5px 8px; text-align: left; vertical-align: top;
 }
@@ -1990,7 +2101,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
    l'humeur envers les joueurs — et toute autre qui deviendrait trop longue. */
 .pn-repliable > summary {
   cursor: pointer; list-style: none;
-  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--texte-faible);
 }
 .pn-repliable > summary::-webkit-details-marker { display: none; }
@@ -2003,22 +2114,22 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .pn-repliable > summary:hover { color: var(--texte-doux); }
 .pn-repli-titre { display: inline-flex; align-items: baseline; gap: 6px; }
 .pn-repli-nombre {
-  font-size: 10.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
+  font-size: 12px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
 }
 .pn-cit-chapitre {
-  margin: 10px 0 4px; font-size: 10.5px; letter-spacing: .1em;
+  margin: 10px 0 4px; font-size: 12px; letter-spacing: .1em;
   text-transform: uppercase; color: var(--texte-faible);
 }
 .pn-cit-note { margin-bottom: 8px; }
 .pn-cit-note-titre {
   display: flex; align-items: baseline; gap: 6px;
-  font-size: 12px; font-weight: 600; color: var(--texte-doux); margin-bottom: 3px;
+  font-size: 13.5px; font-weight: 600; color: var(--texte-doux); margin-bottom: 3px;
 }
 .pn-cit-extrait {
   display: block; width: 100%; text-align: left;
   background: var(--fond-3); border: 1px solid var(--bord); border-radius: 6px;
   padding: 5px 8px; margin: 3px 0; cursor: pointer;
-  font-size: 12px; line-height: 1.5; color: var(--texte-doux);
+  font-size: 13.5px; line-height: 1.5; color: var(--texte-doux);
 }
 .pn-cit-extrait:hover { border-color: var(--accent); color: var(--texte); }
 .pn-cit-extrait b { color: var(--accent-fonce); }
@@ -2056,7 +2167,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 
 .groupe-compte { display: flex; align-items: center; gap: 6px; }
 .compte {
-  font-size: 11px; color: var(--texte-faible);
+  font-size: 12.5px; color: var(--texte-faible);
   max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 #aide-plafonds { margin: 7px 0 0; }
@@ -2131,7 +2242,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   .barre-haut .champ-couleur,
   .barre-haut #lien-document,
   .barre-haut #btn-vue-generale,
-  .barre-haut #btn-annee,
+  .barre-haut #champ-annee,
   .barre-haut #btn-theme,
   .barre-haut #lien-admin,
   .barre-haut #lien-donnees,
@@ -2183,16 +2294,16 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
      données, se déconnecter — et non une grille de réglages à parcourir. */
   #accueil-compte { grid-template-columns: 1fr; }
   #accueil-compte .bouton {
-    min-height: 46px; justify-content: flex-start; gap: 8px; font-size: 14px;
+    min-height: 46px; justify-content: flex-start; gap: 8px; font-size: 15px;
   }
   /* C'est ici, et ici seulement, que ⚙ 🛡 ⏻ disent leur nom. */
   #accueil-compte #lien-admin .lib,
   #accueil-compte #lien-donnees .lib,
   #accueil-compte #btn-deconnexion .lib { display: inline; }
-  #accueil-compte .bouton .ico { margin-right: 2px; font-size: 16px; opacity: 1; }
+  #accueil-compte .bouton .ico { margin-right: 2px; font-size: 17px; opacity: 1; }
   #accueil-compte #btn-deconnexion { border-color: var(--bord); color: var(--texte-faible); }
   /* L'adresse du compte n'est pas un bouton : elle occupe sa propre ligne. */
-  #accueil-compte .compte { max-width: none; font-size: 13px; padding: 2px 0; }
+  #accueil-compte .compte { max-width: none; font-size: 14.5px; padding: 2px 0; }
   /* « Créer un compte » et « Se connecter », descendus ici depuis la barre du
      haut. Ils se partagent la ligne : c'est tout ce que voit un visiteur sans
      compte qui touche 👤, et il n'a rien à chercher. */
@@ -2210,7 +2321,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
    * modifié quelque chose et qu'il y a du travail à perdre. C'est exactement la
    * distinction sur laquelle ce bandeau a été construit — discret tant qu'on
    * regarde, insistant dès qu'on écrit — et non une exception de plus. */
-  .bandeau-essai { padding: 6px 10px; font-size: 11.5px; gap: 8px; }
+  .bandeau-essai { padding: 6px 10px; font-size: 13px; gap: 8px; }
   .bandeau-essai:not(.presse) .bouton-primaire { display: none; }
   .bandeau-essai.presse .bouton-primaire { min-height: 36px; }
   .bandeau-essai-texte { min-width: 0; }
@@ -2224,7 +2335,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
    * « ? Tutoriel » disparaît tout court : la visite guidée a déjà sa porte dans
    * le tiroir, sous 👤. « Créer un compte » / « En faire mon monde » revient
    * dès qu'on a écrit — le moment où il y a quelque chose à perdre. */
-  .bandeau-demo { padding: 6px 10px; font-size: 11.5px; gap: 8px; }
+  .bandeau-demo { padding: 6px 10px; font-size: 13px; gap: 8px; }
   .bandeau-demo #btn-demo-tutoriel { display: none; }
   .bandeau-demo:not(.presse) #btn-demo-garder { display: none; }
   .bandeau-demo.presse #btn-demo-garder { min-height: 36px; }
@@ -2245,48 +2356,48 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
      disait inutilisables — elles étaient là, simplement trop fines pour un
      doigt. */
   .rail .rail-actions { gap: 6px; }
-  .rail .rail-actions .bouton { min-height: 44px; padding: 8px 6px; font-size: 12.5px; }
+  .rail .rail-actions .bouton { min-height: 44px; padding: 8px 6px; font-size: 14px; }
   .rail .legende li { min-height: 40px; padding: 8px 8px; }
   .rail .liste-vues li,
   .rail .liste-joueurs li,
   .rail .liste-sauvegardes li { min-height: 44px; }
-  .rail .axe-puce { min-height: 36px; padding: 6px 12px; font-size: 12px; }
+  .rail .axe-puce { min-height: 36px; padding: 6px 12px; font-size: 13.5px; }
   .rail .btn-entete,
   .rail .rail-plier,
-  .rail .joueur-rail-fiche { min-width: 40px; min-height: 40px; font-size: 16px; }
+  .rail .joueur-rail-fiche { min-width: 40px; min-height: 40px; font-size: 17px; }
   /* Les onglets du rail (lot 21.A) : au doigt aussi, et sans se coller au bord
      supérieur du tiroir. */
-  .rail .rail-onglet { min-height: 44px; font-size: 13px; }
+  .rail .rail-onglet { min-height: 44px; font-size: 14.5px; }
   /* L'écriteau du plan disparaît : 375 px d'écran, et la barre du bas passe
      déjà par-dessus le coin où il vit. */
   .stats-plan { display: none; }
   .rail .option { min-height: 40px; }
   .rail .option input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 20px; }
   /* Les options numériques d'une vue (taille des cartes, écartement…). */
-  .rail .option input[type='number'] { min-height: 38px; font-size: 16px; }
+  .rail .option input[type='number'] { min-height: 38px; font-size: 17px; }
   /* Les libellés d'aide occupaient un tiers du tiroir. On les garde — ils
      enseignent l'appui long — mais lisibles plutôt que minuscules. */
-  .rail .rail-aide { font-size: 11.5px; }
+  .rail .rail-aide { font-size: 13px; }
 
-  /* Le volet de droite, aux mêmes mesures. `font-size: 16px` sur la recherche
+  /* Le volet de droite, aux mêmes mesures. `font-size: 17px` sur la recherche
      n'est pas une coquetterie : en dessous, iOS zoome sur le champ au premier
      appui et laisse la page décadrée. */
-  .panneau #recherche { min-height: 42px; font-size: 16px; }
+  .panneau #recherche { min-height: 42px; font-size: 17px; }
   .panneau #selecteur-groupe { min-height: 42px; }
-  #btn-fermer-panneau { min-width: 40px; min-height: 40px; font-size: 16px; }
+  #btn-fermer-panneau { min-width: 40px; min-height: 40px; font-size: 17px; }
 
   /* La fiche, éditable au doigt.
    *
    * Mesuré le 13/08/2026, fiche ouverte sur 375 px : les champs de saisie
    * faisaient **21 à 29 px**, les puces de rang 26, le ✕ de la fiche 30. Le
-   * `font-size: 16px` sur tout ce qui se saisit est là pour iOS, qui zoome sur
+   * `font-size: 17px` sur tout ce qui se saisit est là pour iOS, qui zoome sur
    * un champ plus petit et laisse la page décadrée — impossible à récupérer
    * d'une main. */
   .panneau .champ-edit input,
   .panneau .champ-edit select,
   .panneau .champ-edit textarea,
   .panneau .champ-suggere input,
-  .panneau .joueur-commentaire input { min-height: 40px; font-size: 16px; }
+  .panneau .joueur-commentaire input { min-height: 40px; font-size: 17px; }
   .panneau .puce-rang { min-height: 36px; }
   .panneau .pn-fermer { min-width: 40px; min-height: 40px; }
   /* Les sept points d'humeur tiennent sur une ligne : 28 px chacun, c'est le
@@ -2371,12 +2482,12 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   .carnet-large .cn-btn-sommaire { display: inline-flex; }
 
   .cn-barre .bouton { min-height: 38px; }
-  .cn-outil { min-width: 34px; height: 34px; font-size: 12.5px; }
+  .cn-outil { min-width: 34px; height: 34px; font-size: 14px; }
   .cn-ligne { min-height: 42px; }
   .cn-chap-titre, .cn-titre { min-height: 38px; }
   /* 16 px : en dessous, iOS zoome sur le champ dès qu'on y pose le doigt, et
      la note se retrouve à moitié hors de l'écran. */
-  .cn-source { font-size: 16px; }
+  .cn-source { font-size: 17px; }
   .cn-suggestions { min-width: 60vw; max-width: 88vw; }
   .cn-suggestions li { min-height: 40px; align-items: center; }
   .cn-chapitre-choix { min-height: 36px; }
@@ -2399,7 +2510,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .liste-membres { list-style: none; margin: 0; padding: 0; }
 .membre {
   display: flex; align-items: center; gap: 7px;
-  padding: 4px 6px; border-radius: 6px; font-size: 11.5px;
+  padding: 4px 6px; border-radius: 6px; font-size: 13px;
 }
 .membre:hover { background: var(--fond-3); }
 .membre input { margin: 0; flex: 0 0 auto; }
@@ -2417,7 +2528,7 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .membre-arbre {
   min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; background: none; border: 0; padding: 0; cursor: pointer;
-  color: var(--texte-faible); font: inherit; font-size: 10px;
+  color: var(--texte-faible); font: inherit; font-size: 11.5px;
   border-bottom: 1px dotted var(--bord-clair); align-self: flex-start; max-width: 100%;
 }
 .membre-arbre:hover { color: var(--accent); }
@@ -2427,30 +2538,30 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 .membre-absent { opacity: .55; }
 .membre-absent .membre-arbre { font-style: italic; }
 .membre-compte {
-  color: var(--texte-faible); font-size: 10.5px; font-variant-numeric: tabular-nums;
+  color: var(--texte-faible); font-size: 12px; font-variant-numeric: tabular-nums;
 }
 
 /* Ce que la superposition révèle, dit sur la carte elle-même. */
 .carte.partielle { border-style: dashed; }
 .carte.desaccord .carte-nom::after {
-  content: ' ⚖'; color: var(--texte-faible); font-size: 10px;
+  content: ' ⚖'; color: var(--texte-faible); font-size: 11.5px;
 }
 
 /* Le panneau de droite : qui a quoi. */
-.pn-titre { font-size: 13px; font-weight: 600; }
-.pn-aide { margin: 0 0 9px; font-size: 11.5px; color: var(--texte-faible); line-height: 1.5; }
+.pn-titre { font-size: 14.5px; font-weight: 600; }
+.pn-aide { margin: 0 0 9px; font-size: 13px; color: var(--texte-faible); line-height: 1.5; }
 .pn-sous-titre {
-  margin: 14px 0 6px; font-size: 10px; letter-spacing: .14em;
+  margin: 14px 0 6px; font-size: 11.5px; letter-spacing: .14em;
   text-transform: uppercase; color: var(--texte-faible);
 }
 .pn-porteurs { list-style: none; margin: 0 0 10px; padding: 0; }
 .pn-porteurs li {
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
-  padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--bord);
+  padding: 3px 0; font-size: 12.5px; border-bottom: 1px solid var(--bord);
 }
 .pn-porteur-qui { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.pn-porteurs code { font-size: 10px; color: var(--texte-faible); }
-.pn-autre { font-size: 10px; color: var(--accent); }
+.pn-porteurs code { font-size: 11.5px; color: var(--texte-faible); }
+.pn-autre { font-size: 11.5px; color: var(--accent); }
 
 .pn-candidat {
   border: 1px solid var(--bord); border-radius: 8px;
@@ -2458,30 +2569,30 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
 }
 .pn-candidat-noms {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
-  font-size: 11.5px; margin-bottom: 3px;
+  font-size: 13px; margin-bottom: 3px;
 }
 .pn-score {
-  font-size: 10px; padding: 1px 5px; border-radius: 999px;
+  font-size: 11.5px; padding: 1px 5px; border-radius: 999px;
   background: var(--fond-2); border: 1px solid var(--bord);
   font-variant-numeric: tabular-nums;
 }
-.pn-candidat-qui { font-size: 10px; color: var(--texte-faible); }
-.pn-candidat-verdict { font-size: 10.5px; color: var(--accent); margin-top: 3px; }
+.pn-candidat-qui { font-size: 11.5px; color: var(--texte-faible); }
+.pn-candidat-verdict { font-size: 12px; color: var(--accent); margin-top: 3px; }
 .pn-candidat-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
 
 /* Le panneau de geste : un lot, posé depuis le plan. */
 .flottant.flottant-geste { width: 372px; }
-.gc-portee { display: block; font-size: 10.5px; color: var(--texte-faible); margin-top: 2px; }
-.gc-bascule { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.gc-portee { display: block; font-size: 12px; color: var(--texte-faible); margin-top: 2px; }
+.gc-bascule { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 .gc-rapport { border-top: 1px solid var(--bord); padding-top: 9px; }
 .gc-lignes { list-style: none; margin: 0; padding: 0; max-height: 30vh; overflow: auto; }
 .gc-lignes li {
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
-  padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--bord);
+  padding: 3px 0; font-size: 12.5px; border-bottom: 1px solid var(--bord);
 }
 .gc-qui { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.gc-etat { font-size: 10px; padding: 1px 5px; border-radius: 999px; border: 1px solid var(--bord); }
-.gc-quoi { flex-basis: 100%; font-size: 10px; color: var(--texte-faible); }
+.gc-etat { font-size: 11.5px; padding: 1px 5px; border-radius: 999px; border: 1px solid var(--bord); }
+.gc-quoi { flex-basis: 100%; font-size: 11.5px; color: var(--texte-faible); }
 .gc-cree .gc-etat { color: #2f7d52; border-color: #a8d3ba; }
 .gc-mis_a_jour .gc-etat { color: #2f6f9e; border-color: #a9c9e0; }
 .gc-inchange .gc-etat { color: var(--texte-faible); }
@@ -2493,7 +2604,7 @@ body.sombre .gc-refuse .gc-etat { color: #e0a196; border-color: #5b3636; }
 /* Le curseur de seuil : une ligne, pas une grille de formulaire. */
 #bloc-rapprochement .option { gap: 9px; }
 #bloc-rapprochement input[type="range"] { flex: 1; min-width: 0; }
-#seuil-valeur { font-variant-numeric: tabular-nums; font-size: 11px; }
+#seuil-valeur { font-variant-numeric: tabular-nums; font-size: 12.5px; }
 
 /* Les deux tiroirs du plan collectif.
  *

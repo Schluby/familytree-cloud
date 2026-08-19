@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚔</text></svg>">
 </head>
-<body>
+<body spellcheck="false">
   <div class="application">
 
     <!-- Procuration : on édite l'arbre de quelqu'un d'autre. Le bandeau ne se
@@ -86,8 +86,18 @@
         <a id="lien-regles" class="bouton" target="_blank" rel="noopener"
            href="https://docs.google.com/document/d/1iKSLqAWBq9HfTkYdreupiAQw5C3f40Pb/edit?usp=sharing&amp;rtpof=true&amp;sd=true"
            title="Ouvrir les règles du jeu de rôle dans un nouvel onglet">📖 Règles</a>
-        <!-- L'année courante : c'est d'elle que tous les âges se déduisent. -->
-        <button id="btn-annee" class="bouton" title="Année courante de la campagne">📅</button>
+        <!-- L'année courante : c'est d'elle que tous les âges se déduisent.
+             Lot 22.A — elle s'écrit ici, dans la barre, et non plus dans une
+             fenêtre qu'il fallait ouvrir puis refermer pour avancer d'un an.
+             Les deux flèches restent : « la campagne vieillit » est le geste
+             qu'on fait le plus souvent, et il ne mérite pas d'être tapé. -->
+        <span class="champ-annee" id="champ-annee" title="Année courante de la campagne — les âges des fiches en découlent">
+          <span class="annee-icone" aria-hidden="true">📅</span>
+          <button id="btn-annee-moins" class="bouton bouton-icone annee-pas" title="Reculer d’un an">−</button>
+          <input id="saisie-annee" type="text" inputmode="text" spellcheck="false"
+                 placeholder="Année" aria-label="Année courante de la campagne" />
+          <button id="btn-annee-plus" class="bouton bouton-icone annee-pas" title="Avancer d’un an — toute la campagne vieillit">+</button>
+        </span>
         <button id="btn-vue-generale" class="bouton bouton-primaire" title="Échap">Vue générale</button>
         <button id="btn-theme" class="bouton bouton-icone" title="Thème clair / sombre">◐</button>
         <!-- La langue (lot 16.G) et les raccourcis (lot 16.D) : deux dépliants

@@ -211,12 +211,41 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
     }
   }
 
+  /**
+   * Entrée vaut « Enregistrer » (lot 22.B).
+   *
+   * Un `<form>` ferait ça tout seul, mais l'application n'en a aucun : ses
+   * panneaux flottent au-dessus de la page et se referment d'eux-mêmes, ce
+   * qu'un formulaire natif rendrait pénible. On reprend donc ici la seule règle
+   * qui manquait — Entrée appuie sur le bouton principal — plutôt que de la
+   * réécrire dans chaque éditeur, comme elle l'était déjà dans six d'entre eux
+   * et absente des deux autres.
+   *
+   * Dans une zone de texte, Entrée reste un retour à la ligne : c'est ce qu'on
+   * y attend d'une note. Ctrl (ou ⌘) + Entrée y enregistre.
+   */
+  function surEntree(evenement) {
+    if (evenement.key !== 'Enter' || !element) return;
+    if (!element.contains(evenement.target)) return;
+    const cible = evenement.target;
+    // Un bouton qui a le focus fait déjà ce qu'il faut ; le doubler
+    // enregistrerait *et* déclencherait « Supprimer ».
+    if (cible.tagName === 'BUTTON') return;
+    const dansUnTexte = cible.tagName === 'TEXTAREA' || cible.isContentEditable;
+    if (dansUnTexte && !evenement.ctrlKey && !evenement.metaKey) return;
+    const principal = element.querySelector('.bouton-primaire:not([disabled])');
+    if (!principal) return;
+    evenement.preventDefault();
+    principal.click();
+  }
+
   function fermer() {
     if (!element) return;
     element.remove();
     element = null;
     document.removeEventListener('mousedown', surClicExterieur, true);
     document.removeEventListener('keydown', surTouche, true);
+    document.removeEventListener('keydown', surEntree);
     window.removeEventListener('blur', fermer);
     surFermeture?.();
   }
@@ -232,6 +261,7 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
       window.addEventListener('blur', fermer);
     }
     document.addEventListener('keydown', surTouche, true);
+    document.addEventListener('keydown', surEntree);
     return element;
   }
 

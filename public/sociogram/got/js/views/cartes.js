@@ -83,10 +83,16 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     plan,
     pointMonde,
     rappels: {
-      surCreation: (donnees) => contexte.surFormeCreee?.(donnees),
+      surCreation: (donnees, point) => contexte.surFormeCreee?.(donnees, point),
       surModification: (id, patch) => contexte.surFormeModifiee?.(id, patch),
       surSuppression: (id) => contexte.surFormeSupprimee?.(id),
       surOutil: (genre) => contexte.surOutilForme?.(genre),
+      // Pour nommer les profils auxquels une forme est rattachée. Le moteur les
+      // a déjà sous la main : inutile de les redemander à `main.js`.
+      profils: () =>
+        (payload?.noeuds || [])
+          .map((noeud) => ({ id: noeud.id, nom: noeud.label || noeud.id }))
+          .sort((a, b) => a.nom.localeCompare(b.nom, 'fr')),
     },
   });
 
@@ -165,11 +171,19 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   plan.addEventListener('click', (evenement) => {
     // Le clic qui suit un lâcher de liaison ne doit rien déclencher d'autre.
     if (performance.now() - finLiaison < 250) return;
+    // Ni celui qui suit un cadre de sélection : il défairait ce qu'on vient
+    // de prendre.
+    if (performance.now() - finBande < 250) return;
     if (sortDAppuiLong()) return;
     const liens = liensSous(evenement);
     if (liens.length) {
       contexte.surClicLien?.(liens, evenement);
       return;
+    }
+    // Un clic simple dans le vide repose la main : sans ça, une sélection
+    // oubliée emporterait tout un groupe au prochain glisser.
+    if (!evenement.shiftKey && (evenement.target === plan || evenement.target === monde)) {
+      viderSelection();
     }
     // Cliquer dans le vide ne quitte plus le focus : on ne perd pas sa vue
     // resserrée d'un clic malheureux. Échap et « Vue générale » restent là.
@@ -202,23 +216,51 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     ouvrirMenuAu(evenement.clientX, evenement.clientY)
   );
 
-  // --------------------------------------------- déplacer une fiche (ctrl)
+  // ------------------------------------ déplacer une fiche, ou toute une main
+  //
+  // Lot 22.D : ce qu'on lâche est enregistré comme une **position absolue**, et
+  // plusieurs fiches peuvent partir ensemble — voir `selection`.
   let deport = null;
   let finDeplacement = 0;
+  /** Les fiches choisies, qui se déplacent d'un bloc. */
+  const selection = new Set();
+
+  function marquerSelection() {
+    cartes.forEach((carte, id) => carte.classList.toggle('selectionnee', selection.has(id)));
+    contexte.surSelectionMultiple?.(selection.size);
+  }
+
+  function viderSelection() {
+    if (!selection.size) return;
+    selection.clear();
+    marquerSelection();
+  }
+
+  function basculerSelection(id) {
+    if (selection.has(id)) selection.delete(id);
+    else selection.add(id);
+    marquerSelection();
+  }
 
   function demarrerDeplacement(id, evenement) {
     const boite = disposition?.boites.get(id);
     if (!boite) return;
     const curseur = pointMonde(evenement);
+    // Prendre une fiche hors sélection, c'est ne déplacer qu'elle : sinon on
+    // emporterait sans le vouloir un groupe choisi il y a dix minutes.
+    if (!selection.has(id)) viderSelection();
+    const groupe = selection.size ? [...selection] : [id];
     deport = {
       id,
-      boite,
-      ecartX: boite.x - curseur.x,
-      ecartY: boite.y - curseur.y,
-      depart: { x: boite.x, y: boite.y },
+      quoi: groupe
+        .map((autre) => {
+          const cible = disposition?.boites.get(autre);
+          return cible && { id: autre, boite: cible, ecartX: cible.x - curseur.x, ecartY: cible.y - curseur.y, depart: { x: cible.x, y: cible.y } };
+        })
+        .filter(Boolean),
     };
     coucheCartes.classList.add('sans-transition');
-    cartes.get(id)?.classList.add('en-deport');
+    deport.quoi.forEach((part) => cartes.get(part.id)?.classList.add('en-deport'));
     plan.classList.add('en-deport');
     document.addEventListener('mousemove', surDeplacement, true);
     document.addEventListener('mouseup', surFinDeplacement, true);
@@ -227,18 +269,22 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   function surDeplacement(evenement) {
     if (!deport) return;
     const curseur = pointMonde(evenement);
-    deport.boite.x = curseur.x + deport.ecartX;
-    deport.boite.y = curseur.y + deport.ecartY;
-    const carte = cartes.get(deport.id);
-    carte.style.left = `${deport.boite.x}px`;
-    carte.style.top = `${deport.boite.y}px`;
-    tracerLiens(); // les connecteurs suivent la fiche
+    deport.quoi.forEach(({ id, boite, ecartX, ecartY }) => {
+      // Jamais au-delà du coin : le monde commence à zéro, et une fiche posée
+      // en négatif serait rognée par le cadre.
+      boite.x = Math.max(0, curseur.x + ecartX);
+      boite.y = Math.max(0, curseur.y + ecartY);
+      const carte = cartes.get(id);
+      carte.style.left = `${boite.x}px`;
+      carte.style.top = `${boite.y}px`;
+    });
+    tracerLiens(); // les connecteurs suivent les fiches
   }
 
   function surFinDeplacement(evenement) {
     if (!deport) return;
-    const { id, boite, depart } = deport;
-    cartes.get(id)?.classList.remove('en-deport');
+    const { quoi } = deport;
+    quoi.forEach((part) => cartes.get(part.id)?.classList.remove('en-deport'));
     plan.classList.remove('en-deport');
     coucheCartes.classList.remove('sans-transition');
     document.removeEventListener('mousemove', surDeplacement, true);
@@ -248,17 +294,100 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     evenement.preventDefault();
     evenement.stopPropagation();
 
-    const dx = Math.round(boite.x - depart.x);
-    const dy = Math.round(boite.y - depart.y);
-    if (!dx && !dy) return; // simple ctrl-clic
-    const noeud = indexNoeuds.get(id);
-    const ancien = noeud?.decalage || [0, 0];
-    const nouveau = [ancien[0] + dx, ancien[1] + dy];
-    if (noeud) noeud.decalage = nouveau;
-    // Rejoue la mise en page : la fiche lâchée reste où on l'a posée, et ses
-    // voisines s'écartent si elle est venue leur marcher dessus.
+    const bouges = quoi.filter(
+      ({ boite, depart }) => Math.round(boite.x - depart.x) || Math.round(boite.y - depart.y)
+    );
+    if (!bouges.length) return; // simple ctrl-clic
+
+    const positions = {};
+    bouges.forEach(({ id, boite }) => {
+      const position = [Math.round(boite.x), Math.round(boite.y)];
+      const noeud = indexNoeuds.get(id);
+      if (noeud) {
+        noeud.position = position;
+        // Le déport relatif d'avant a fini son office : le garder ferait
+        // s'ajouter deux fois le même déplacement au prochain calcul.
+        noeud.decalage = null;
+      }
+      positions[id] = position;
+    });
+    // Rejoue la mise en page : les fiches lâchées restent où on les a posées,
+    // et leurs voisines s'écartent si elles sont venues leur marcher dessus.
     appliquer({ animer: true });
-    contexte.surDeport?.(id, nouveau);
+    contexte.surPositions?.(positions);
+  }
+
+  // ------------------------------------------- choisir plusieurs fiches (Maj)
+  //
+  // Maj + glisser dans le vide trace un cadre et prend tout ce qu'il touche.
+  // Maj, et non Ctrl : sur une fiche, Ctrl est déjà « déplacer » et Maj est
+  // déjà « lien rapide » — dans le vide, les deux sont libres, et le cadre de
+  // sélection est un geste du vide.
+  const bandeSelection = document.createElement('div');
+  bandeSelection.className = 'bande-selection';
+  bandeSelection.hidden = true;
+  plan.append(bandeSelection);
+
+  let bande = null;
+  let finBande = 0;
+
+  plan.addEventListener('mousedown', (evenement) => {
+    if (evenement.button !== 0 || !evenement.shiftKey) return;
+    if (evenement.target.closest('.carte, .forme')) return;
+    evenement.preventDefault();
+    // Indispensable, et pas seulement poli : d3-zoom écoute ici et poserait ses
+    // écouteurs sur la fenêtre en phase de capture, où il appelle
+    // `stopImmediatePropagation`. Nos `mousemove` ne nous parviendraient jamais.
+    evenement.stopPropagation();
+    const cadre = plan.getBoundingClientRect();
+    bande = {
+      x0: evenement.clientX - cadre.left,
+      y0: evenement.clientY - cadre.top,
+      cadre,
+      // Maj + glisser **ajoute** à ce qui est déjà pris : on compose une main
+      // en plusieurs passes plutôt que de tout reprendre à chaque fois.
+      avant: new Set(selection),
+    };
+    bandeSelection.hidden = false;
+    majBande(evenement);
+    document.addEventListener('mousemove', majBande, true);
+    document.addEventListener('mouseup', finirBande, true);
+  });
+
+  function majBande(evenement) {
+    if (!bande) return;
+    const x1 = evenement.clientX - bande.cadre.left;
+    const y1 = evenement.clientY - bande.cadre.top;
+    const gauche = Math.min(bande.x0, x1);
+    const haut = Math.min(bande.y0, y1);
+    bandeSelection.style.left = `${gauche}px`;
+    bandeSelection.style.top = `${haut}px`;
+    bandeSelection.style.width = `${Math.abs(x1 - bande.x0)}px`;
+    bandeSelection.style.height = `${Math.abs(y1 - bande.y0)}px`;
+
+    // Le cadre est à l'écran, les fiches sont dans le monde : on ramène le
+    // cadre au monde plutôt que les soixante fiches à l'écran.
+    const [mx0, my0] = transformCourante.invert([gauche, haut]);
+    const [mx1, my1] = transformCourante.invert([gauche + Math.abs(x1 - bande.x0), haut + Math.abs(y1 - bande.y0)]);
+    selection.clear();
+    bande.avant.forEach((id) => selection.add(id));
+    disposition?.boites.forEach((boite, id) => {
+      if (!cartes.get(id) || cartes.get(id).classList.contains('masquee')) return;
+      const touche = boite.x < mx1 && boite.x + boite.l > mx0 && boite.y < my1 && boite.y + boite.h > my0;
+      if (touche) selection.add(id);
+    });
+    marquerSelection();
+  }
+
+  function finirBande(evenement) {
+    if (!bande) return;
+    bande = null;
+    bandeSelection.hidden = true;
+    document.removeEventListener('mousemove', majBande, true);
+    document.removeEventListener('mouseup', finirBande, true);
+    finBande = performance.now();
+    evenement.preventDefault();
+    evenement.stopPropagation();
   }
 
   // ------------------------------------------------------- glisser un lien
@@ -347,7 +476,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         carte.addEventListener('click', (evenement) => {
           if (evenement.target.closest('.carte-poignee')) return;
           evenement.stopPropagation();
-          if (evenement.ctrlKey || evenement.metaKey) return; // c'était un déport
+          if (evenement.ctrlKey || evenement.metaKey) {
+            // Ctrl + glisser déplace ; Ctrl + clic sans glisser ajoute ou
+            // retire la fiche de la main qu'on est en train de composer.
+            if (performance.now() - finDeplacement < 250 && !deport) basculerSelection(noeud.id);
+            return;
+          }
           if (performance.now() - finDeplacement < 250) return;
           if (sortDAppuiLong()) return; // le menu long-press vient de s'ouvrir
           if (evenement.shiftKey) {
@@ -515,9 +649,6 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     if (mode === 'statut') return COULEURS_STATUT[noeud.statut] || '#8a8f98';
     // La catégorie d'une maison : sa couleur vient du référentiel, injectée
     // dans les options par l'orchestrateur (le moteur ne lit pas l'API).
-    if (mode === 'categorie') {
-      return options.couleursCategories?.[noeud.categorie || ''] || '#8a8f98';
-    }
     if (mode === 'generation') {
       return COULEURS_GENERATION[(noeud.generation || 0) % COULEURS_GENERATION.length];
     }
@@ -833,13 +964,26 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         boites.set(id, { ...place, l, h, satellite: true, ancre: lien.ancre });
       });
 
-    // --- 11. déports manuels (ctrl + glisser) ------------------------------
+    // --- 11. positions posées à la main (lot 22.D) -------------------------
+    //
+    // Une `position` **remplace** ce que le calcul avait trouvé ; un `decalage`
+    // s'y ajoute encore, mais seulement pour les mondes d'avant le lot 22 :
+    // `figerLaMiseEnPage()` les convertit en positions au premier passage, et
+    // ils ne repassent jamais par ici.
     const places = new Set();
+    let ancrage = false;
     boites.forEach((boite, id) => {
-      const decalage = indexNoeuds.get(id)?.decalage;
-      if (!decalage) return;
-      boite.x += decalage[0];
-      boite.y += decalage[1];
+      const noeud = indexNoeuds.get(id);
+      if (noeud?.position) {
+        boite.x = noeud.position[0];
+        boite.y = noeud.position[1];
+        places.add(id);
+        ancrage = true;
+        return;
+      }
+      if (!noeud?.decalage) return;
+      boite.x += noeud.decalage[0];
+      boite.y += noeud.decalage[1];
       places.add(id);
     });
 
@@ -847,9 +991,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     separerCartes(boites, places);
 
     // --- 12. normalisation ------------------------------------------------
+    //
+    // Dès qu'une fiche porte une coordonnée absolue, le plan a une origine, et
+    // la recaler ferait mentir toutes les positions enregistrées : la fiche
+    // qu'on a posée à (400, 200) s'y retrouverait à chaque ouverture, mais
+    // ailleurs à l'écran. On ne translate donc que tant que rien n'est ancré.
     const finale = etendueDe(boites);
-    const decalageX = GEO.marge - finale.x0;
-    const decalageY = GEO.marge - finale.y0;
+    const decalageX = ancrage ? 0 : GEO.marge - finale.x0;
+    const decalageY = ancrage ? 0 : GEO.marge - finale.y0;
     boites.forEach((boite) => {
       boite.x += decalageX;
       boite.y += decalageY;
@@ -868,8 +1017,10 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         );
       }),
       sociaux: [...sociaux, ...fratriesEloignees].filter(lienVisible),
-      largeur: finale.x1 - finale.x0 + GEO.marge * 2,
-      hauteur: finale.y1 - finale.y0 + GEO.marge * 2,
+      // Ancré, le monde part de zéro et non du coin de la boîte englobante :
+      // c'est la même origine que les positions enregistrées.
+      largeur: ancrage ? finale.x1 + GEO.marge : finale.x1 - finale.x0 + GEO.marge * 2,
+      hauteur: ancrage ? finale.y1 + GEO.marge : finale.y1 - finale.y0 + GEO.marge * 2,
     };
   }
 
@@ -1543,6 +1694,10 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       );
     });
 
+    // Les formes ne dépendent d'aucun filtre, mais elles dépendent de la vue :
+    // celles d'un profil ne paraissent qu'en centrant sur lui (lot 22.C).
+    formes.definirVue(focusId);
+
     mesurer();
     disposition = calculerMiseEnPage(ids);
     positionner(animer);
@@ -1742,6 +1897,56 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       modeActif: () => formes.modeActif(),
       armer: (genre) => formes.armer(genre),
       outilArme: () => formes.outilArme(),
+      // Juste après en avoir tracé une : elle s'ouvre, curseur dans le texte.
+      ouvrirPour: (id, x, y) => formes.ouvrirPour(id, x, y),
+    },
+
+    /* ------------------------------------------------ le plan qu'on fige
+     *
+     * Lot 22.D. Tant qu'une fiche n'a pas de position à elle, c'est le calcul
+     * qui la place — et le calcul change dès qu'on ajoute un lien ou quelqu'un.
+     * On le fait donc **une fois**, à la première ouverture, puis plus jamais :
+     * à partir de là, seule une main déplace une fiche.
+     */
+    positionsAFiger() {
+      if (!disposition) return null;
+      const manquantes = {};
+      let combien = 0;
+      disposition.boites.forEach((boite, id) => {
+        if (indexNoeuds.get(id)?.position) return;
+        manquantes[id] = [Math.round(boite.x), Math.round(boite.y)];
+        combien += 1;
+      });
+      return combien ? manquantes : null;
+    },
+
+    /** Le serveur a pris les positions : on les inscrit sur les nœuds. */
+    confirmerPositions(positions) {
+      Object.entries(positions).forEach(([id, position]) => {
+        const noeud = indexNoeuds.get(id);
+        if (!noeud) return;
+        noeud.position = position;
+        noeud.decalage = null; // replié dans la position, il a fini son office
+      });
+    },
+
+    /** Ce qui est pris en ce moment — pour l'écriteau du plan. */
+    selection: () => [...selection],
+    viderSelection,
+
+    /** Un événement souris → les coordonnées du plan, pour y poser une fiche. */
+    pointDuPlan: (evenement) => pointMonde(evenement),
+
+    /**
+     * Le milieu de ce qu'on regarde, en coordonnées du plan.
+     *
+     * C'est le repli quand personne n'a cliqué nulle part — le bouton « ＋ » de
+     * la barre, par exemple. Mieux vaut le centre de l'écran que la rangée du
+     * bas, qui peut être à deux mille pixels de là.
+     */
+    centreVisible() {
+      const [x, y] = transformCourante.invert([largeurPlan() / 2, hauteurPlan() / 2]);
+      return { x, y };
     },
 
     detruire() {

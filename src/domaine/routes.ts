@@ -543,6 +543,35 @@ routesDomaine.get('/personnes/:id', async (c) => {
   });
 });
 
+/**
+ * Ranger plusieurs fiches d'un coup (lot 22.D).
+ *
+ * Corps : `{ "aerys-targaryen": [120, 40], "rickard-stark": null, … }`.
+ *
+ * Déclarée **avant** `/personnes/:id` : sinon « positions » serait pris pour un
+ * identifiant. Elle existe pour une raison précise — la première ouverture d'un
+ * monde d'avant le lot 22 fige la mise en page calculée, soit soixante-sept
+ * écritures. En une requête, c'est un enregistrement ; en soixante-sept, c'est
+ * soixante-sept enregistrements du document entier.
+ *
+ * Un identifiant inconnu est ignoré au lieu de faire échouer le lot : ces
+ * positions arrivent d'un plan qui peut avoir une fiche de retard.
+ */
+routesDomaine.patch('/personnes/positions', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  let rangees = 0;
+  for (const [id, brut] of Object.entries(corps)) {
+    const personne = courant.dataset.personne(id);
+    if (!personne) continue;
+    if (personne.appliquerPatch({ position: brut }).length) rangees += 1;
+  }
+  if (rangees) await enregistrer(c, courant);
+  return c.json({ rangees });
+});
+
 routesDomaine.patch('/personnes/:id', async (c) => {
   const corps = await corpsDe(c);
   const courant = await monde(c);

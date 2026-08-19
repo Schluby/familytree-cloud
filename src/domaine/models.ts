@@ -79,6 +79,8 @@ export const PERSONNE_CHAMPS = [
   'tags',
   'relations_joueurs',
   'decalage',
+  // Lot 22.D : la position absolue sur le plan, qui prend la suite de `decalage`.
+  'position',
   'generation',
   // Lot 20.B. Voir `Personne.bordure` : c'est le liseré autour de la fiche,
   // et il ne remplace pas `couleur`.
@@ -161,6 +163,33 @@ export function normaliserDecalage(brut: unknown): [number, number] | null {
   return dx === 0 && dy === 0 ? null : [dx, dy];
 }
 
+/** Le plan est vaste mais pas infini — mêmes bornes que pour les formes. */
+const LIMITE_PLAN = 200000;
+
+/**
+ * Position absolue d'une fiche sur le plan : `[x, y]`.
+ *
+ * Contrairement à `normaliserDecalage`, `[0, 0]` est une position **valable** —
+ * c'est le coin du plan, pas « rien ». Seuls `null`, le vide et l'illisible
+ * rendent `null`, qui veut dire « laisse la mise en page décider ».
+ */
+export function normaliserPosition(brut: unknown): [number, number] | null {
+  if (estVide(brut)) return null;
+
+  let paire: unknown[];
+  if (estObjet(brut)) paire = [brut.x ?? brut.dx, brut.y ?? brut.dy];
+  else if (Array.isArray(brut)) paire = brut;
+  else return null;
+
+  if (paire.length !== 2) return null;
+  const xBrut = versFlottant(paire[0]);
+  const yBrut = versFlottant(paire[1]);
+  if (xBrut === null || yBrut === null) return null;
+
+  const borne = (valeur: number) => Math.max(-LIMITE_PLAN, Math.min(LIMITE_PLAN, arrondir(valeur, 1)));
+  return [borne(xBrut), borne(yBrut)];
+}
+
 /**
  * Accepte `{"j1": 4}` ou `{"j1": {"note": 4, "commentaire": "…"}}`.
  *
@@ -236,6 +265,19 @@ export class Personne {
   relations_joueurs: Record<string, NoteJoueur> = {};
   decalage: [number, number] | null = null;
   /**
+   * Où la fiche est posée sur le plan : `[x, y]` **absolus** (lot 22.D).
+   *
+   * C'est ce qui remplace `decalage` comme source de vérité. La différence n'est
+   * pas de forme mais de nature : un écart suit une base qui bouge, une position
+   * ne suit rien. Tant que la position était relative, ajouter un lien ou une
+   * personne recalculait la base et déplaçait donc *aussi* les fiches qu'on
+   * avait rangées à la main — c'est très exactement ce qu'on nous reproche.
+   *
+   * `decalage` reste lu à l'ouverture d'un vieux monde et se replie dans la
+   * position au premier calcul : voir `js/views/cartes.js`, étape 11.
+   */
+  position: [number, number] | null = null;
+  /**
    * Vide : la généalogie la calcule. Renseignée : elle gagne (personnages
    * rapportés, générations sautées — ce que l'arbre ne peut pas deviner).
    */
@@ -260,6 +302,7 @@ export class Personne {
     personne.tags = Array.isArray(personne.tags) ? [...personne.tags] : [];
     personne.relations_joueurs = normaliserRelationsJoueurs(personne.relations_joueurs);
     personne.decalage = normaliserDecalage(personne.decalage);
+    personne.position = normaliserPosition(personne.position);
     personne.generation = normaliserGeneration(personne.generation);
 
     // Tolérant à la lecture : une sauvegarde bricolée à la main doit s'ouvrir
@@ -302,6 +345,9 @@ export class Personne {
       relations_joueurs: this.relations_joueurs,
       decalage: this.decalage,
       generation: this.generation,
+      // Même règle que `bordure` : écrite seulement si elle vaut quelque chose.
+      // Un monde qu'on n'a jamais rangé à la main doit ressortir tel quel.
+      ...(this.position ? { position: this.position } : {}),
       // Écrit seulement s'il porte quelque chose, comme `revolu` et `emoji` sur
       // une relation : un monde qui ne se sert pas des liserés doit ressortir
       // exactement comme il est entré, sans gagner soixante-sept `"bordure":
@@ -344,6 +390,8 @@ export class Personne {
         valeur = normaliserRelationsJoueurs(brut);
       } else if (champ === 'decalage') {
         valeur = normaliserDecalage(brut);
+      } else if (champ === 'position') {
+        valeur = normaliserPosition(brut);
       } else if (champ === 'generation') {
         valeur = normaliserGeneration(brut);
       } else if (champ === 'titres' || champ === 'tags') {

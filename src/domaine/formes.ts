@@ -27,6 +27,18 @@
  * seul le rendu diffère. Une zone de texte est donc une forme sans contour et
  * sans fond — et, en retour, un rectangle peut porter un titre, ce qui est
  * exactement ce qu'on veut pour nommer une zone.
+ *
+ * ── Où une forme se montre (lot 22.C) ────────────────────────────────────────
+ *
+ * Le plan se regarde de deux façons : en entier, ou centré sur un profil et ses
+ * voisins. Ce ne sont pas les mêmes lectures, donc pas les mêmes annotations —
+ * « les prétendants » n'a de sens qu'autour de Daenerys, et l'afficher sur le
+ * plan général met un rectangle en travers de Westeros.
+ *
+ * D'où `vue` : `'plan'` pour le plan général, `'profils'` pour une forme qui ne
+ * paraît qu'en centrant sur l'un des `profils` listés. Une forme invisible est
+ * **retirée du rendu**, pas seulement transparente : c'est la seule manière
+ * d'être sûr qu'elle n'attrape ni un clic ni un glisser.
  */
 
 import { idsLibres, type Objet } from './models';
@@ -73,6 +85,31 @@ function texteBorne(brut: unknown, maximum: number): string {
     .slice(0, maximum);
 }
 
+/** Les deux portées d'une forme. Voir l'entête pour le pourquoi. */
+export const VUES = ['plan', 'profils'] as const;
+
+/** Autant de profils qu'on veut, mais pas une liste qui remplace le monde. */
+const MAX_PROFILS = 60;
+
+/**
+ * Les profils qui montrent cette forme, dédoublonnés et bornés.
+ *
+ * On ne vérifie **pas** que ces identifiants existent : une forme n'est pas une
+ * donnée du monde, et une fiche supprimée ne doit pas faire échouer
+ * l'enregistrement d'un rectangle. Un identifiant orphelin ne coûte rien — il
+ * désigne une vue où l'on n'ira plus.
+ */
+function profilsBornes(brut: unknown): string[] {
+  if (!Array.isArray(brut)) return [];
+  const vus = new Set<string>();
+  for (const entree of brut) {
+    const id = texteBorne(entree, 80);
+    if (id) vus.add(id);
+    if (vus.size >= MAX_PROFILS) break;
+  }
+  return [...vus];
+}
+
 /** Une forme complète, quelles que soient les lacunes de ce qu'on lui donne. */
 export function normaliser(brut: Objet, id: string): Objet {
   const genre = texteBorne(brut.genre, 20);
@@ -92,6 +129,14 @@ export function normaliser(brut: Objet, id: string): Objet {
     gras: Boolean(brut.gras),
     italique: Boolean(brut.italique),
     couleur_texte: couleur(brut.couleur_texte, '#8a8f98'),
+    // En pourcents, et sur la forme entière — contour, fond et texte. Un
+    // flottant de 0 à 1 se serait affiché « 0.35000000000000003 » dans la
+    // sauvegarde ; un entier se relit à l'œil et se règle au curseur.
+    opacite: nombre(brut.opacite, 100, 5, 100),
+    vue: (VUES as readonly string[]).includes(texteBorne(brut.vue, 20))
+      ? texteBorne(brut.vue, 20)
+      : 'plan',
+    profils: profilsBornes(brut.profils),
   };
 }
 
@@ -151,10 +196,22 @@ export function appliquer(forme: Objet, patch: Objet): string[] {
 
   const modifies: string[] = [];
   for (const [cle, valeur] of Object.entries(propre)) {
-    if (forme[cle] !== valeur) {
-      forme[cle] = valeur;
-      modifies.push(cle);
-    }
+    if (identique(forme[cle], valeur)) continue;
+    forme[cle] = valeur;
+    modifies.push(cle);
   }
   return modifies;
+}
+
+/**
+ * `profils` est un tableau, et `normaliser` en rend un neuf à chaque passage :
+ * comparé au `!==`, il serait « modifié » même quand on ne touche qu'à la
+ * couleur. Sans ça, déplacer une forme réécrirait la sauvegarde en annonçant un
+ * changement de portée qui n'a pas eu lieu.
+ */
+function identique(avant: unknown, apres: unknown): boolean {
+  if (Array.isArray(avant) && Array.isArray(apres)) {
+    return avant.length === apres.length && avant.every((v, i) => v === apres[i]);
+  }
+  return avant === apres;
 }

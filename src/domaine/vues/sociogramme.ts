@@ -228,6 +228,9 @@ export class VueSociogramme extends Vue {
         genre: personne.genre,
         importance: personne.importance,
         decalage: personne.decalage,
+        // Lot 22.D. Le plan la pose telle quelle ; `decalage` ne sert plus qu'à
+        // rattraper les mondes d'avant, une fois, au premier calcul.
+        position: personne.position,
         titres: personne.titres,
         lieu: personne.lieu,
         // Les deux autres quarts de la carte (lot 21.D). Ils voyagent avec

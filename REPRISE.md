@@ -6,8 +6,8 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 21** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 18/08/2026.
+**Les sept lots du plan sont livrés, puis les lots 8 à 22** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 20/08/2026.
 
 **L'application n'est plus à la racine du domaine** (lot 18, 16/08). Elle est
 montée sous `/sociogram/got`, parce que `myschlub.com` porte désormais deux
@@ -34,6 +34,16 @@ même parent non plus** —, lève l'interdiction de supprimer les quatre types
 structurants, et porte la carte du plan à quatre cases (maison, rôle, région,
 ville). Voir « Le rail et les liens (lot 21) » plus bas : la leçon transposable
 est que *placer* et *dessiner* ne doivent pas partager une liste.
+
+Le lot 22 (20/08) est le plus lourd des quatre derniers, parce qu'il change une
+**nature** : la position d'une fiche n'est plus un écart à une mise en page
+recalculée sans arrêt, c'est une coordonnée absolue que rien ne touche sauf une
+main. Le plan se fige à la première ouverture, un profil naît là où l'on clique,
+et on peut en prendre plusieurs au cadre. Le lot répare aussi les formes du
+lot 20.D, **injouables depuis leur livraison** faute d'une classe CSS, leur
+donne une portée (plan général / profils choisis), retire l'axe « Catégorie de
+maison » et la fenêtre de l'année, et monte la typographie d'un cran. Voir
+« Le plan qui obéit (lot 22) » plus bas.
 
 Le lot 17 ouvre une **seconde page d'administration**, `/collectif.html` : les
 mondes des membres superposés en un seul sociogramme, où l'on pilote par clic
@@ -960,6 +970,96 @@ dans tout le Nord ; le bouton « ▭ Formes » ouvre le mode dessin.
 Deux de plus au lot 21.D — `role` et `ville`. C'est la règle de tout ce dépôt —
 un monde qui ne s'en sert pas doit ressortir octet pour octet comme il est
 entré — et le harnais la vérifie dans les deux sens.
+
+## Le plan qui obéit (lot 22)
+
+Quatre morceaux, mais un seul qui change la façon de penser le plan.
+
+### `position` a remplacé `decalage`, et ce n'est pas un renommage
+
+`decalage` valait `[dx, dy]` **relatifs** à la position calculée. `position` vaut
+`[x, y]` **absolus**. Trois conséquences à garder en tête avant de toucher à
+`views/cartes.js` :
+
+1. **L'étape 11 remplace, elle n'ajoute plus.** `boite.x = noeud.position[0]`.
+   Un `decalage` encore présent (monde d'avant le lot 22) s'ajoute une dernière
+   fois, puis `figerLesPositions()` le replie dans la position et le met à
+   `null`.
+2. **L'étape 12 ne translate plus dès qu'une fiche est ancrée** (`ancrage`). Si
+   vous la réactivez, toutes les positions enregistrées deviennent fausses d'un
+   même vecteur, à chaque ouverture, sans erreur nulle part. C'est le piège de
+   ce lot.
+3. **Le monde part de zéro**, donc les glissers sont bornés à `Math.max(0, …)`.
+   Une fiche en coordonnée négative serait rognée par le cadre.
+
+`figerLesPositions()` (`main.js`) écrit ce que le calcul vient de trouver, une
+fois par monde, via `PATCH /personnes/positions` — **une** requête pour
+soixante-sept fiches. Elle ne s'exécute jamais sur une vue partagée (`PARTAGE`)
+ni hors du rendu `cartes`. Si vous ajoutez un rendu qui place des fiches, pensez
+à ce garde-fou.
+
+`normaliserPosition` **n'est pas** `normaliserDecalage` : pour la première,
+`[0, 0]` est une position valable (le coin du plan) ; pour la seconde, `[0, 0]`
+voulait dire « aucun » et devenait `null`. Les deux fonctions se ressemblent
+beaucoup et disent le contraire sur ce cas précis.
+
+### Les formes : la classe qui manquait, et la leçon
+
+Le panneau de réglage d'une forme existait depuis le lot 20.D, avec ses huit
+contrôles et sa corbeille. Il n'a **jamais pu s'afficher** : `ouvrirEditeur`
+construisait `<div class="forme-editeur">` sans `flottant`, la classe qui porte
+`position: fixed` et le `z-index`. Monté dans `<body>`, en flux normal, sous une
+application en `height: 100vh; overflow: hidden` — hors écran, sans une erreur.
+
+**La leçon vaut au-delà de ce bogue** : dans ce projet, tout panneau flottant
+porte `flottant` *plus* une classe à lui, et la largeur se redit sur
+`.flottant.<la-vôtre>` — sinon les 322 px de `.flottant`, déclarés plus bas dans
+la feuille, l'emportent. Les neuf autres panneaux le faisaient ; celui-là non.
+
+Deux choses à savoir en y retouchant :
+
+- **Une forme hors de sa vue est retirée du DOM**, pas masquée. `visible(forme)`
+  filtre dans `dessiner()`, et `definirVue(focusId)` est appelé depuis
+  `appliquer()` — pas depuis `rendre()` — parce qu'on centre et décentre sans
+  recharger la vue.
+- **`profils` est un tableau**, donc `appliquer()` (côté serveur) compare avec
+  `identique()` et non `!==` : sans ça, déplacer une forme annoncerait un
+  changement de portée à chaque fois et réécrirait la sauvegarde.
+
+### Ce qui a été retiré, et ce que ça a emporté
+
+L'axe `categorie` remplissait **deux** surfaces : l'entrée « Catégorie de
+maison » du sélecteur du haut, et le bloc « Catégories » du rail. Le retirer une
+fois les retire toutes les deux. Il emporte `menuCategorie`, `menuCategories` et
+l'instance `editeurCategorie` — ils n'avaient pas d'autre porte d'entrée.
+`editeurCategorieRapide` reste : c'est celui qu'ouvre la fiche d'une maison.
+
+La fenêtre de l'année (`creerEditeurAnnee`, 131 lignes) est supprimée ;
+l'année s'écrit dans la barre du haut (`enregistrerAnnee` dans `main.js`).
+`Api.majMeta` n'a plus qu'un appelant et n'envoie plus que `annee_courante` —
+`meta.document` existe toujours côté serveur mais ne se règle plus que par les
+lots d'administration.
+
+### La typographie, et pourquoi la barre du haut ne l'a pas suivie
+
+Les 223 `font-size` de `app.css` ont monté d'un cran (plancher à 10 px). Deux
+effets à ne pas défaire :
+
+- `--carte-hauteur` est passée de 132 à **144 px**. `mesurer()` relit cette
+  hauteur sur une fiche réelle, donc la géométrie des connecteurs suit seule —
+  mais si vous la rebaissez, les deux quarts du bas de la carte débordent.
+- **`.barre-haut` garde délibérément l'ancienne taille** (`.barre-haut .bouton`,
+  `.barre-haut .champ`). Grossie comme le reste, elle sortait de l'écran sur
+  1280 px, et `html` étant en `overflow: hidden`, ce qui dépasse est perdu, pas
+  défilable. Elle passe aussi à la ligne (`flex-wrap`) comme filet.
+
+### Entrée enregistre, une fois pour toutes
+
+`creerFlottant` (`dom.js`) installe désormais un `keydown` qui, sur Entrée, clique
+le premier `.bouton-primaire` du panneau. Six éditeurs le faisaient chacun dans
+leur coin, deux ne le faisaient pas. Dans une zone de texte, Entrée reste un
+retour à la ligne ; Ctrl/⌘ + Entrée enregistre. **Un nouvel éditeur n'a donc plus
+rien à écrire pour ça** — il lui suffit d'avoir un bouton `.bouton-primaire`.
 
 ## Le rail et les liens (lot 21)
 

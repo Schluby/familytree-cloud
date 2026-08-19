@@ -106,7 +106,7 @@ const ETAPES = [
   {
     titre: 'Changer ce que la couleur raconte',
     texte:
-      'Maison, catégorie, génération, humeur, ou un filtre à vous : ce sélecteur change l’axe de lecture de tout l’arbre. Choisissez <b>« Catégorie de maison »</b> et le même ＋ crée alors une catégorie — de quoi regrouper les maisons du Nord, les maisons vassales, ce que vous voulez.',
+      'Maison, génération, statut, humeur, ou un filtre à vous : ce sélecteur change l’axe de lecture de tout l’arbre. Choisissez <b>« Humeur envers les joueurs »</b> et les fiches se recolorent selon ce que vos joueurs inspirent — le même plan, une autre question.',
     // Au téléphone, ce sélecteur a déménagé dans « Réglages de l'affichage » :
     // c'est ce bloc-là qu'il faut dérouler, pas celui des filtres.
     cible: '#selecteur-couleur',

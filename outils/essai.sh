@@ -1439,7 +1439,8 @@ code - GET /js/tutoriel.js > /dev/null
 verifier "il dit d'abord que rien n'est conserve" oui "$(contient "n’est conservé")"
 verifier "  il montre comment creer un profil" oui "$(contient 'btn-nouveau-profil')"
 verifier "  comment relier deux fiches" oui "$(contient 'Relier deux personnes')"
-verifier "  ou vivent maisons et categories" oui "$(contient 'Catégorie de maison')"
+# Lot 22.A : l'axe « Catégorie de maison » a disparu, le tutoriel montre l'humeur.
+verifier "  ce que la couleur raconte" oui "$(contient 'Humeur envers les joueurs')"
 verifier "  et ou se construit son propre monde" oui "$(contient 'btn-nouvelle-sauvegarde')"
 # Il se propose, il ne s'impose pas : le premier ecran offre de sortir.
 verifier "  il se laisse passer" oui "$(contient 'Plus tard')"
@@ -2167,6 +2168,105 @@ verifier "  et la ville a cote de la region" oui "$(contient "fait('Ville'")"
 code - GET /css/app.css > /dev/null
 verifier "un trait separe les deux cases d'une rangee" oui "$(contient '.carte-fait + .carte-fait { border-left')"
 verifier "  et rien ne deborde de la fiche" oui "$(contient 'flex: 1 1 50%; min-width: 0; min-height: 0;')"
+
+# ---------------------------------------------------------------------------
+# Lot 22 : le menage, le confort, les formes vivantes, et le plan qui obeit
+#
+# Le morceau qui compte ici est le 22.D, et il ne se voit pas a l'oeil : une
+# position de fiche a change de **nature**. C'etait un ecart a une mise en page
+# recalculee sans arret ; c'est desormais une coordonnee absolue que personne ne
+# touche sauf une main. Tout ce qui suit tourne autour de cette phrase :
+#
+#  1. La position s'ecrit, se relit, et ne s'ecrit **pas** quand elle est vide —
+#     un monde qu'on n'a jamais range doit ressortir comme il est entre.
+#  2. `[0, 0]` est une position valable (c'est le coin du plan), la ou `[0, 0]`
+#     ne voulait rien dire pour un ecart. C'est la difference qui pique.
+#  3. Le rangement en lot existe pour une seule raison : figer soixante-sept
+#     fiches en une ecriture au lieu de soixante-sept.
+#
+# Le reste est du contrat de surface — ce qui a disparu de l'ecran (22.A), ce
+# qui a grossi (22.B), et les deux champs neufs d'une forme (22.C).
+# ---------------------------------------------------------------------------
+
+echo "-- 22.A le menage"
+code - GET /js/main.js > /dev/null
+verifier "l'axe « Categorie de maison » a quitte le selecteur" non "$(contient "id: 'categorie', label: 'Catégorie de maison'")"
+verifier "  et le bloc « Categories » du rail avec lui" non "$(contient "titre: 'Catégories',")"
+verifier "on ne replace plus tout le plan d'un clic" non "$(contient "label: 'Replacer toutes les fiches'")"
+verifier "  mais une fiche seule, si" oui "$(contient 'Replacer automatiquement')"
+verifier "l'annee s'ecrit sans passer par une fenetre" oui "$(contient 'async function enregistrerAnnee')"
+code - GET /js/editeurs.js > /dev/null
+verifier "la fenetre de l'annee n'existe plus" non "$(contient 'export function creerEditeurAnnee')"
+verifier "  ni le champ « Document de campagne »" non "$(contient 'Document de campagne (facultatif)')"
+code - GET / > /dev/null
+verifier "l'annee est un champ de la barre du haut" oui "$(contient 'id="saisie-annee"')"
+verifier "  encadre de ses deux fleches" oui "$(contient 'id="btn-annee-plus"')"
+verifier "  et l'ancien bouton a disparu" non "$(contient 'id="btn-annee"')"
+
+echo "-- 22.B le confort de lecture"
+code - GET / > /dev/null
+verifier "le correcteur anglais est coupe" oui "$(contient '<body spellcheck="false">')"
+code - GET /css/app.css > /dev/null
+verifier "la fiche de droite s'etire" oui "$(contient 'var(--fiche-largeur, 400px)')"
+verifier "  par une poignee sur son bord" oui "$(contient '.pn-poignee {')"
+verifier "le petit texte a monte d'un cran" non "$(contient 'font-size: 8.5px')"
+verifier "  la carte du plan a suivi en hauteur" oui "$(contient '--carte-hauteur: 144px')"
+code - GET /js/dom.js > /dev/null
+verifier "Entree vaut « Enregistrer » partout" oui "$(contient 'function surEntree(evenement)')"
+verifier "  sauf dans une zone de texte, ou elle passe a la ligne" oui "$(contient 'if (dansUnTexte && !evenement.ctrlKey')"
+code - GET /js/panel.js > /dev/null
+verifier "le commentaire d'un joueur se lit sur plusieurs lignes" oui "$(contient 'function ajusterHauteur(zone)')"
+
+echo "-- 22.C les formes vivantes"
+code "$BOCAL_A" POST /api/formes '{"genre":"texte","x":10,"y":20,"l":200,"h":60}' > /dev/null
+ID_FORME="$(lire forme.id)"
+verifier "une forme neuve est opaque" 100 "$(lire forme.opacite)"
+verifier "  et appartient au plan general" plan "$(lire forme.vue)"
+verifier "  sans profil attache" oui "$(contient '"profils":[]')"
+code "$BOCAL_A" PATCH "/api/formes/$ID_FORME" '{"opacite":40,"vue":"profils","profils":["aerys-targaryen","aerys-targaryen"]}' > /dev/null
+verifier "l'opacite se regle" 40 "$(lire forme.opacite)"
+verifier "  la portee aussi" profils "$(lire forme.vue)"
+verifier "  et un profil repete ne compte qu'une fois" oui "$(contient '"profils":["aerys-targaryen"]')"
+code "$BOCAL_A" PATCH "/api/formes/$ID_FORME" '{"opacite":0,"vue":"nulle-part"}' > /dev/null
+verifier "une opacite nulle est ramenee au minimum lisible" 5 "$(lire forme.opacite)"
+verifier "  et une portee inventee retombe sur le plan" plan "$(lire forme.vue)"
+code - GET /js/formes.js > /dev/null
+verifier "l'editeur d'une forme est un vrai panneau flottant" oui "$(contient "class: 'flottant forme-editeur'")"
+verifier "  on ecrit dans la forme elle-meme" oui "$(contient "contenteditable: 'plaintext-only'")"
+verifier "  Suppr efface celle qu'on a choisie" oui "$(contient "evenement.key !== 'Delete'")"
+verifier "  et une forme hors de sa vue n'est pas dessinee" oui "$(contient 'formes.filter(visible)')"
+code - GET /css/app.css > /dev/null
+verifier "la barre du bas passe devant la surface de trace" oui "$(contient 'z-index: 8;')"
+
+echo "-- 22.D le plan obeit"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Sans","nom":"Place"}' > /dev/null
+ID_PLACE="$(lire personne.id)"
+verifier "une fiche neuve n'a pas de position" "" "$(lire personne.position)"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_PLACE" '{"position":[420,260]}' > /dev/null
+verifier "on peut la poser quelque part" oui "$(contient '"position":[420,260]')"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_PLACE" '{"position":[0,0]}' > /dev/null
+verifier "le coin du plan est une position comme une autre" oui "$(contient '"position":[0,0]')"
+code "$BOCAL_A" PATCH "/api/personnes/$ID_PLACE" '{"position":null}' > /dev/null
+verifier "  et le vide la rend a la mise en page" "" "$(lire personne.position)"
+verifier "une fiche peut naitre a un endroit precis" 201 "$(code "$BOCAL_A" POST /api/personnes '{"prenom":"Ne","nom":"Ici","position":[900,300]}')"
+ID_NE_ICI="$(lire personne.id)"
+verifier "  et elle y est" oui "$(contient '"position":[900,300]')"
+verifier "ranger plusieurs fiches tient en une requete" 200 "$(code "$BOCAL_A" PATCH /api/personnes/positions "{\"$ID_PLACE\":[10,20],\"$ID_NE_ICI\":[30,40]}")"
+verifier "  les deux ont ete rangees" 2 "$(lire rangees)"
+code "$BOCAL_A" PATCH /api/personnes/positions "{\"$ID_PLACE\":[11,21],\"fiche-qui-nexiste-pas\":[1,2]}" > /dev/null
+verifier "  un inconnu est ignore, le reste passe" 1 "$(lire rangees)"
+code "$BOCAL_A" GET /api/vue/sociogramme > /dev/null
+verifier "la vue descend la position aux fiches" oui "$(contient '"position":[11,21]')"
+code - GET /js/views/cartes.js > /dev/null
+verifier "une position remplace le calcul au lieu de s'y ajouter" oui "$(contient 'boite.x = noeud.position[0]')"
+verifier "  et le plan cesse alors de se recadrer" oui "$(contient 'const decalageX = ancrage ? 0 :')"
+verifier "on peut prendre plusieurs fiches a la fois" oui "$(contient 'const selection = new Set()')"
+verifier "  au cadre, dans le vide, avec Maj" oui "$(contient 'bandeSelection')"
+code - GET /js/main.js > /dev/null
+verifier "le plan se fige a la premiere ouverture" oui "$(contient 'async function figerLesPositions')"
+verifier "  jamais sur une vue partagee" oui "$(contient 'if (PARTAGE) return;')"
+code - GET /js/editeurs.js > /dev/null
+verifier "un profil cree tombe sous le curseur" oui "$(contient 'Math.round(surLePlan.x - 93)')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
