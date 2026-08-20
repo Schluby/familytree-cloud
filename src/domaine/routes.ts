@@ -44,6 +44,7 @@ import * as carnet from './carnet';
 import { glossaireDe, glossaireDepuisJson, rattacher } from './envois';
 import * as filtres from './filtres';
 import * as formes from './formes';
+import * as pressePapiers from './presse_papiers';
 import * as humeur from './humeur';
 import * as referentiels from './referentiels';
 import * as registre from './registre';
@@ -93,6 +94,8 @@ const SURFACE = [
   '/filtres/*',
   '/formes',
   '/formes/*',
+  '/extrait',
+  '/coller',
   '/carnet',
   '/carnet/*',
   '/lieux',
@@ -167,7 +170,8 @@ function enErreur(c: Contexte, erreur: unknown): Response {
     erreur instanceof ErreurReferentiel ||
     erreur instanceof ErreurPortrait ||
     erreur instanceof carnet.ErreurCarnet ||
-    erreur instanceof formes.ErreurForme
+    erreur instanceof formes.ErreurForme ||
+    erreur instanceof pressePapiers.ErreurExtrait
   ) {
     return c.json({ erreur: erreur.message }, 400);
   }
@@ -541,6 +545,52 @@ routesDomaine.get('/personnes/:id', async (c) => {
     // déplier pour rien.
     citations: carnet.citations(dataset, 'p', personneId),
   });
+});
+
+/* ------------------------------------------------- copier, coller (lot 23.B)
+ *
+ * Deux routes, et une seule idée : un extrait est **du texte**. Il se met dans
+ * le presse-papiers, se colle ailleurs, s'envoie par message. Le serveur ne
+ * garde rien entre les deux — il n'existe pas de « presse-papiers du compte »,
+ * et c'est justement ce qui permet de coller chez quelqu'un d'autre sans rien
+ * lui partager.
+ */
+
+routesDomaine.get('/extrait', async (c) => {
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+  const ids = (c.req.query('ids') || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  try {
+    return c.json({ extrait: pressePapiers.extraire(courant.dataset, ids) });
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
+});
+
+routesDomaine.post('/coller', async (c) => {
+  const corps = await corpsDe(c);
+  const courant = await monde(c);
+  if (courant instanceof Response) return courant;
+
+  const point =
+    corps.x === undefined || corps.y === undefined
+      ? undefined
+      : { x: Number(corps.x), y: Number(corps.y) };
+  try {
+    const bilan = pressePapiers.coller(
+      courant.dataset,
+      corps.extrait,
+      point,
+      corps.rappels !== false
+    );
+    await enregistrer(c, courant);
+    return c.json(bilan, 201);
+  } catch (erreur) {
+    return enErreur(c, erreur);
+  }
 });
 
 /**

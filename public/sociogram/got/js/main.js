@@ -1745,6 +1745,7 @@ function confirmerSuppressionPersonne(id, evenement) {
  * défaire son rangement d'un clic, sans le vouloir et sans retour.
  */
 function menuFond(evenement, point) {
+  const choisies = etat.moteur?.selection?.() || [];
   menu.ouvrir(evenement.clientX, evenement.clientY, [
     { titre: etat.referentiels.meta?.sauvegarde || etat.referentiels.meta?.titre || 'Plan' },
     {
@@ -1753,6 +1754,39 @@ function menuFond(evenement, point) {
       onclick: () =>
         formulairePersonne.ouvrir(evenement.clientX, evenement.clientY, { position: point }),
     },
+    // Copier / coller (lot 23.B). Les deux entrées ne s'affichent que quand
+    // elles servent : un menu qui propose « Coller » sans rien à coller apprend
+    // seulement qu'on s'est trompé.
+    choisies.length && {
+      label: `Copier ${pluriel(choisies.length, 'fiche')}`,
+      icone: '⧉',
+      detail: 'Ctrl + C',
+      onclick: () => copierLaSelection(),
+    },
+    ...(() => {
+      const extrait = lireExtrait(null);
+      if (!extrait) return [];
+      const sortants = liensSortants(extrait);
+      return [
+        {
+          label: 'Coller ici',
+          icone: '📋',
+          detail: sortants
+            ? `${pluriel(extrait.personnes.length, 'fiche')} · ${pluriel(sortants, 'lien')} vers l’extérieur`
+            : 'Ctrl + V',
+          onclick: () => collerLExtrait(null, point),
+        },
+        // L'échappatoire : deux fiches copiées peuvent traîner vingt liens vers
+        // des gens qu'on n'a pas pris, donc vingt fiches de rappel. On le dit
+        // avec le compte, et on laisse refuser.
+        sortants && {
+          label: 'Coller les fiches seules',
+          icone: '📋',
+          detail: `sans les ${pluriel(sortants, 'lien')} vers l’extérieur`,
+          onclick: () => collerLExtrait(null, point, { rappels: false }),
+        },
+      ].filter(Boolean);
+    })(),
     { separateur: true },
     { label: 'Vue générale', icone: '⇱', onclick: () => vueGenerale() },
     { label: 'Ajuster à l’écran', icone: '⤢', onclick: () => etat.moteur?.recentrer() },
@@ -2728,6 +2762,82 @@ function installerEtirementFiche() {
   });
 }
 
+/* ------------------------------------------------- copier, coller (lot 23.B)
+ *
+ * Un extrait est **du texte**, et c'est tout le dessein : il va dans le
+ * presse-papiers du système, donc il se colle dans un autre de ses mondes, mais
+ * aussi dans un message envoyé à quelqu'un d'autre, qui le collera chez lui.
+ * Rien n'est gardé côté serveur entre les deux — il n'y a pas de presse-papiers
+ * de compte à administrer, à vider ou à cloisonner.
+ *
+ * Le double du texte est rangé dans `localStorage` : lire le presse-papiers du
+ * système sans geste de l'utilisateur demande une permission que le navigateur
+ * n'accorde pas toujours, alors qu'un `Ctrl+V` nous donne le texte de lui-même.
+ * Quand les deux existent, c'est le texte collé qui gagne — c'est le plus
+ * récent, et c'est celui qu'on vient de recevoir.
+ */
+const PRESSE_PAPIERS = cle('familytree-presse-papiers');
+
+async function copierLaSelection() {
+  const ids = etat.moteur?.selection?.() || [];
+  if (!ids.length) {
+    astuce('Rien de choisi — Maj + glisser dans le vide pour prendre des fiches.');
+    return;
+  }
+  try {
+    const { extrait } = await Api.extrait(ids);
+    const texte = JSON.stringify(extrait);
+    localStorage.setItem(PRESSE_PAPIERS, texte);
+    // Peut échouer (permission, page non focalisée) : le double local suffit à
+    // coller chez soi, donc on ne fait pas de bruit pour ça.
+    await navigator.clipboard?.writeText?.(texte).catch(() => {});
+    const liens = (extrait.relations || []).length;
+    astuce(
+      `${pluriel(ids.length, 'fiche')} et ${pluriel(liens, 'lien')} copiés — Ctrl+V pour les poser.`
+    );
+  } catch (erreur) {
+    message(`Copie impossible : ${erreur.message}`);
+  }
+}
+
+/** `texte` vient du presse-papiers du système ; sinon on relit le double local. */
+function lireExtrait(texte) {
+  const essais = [texte, localStorage.getItem(PRESSE_PAPIERS)];
+  for (const brut of essais) {
+    if (!brut) continue;
+    try {
+      const extrait = JSON.parse(brut);
+      if (extrait?.format === 'familytree/extrait') return extrait;
+    } catch {
+      // Ce n'était pas un extrait : on essaie la source suivante.
+    }
+  }
+  return null;
+}
+
+async function collerLExtrait(texte, point, { rappels = true } = {}) {
+  const extrait = lireExtrait(texte);
+  if (!extrait) {
+    astuce('Rien à coller — copiez d’abord des fiches, ou collez le texte d’un extrait.');
+    return;
+  }
+  try {
+    const bilan = await Api.coller(extrait, point || etat.moteur?.centreVisible?.(), { rappels });
+    await rechargerVue({ conserverFocus: true });
+    const rappelees = bilan.rappels?.length
+      ? ` · ${pluriel(bilan.rappels.length, 'fiche')} de rappel pour les liens qui sortaient de la sélection`
+      : '';
+    astuce(`${pluriel(bilan.personnes.length, 'fiche')} collée(s)${rappelees}.`);
+  } catch (erreur) {
+    message(`Collage impossible : ${erreur.message}`);
+  }
+}
+
+/** Combien de liens de cet extrait sortaient de la sélection copiée. */
+function liensSortants(extrait) {
+  return (extrait?.relations || []).filter((lien) => lien.absent).length;
+}
+
 /**
  * Combien de fiches sont prises en main (lot 22.D).
  *
@@ -3347,6 +3457,30 @@ document.addEventListener('keydown', (evenement) => {
     evenement.preventDefault();
     elements.recherche.focus();
   }
+  // Copier la sélection (lot 23.B). Hors d'un champ de saisie : là, Ctrl+C doit
+  // rester Ctrl+C. Et seulement si quelque chose est pris, sinon on volerait la
+  // copie d'un texte sélectionné à la souris.
+  if ((evenement.ctrlKey || evenement.metaKey) && evenement.key.toLowerCase() === 'c' && !saisie) {
+    if (etat.moteur?.selection?.().length) {
+      evenement.preventDefault();
+      copierLaSelection();
+    }
+  }
+});
+
+/**
+ * Coller (lot 23.B).
+ *
+ * On écoute l'événement `paste` plutôt que `Ctrl+V` : c'est lui qui **porte le
+ * texte**, sans avoir à demander la permission de lire le presse-papiers. Un
+ * extrait reçu par message se colle donc directement dans le plan.
+ */
+document.addEventListener('paste', (evenement) => {
+  const saisie = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+  if (saisie || document.activeElement?.isContentEditable) return;
+  const texte = evenement.clipboardData?.getData('text/plain') || '';
+  evenement.preventDefault();
+  collerLExtrait(texte);
 });
 
 // Poignée de mise au point : `familyTree.etat`, `familyTree.moteur.focus('id')`…

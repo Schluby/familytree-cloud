@@ -2297,6 +2297,69 @@ verifier "  sans dependre d'un observateur qui peut dormir" oui "$(contient "typ
 verifier "  celui qui tient a sa place la garde" oui "$(contient 'if (exactement) poser(element')"
 
 # ---------------------------------------------------------------------------
+# Lot 23.B : copier un morceau de plan, le coller ailleurs
+#
+# Un extrait est du **texte** : le serveur n'en garde rien entre le copier et le
+# coller, ce qui est justement ce qui permet de le passer a quelqu'un d'autre.
+# Trois choses valent d'etre tenues :
+#
+#  1. Il emporte les referentiels qu'il cite (maisons, types), sinon une fiche
+#     collee ailleurs perd sa maison et ses liens perdent leur type.
+#  2. Il n'ecrase jamais ce que l'hote possede deja : une maison « stark » qui
+#     existe la-bas reste la sienne, avec sa couleur.
+#  3. Un lien dont un seul bout est copie devient une fiche de rappel — et on
+#     doit pouvoir refuser ces fiches-la, sinon deux Stark en trainent quinze.
+# ---------------------------------------------------------------------------
+
+echo "-- 23.B copier / coller"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Copie","nom":"Une","maison":"maison-copie"}' > /dev/null
+ID_C1="$(lire personne.id)"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Copie","nom":"Deux"}' > /dev/null
+ID_C2="$(lire personne.id)"
+code "$BOCAL_A" POST /api/personnes '{"prenom":"Reste","nom":"Dehors"}' > /dev/null
+ID_DEHORS="$(lire personne.id)"
+code "$BOCAL_A" POST /api/relations "{\"source\":\"$ID_C1\",\"cible\":\"$ID_C2\",\"type\":\"ami\"}" > /dev/null
+code "$BOCAL_A" POST /api/relations "{\"source\":\"$ID_C1\",\"cible\":\"$ID_DEHORS\",\"type\":\"ami\"}" > /dev/null
+
+code "$BOCAL_A" GET "/api/extrait?ids=$ID_C1,$ID_C2" > /dev/null
+verifier "un extrait s'annonce pour ce qu'il est" oui "$(contient '"format":"familytree/extrait"')"
+verifier "  il emporte les types de lien cites" oui "$(contient '"types_relations"')"
+verifier "  il nomme l'absent d'un lien qui sort" oui "$(contient '"absent_nom":"Reste Dehors"')"
+verifier "  et il n'emporte aucun portrait" non "$(contient '"avatar"')"
+verifier "copier une fiche qui n'existe pas est refuse" 400 "$(code "$BOCAL_A" GET '/api/extrait?ids=fantome')"
+
+# Le meme monde, deux fois : les identifiants doivent etre renegocies.
+EXTRAIT_SIMPLE="{\"format\":\"familytree/extrait\",\"version\":1,\"personnes\":[{\"id\":\"$ID_C1\",\"prenom\":\"Copie\",\"nom\":\"Une\",\"position\":[10,10]},{\"id\":\"$ID_C2\",\"prenom\":\"Copie\",\"nom\":\"Deux\",\"position\":[210,10]}],\"relations\":[{\"id\":\"r-copie\",\"source\":\"$ID_C1\",\"cible\":\"$ID_C2\",\"type\":\"ami\"}],\"maisons\":{},\"types_relations\":{}}"
+verifier "coller repose le groupe" 201 "$(code "$BOCAL_A" POST /api/coller "{\"extrait\":$EXTRAIT_SIMPLE,\"x\":900,\"y\":400}")"
+verifier "  deux fiches sont nees" 2 "$(lire personnes.length)"
+verifier "  et leur lien avec elles" 1 "$(lire relations)"
+code "$BOCAL_A" GET /api/vue/sociogramme > /dev/null
+verifier "  posees a l'endroit demande" oui "$(contient '"position":[900,400]')"
+verifier "  en gardant leur ecart" oui "$(contient '"position":[1100,400]')"
+
+# Un lien qui sort : avec fiche de rappel, puis sans.
+EXTRAIT_SORTANT="{\"format\":\"familytree/extrait\",\"version\":1,\"personnes\":[{\"id\":\"seule\",\"prenom\":\"Toute\",\"nom\":\"Seule\"}],\"relations\":[{\"id\":\"r-sortant\",\"source\":\"seule\",\"cible\":\"parti\",\"type\":\"ami\",\"absent\":\"cible\",\"absent_nom\":\"Le Parti\"}],\"maisons\":{},\"types_relations\":{}}"
+code "$BOCAL_A" POST /api/coller "{\"extrait\":$EXTRAIT_SORTANT}" > /dev/null
+verifier "un lien qui sort fabrique une fiche de rappel" 1 "$(lire rappels.length)"
+verifier "  et le lien est bien pose" 1 "$(lire relations)"
+code "$BOCAL_A" POST /api/coller "{\"extrait\":$EXTRAIT_SORTANT,\"rappels\":false}" > /dev/null
+verifier "on peut refuser les fiches de rappel" 0 "$(lire rappels.length)"
+verifier "  le lien part alors avec elles" 0 "$(lire relations)"
+
+# Les referentiels : ce qui manque est cree, ce qui existe est laisse tranquille.
+EXTRAIT_MAISON='{"format":"familytree/extrait","version":1,"personnes":[{"id":"venu","prenom":"Venu","nom":"Ailleurs","maison":"maison-neuve"}],"relations":[],"maisons":{"maison-neuve":{"id":"maison-neuve","label":"Maison Neuve","couleur":"#123456"}},"types_relations":{}}'
+code "$BOCAL_A" POST /api/coller "{\"extrait\":$EXTRAIT_MAISON}" > /dev/null
+verifier "une maison absente arrive avec l'extrait" 1 "$(lire maisons)"
+code "$BOCAL_A" POST /api/coller "{\"extrait\":$EXTRAIT_MAISON}" > /dev/null
+verifier "  mais on ne la recree pas la seconde fois" 0 "$(lire maisons)"
+verifier "un texte qui n'est pas un extrait est refuse" 400 "$(code "$BOCAL_A" POST /api/coller '{"extrait":{"format":"autre chose"}}')"
+verifier "un extrait vide aussi" 400 "$(code "$BOCAL_A" POST /api/coller '{"extrait":{"format":"familytree/extrait","personnes":[]}}')"
+
+code - GET /js/main.js > /dev/null
+verifier "le plan ecoute le collage du systeme" oui "$(contient "document.addEventListener('paste'")"
+verifier "  et garde un double a lui" oui "$(contient 'familytree-presse-papiers')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

@@ -366,6 +366,19 @@ export const Api = {
       method: 'PATCH',
       body: JSON.stringify(positions),
     }),
+
+  /* Copier / coller (lot 23.B) : un extrait est du texte, le serveur n'en
+     garde aucune trace entre les deux. */
+  extrait: (ids) => requete(`${DOMAINE}/extrait${versQuery({ ids: ids.join(',') })}`),
+  coller: (extrait, point, { rappels = true } = {}) =>
+    requete(`${DOMAINE}/coller`, {
+      method: 'POST',
+      body: JSON.stringify({
+        extrait,
+        rappels,
+        ...(point ? { x: Math.round(point.x), y: Math.round(point.y) } : {}),
+      }),
+    }),
   creerPersonne: (donnees) =>
     requete(`${DOMAINE}/personnes`, { method: 'POST', body: JSON.stringify(donnees) }),
   supprimerPersonne: (id) => requete(`${DOMAINE}/personnes/${id}`, { method: 'DELETE' }),
