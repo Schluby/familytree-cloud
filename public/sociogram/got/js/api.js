@@ -42,10 +42,22 @@ const ARBRE_VISE = new URLSearchParams(location.search).get('arbre') || '';
  */
 const PARTAGE_VISE = ARBRE_VISE ? '' : new URLSearchParams(location.search).get('partage') || '';
 
+/**
+ * `&edition=1` : on ouvre un arbre partage **en ecriture** (lot 23.D).
+ *
+ * Le droit ne se devine pas ici — il vit dans la table `partages`, et le savoir
+ * demanderait un aller-retour avant de pouvoir composer la moindre adresse.
+ * C'est donc le rail qui l'ajoute a l'adresse, apres avoir lu la liste des
+ * partages ou le droit figure. Le serveur ne s'en remet pas a ce drapeau : la
+ * surface `/edition` verifie le droit **et** l'amitie a chaque requete.
+ */
+const EDITION_VISEE =
+  !!PARTAGE_VISE && new URLSearchParams(location.search).get('edition') === '1';
+
 const DOMAINE = ARBRE_VISE
   ? `/api/admin/arbres/${encodeURIComponent(ARBRE_VISE)}`
   : PARTAGE_VISE
-    ? `/api/partages/${encodeURIComponent(PARTAGE_VISE)}/lecture`
+    ? `/api/partages/${encodeURIComponent(PARTAGE_VISE)}/${EDITION_VISEE ? 'edition' : 'lecture'}`
     : '/api';
 
 /** Redirige vers la connexion en gardant l'adresse demandée. */
@@ -191,17 +203,32 @@ export const Api = {
   procuration: ARBRE_VISE,
   /** L'arbre d'un autre qu'on **regarde**, ou `''`. Lecture seule (11.B). */
   partage: PARTAGE_VISE,
+  /** Un arbre partagé qu'on ouvre pour l'écrire : ce n'est pas une lecture seule. */
+  editionPartagee: EDITION_VISEE,
+
+  // ------------------------------------------------------------------ les amis
+  amis: () => requete('/api/amis'),
+  demanderAmi: (email) =>
+    requete('/api/amis', { method: 'POST', body: JSON.stringify({ email }) }),
+  accepterAmi: (id) => requete(`/api/amis/${id}/accepter`, { method: 'POST' }),
+  retirerAmi: (id) => requete(`/api/amis/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------------ les partages
   /** Les arbres qu'on m'a ouverts. */
   partages: () => requete('/api/partages'),
   /** À qui l'un des miens est ouvert. */
   lecteurs: (id) => requete(`/api/partages/${id}/lecteurs`),
-  /** La liste **entière** des lecteurs, par adresse. Elle remplace. */
-  poserLecteurs: (id, lecteurs) =>
+  /**
+   * La liste **entière** des lecteurs, par adresse. Elle remplace.
+   *
+   * `redacteurs` (lot 23.D) : ceux-là écrivent — mais seulement s'ils sont
+   * amis, et c'est le serveur qui tranche. Une adresse qui n'est pas celle d'un
+   * ami retombe en lecture, et la réponse la nomme dans `sans_amitie`.
+   */
+  poserLecteurs: (id, lecteurs, redacteurs = []) =>
     requete(`/api/partages/${id}/lecteurs`, {
       method: 'PUT',
-      body: JSON.stringify({ lecteurs }),
+      body: JSON.stringify({ lecteurs, redacteurs }),
     }),
   /**
    * Appelé après **toute** écriture réussie. `main.js` s'en sert pour savoir

@@ -103,6 +103,21 @@ export class ErreurPlafond extends Error {
   }
 }
 
+/**
+ * Quelqu'un a écrit dans cette sauvegarde entre notre lecture et notre écriture.
+ *
+ * Refus, et non écrasement : c'est la seule réponse honnête quand deux
+ * personnes tiennent le même document. Le travail de l'autre est intact ; le
+ * nôtre est à refaire, et on le sait.
+ */
+export class ErreurConflit extends Error {
+  constructor() {
+    super(
+      'cette sauvegarde a été modifiée pendant que vous travailliez — rechargez, puis refaites ce geste'
+    );
+  }
+}
+
 export interface Ecriture {
   fiche: Fiche;
   portraitsRetires: number;
@@ -125,13 +140,37 @@ export async function ecrireDocument(
   if (prepare.octets > plafondOctets) throw new ErreurPlafond(prepare.octets, plafondOctets);
 
   const le = maintenant();
-  await base.batch([
+  /* --------------------------------------------------- le verrou de révision
+   *
+   * Lot 23.D. Chaque modification relit le document entier, le change en
+   * mémoire et le réécrit en bloc. À deux — deux onglets du même compte, ou
+   * depuis ce lot deux personnes sur un arbre partagé en écriture — celui qui
+   * enregistrait en second n'écrasait pas un champ : il écrasait **tout le
+   * travail de l'autre**, sans un mot.
+   *
+   * La révision lue au chargement sert donc de jeton. Elle est portée par les
+   * deux instructions, et le contenu s'écrit **avant** que le compteur ne bouge :
+   * dans l'ordre inverse, la première ferait avancer la révision et la seconde
+   * ne reconnaîtrait plus la sienne — plus aucune écriture ne passerait.
+   */
+  const attendue = fiche.revision;
+  const resultats = await base.batch([
+    // Upsert : la ligne existe par construction, mais si elle manquait, une mise
+    // à jour muette perdrait le document sans rien dire.
+    base
+      .prepare(
+        `INSERT INTO contenus (sauvegarde_id, donnees)
+              SELECT ?1, ?2
+               WHERE EXISTS (SELECT 1 FROM sauvegardes WHERE id = ?1 AND revision = ?3)
+           ON CONFLICT(sauvegarde_id) DO UPDATE SET donnees = excluded.donnees`
+      )
+      .bind(fiche.id, prepare.texte, attendue),
     base
       .prepare(
         `UPDATE sauvegardes
             SET schema_version = ?, personnes = ?, relations = ?, taille = ?,
                 revision = revision + 1, modifie_le = ?
-          WHERE id = ? AND utilisateur_id = ?`
+          WHERE id = ? AND utilisateur_id = ? AND revision = ?`
       )
       .bind(
         prepare.schemaVersion,
@@ -140,17 +179,15 @@ export async function ecrireDocument(
         prepare.octets,
         le,
         fiche.id,
-        utilisateurId
+        utilisateurId,
+        attendue
       ),
-    // Upsert : la ligne existe par construction, mais si elle manquait, une mise
-    // à jour muette perdrait le document sans rien dire.
-    base
-      .prepare(
-        `INSERT INTO contenus (sauvegarde_id, donnees) VALUES (?, ?)
-           ON CONFLICT(sauvegarde_id) DO UPDATE SET donnees = excluded.donnees`
-      )
-      .bind(fiche.id, prepare.texte),
   ]);
+
+  // Aucune ligne touchée : quelqu'un a écrit entre notre lecture et la nôtre.
+  // Les deux instructions portant la même condition, rien n'a bougé — le
+  // document de l'autre est intact, et c'est le nôtre qui est à rejouer.
+  if (!resultats[1]?.meta?.changes) throw new ErreurConflit();
 
   return {
     fiche: {

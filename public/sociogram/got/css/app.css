@@ -799,6 +799,31 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 /* --------------------------------------------------------------- panneau */
 
+/* Les amis (lot 23.C). Trois listes dans un bloc, séparées par des intertitres
+   plutôt que par trois cadres : ce sont les mêmes gens à trois moments. */
+.liste-amis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ami {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px; border-radius: 8px;
+}
+.ami:hover { background: var(--fond-3); }
+.ami-corps { flex: 1; min-width: 0; }
+.ami-nom { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ami-meta {
+  font-size: 11.5px; color: var(--texte-faible);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ami-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.ami-actions .bouton-plat { padding: 3px 8px; font-size: 12px; }
+.ami-entete {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--texte-faible); margin: 8px 0 2px;
+}
+.ami-entete:first-child { margin-top: 0; }
+.ami-vide { font-size: 12.5px; color: var(--texte-faible); line-height: 1.45; }
+/* Une demande reçue attend un geste : elle se voit avant les autres. */
+.ami-recue { background: var(--accent-doux); }
+
 /* La fiche de droite (lot 22.B).
    Elle part plus large qu'avant — 330 px pour un bloc de notes de six lignes,
    c'était trop peu — et surtout elle s'étire : `--fiche-largeur` est écrite par
@@ -1790,13 +1815,31 @@ body.en-partage .bandeau-procuration {
 body.sombre.en-partage .bandeau-procuration {
   background: #16242e; color: #93c1de; border-bottom-color: #2c4657;
 }
+/* Ce qui reste caché dans les deux cas : « ⤓ Tout télécharger », « 📸 Instantané »
+   et les gestes du rail portent sur **le compte** et sur la sauvegarde comme
+   objet — ils sont au propriétaire, jamais à l'invité, fût-il rédacteur. */
 body.en-partage #btn-telecharger,
 body.en-partage #btn-instantane,
-body.en-partage #btn-nouveau-profil,
-body.en-partage #champ-annee,
-body.en-partage .rail-actions,
-body.en-partage #btn-nouveau-filtre,
-body.en-partage .etat-ecriture { display: none; }
+body.en-partage .rail-actions { display: none; }
+
+/* Ce qui n'est caché qu'en **lecture** (lot 23.D). Le faire par `:not()` plutôt
+   que par un `display` rendu plus bas : ces éléments n'ont pas tous le même
+   mode d'affichage, et le deviner en rendrait un de travers. Une interface qui
+   ne propose pas ce qui marche ment autant qu'une qui propose ce qui échoue. */
+body.en-partage:not(.en-partage-ecriture) #btn-nouveau-profil,
+body.en-partage:not(.en-partage-ecriture) #champ-annee,
+body.en-partage:not(.en-partage-ecriture) #btn-nouveau-filtre,
+body.en-partage:not(.en-partage-ecriture) .etat-ecriture { display: none; }
+
+/* Le bandeau vert dit « vous pouvez écrire » ; le bleu disait « vous regardez ».
+   Deux couleurs, parce que la différence entre les deux est ce qu'on risque
+   d'oublier au bout de dix minutes. */
+body.en-partage-ecriture .bandeau-procuration {
+  background: #eaf3ec; color: #2f5d3f; border-bottom-color: #a9ccb4;
+}
+body.sombre.en-partage-ecriture .bandeau-procuration {
+  background: #17271c; color: #96c9a6; border-bottom-color: #2d4a37;
+}
 /* La liste des personnes reste ouvrable — c'est de la lecture — mais la fiche
    n'y est plus modifiable : `pointer-events` couperait aussi le défilement. */
 body.en-partage .sauvegarde { cursor: default; }

@@ -2264,7 +2264,9 @@ verifier "on peut prendre plusieurs fiches a la fois" oui "$(contient 'const sel
 verifier "  au cadre, dans le vide, avec Maj" oui "$(contient 'bandeSelection')"
 code - GET /js/main.js > /dev/null
 verifier "le plan se fige a la premiere ouverture" oui "$(contient 'async function figerLesPositions')"
-verifier "  jamais sur une vue partagee" oui "$(contient 'if (PARTAGE) return;')"
+# Depuis le lot 23.D, la garde distingue « pas a moi » de « je ne peux pas
+# l'ecrire » : un arbre confie en ecriture se fige comme le sien.
+verifier "  jamais sur une vue partagee en lecture" oui "$(contient 'if (PARTAGE_LECTURE) return;')"
 code - GET /js/editeurs.js > /dev/null
 verifier "un profil cree tombe sous le curseur" oui "$(contient 'Math.round(surLePlan.x - 93)')"
 
@@ -2358,6 +2360,81 @@ verifier "un extrait vide aussi" 400 "$(code "$BOCAL_A" POST /api/coller '{"extr
 code - GET /js/main.js > /dev/null
 verifier "le plan ecoute le collage du systeme" oui "$(contient "document.addEventListener('paste'")"
 verifier "  et garde un double a lui" oui "$(contient 'familytree-presse-papiers')"
+
+# ---------------------------------------------------------------------------
+# Lot 23.C/D : se connaitre, et ecrire a deux sur le meme arbre
+#
+# La migration 0007 disait « il n'y a pas de colonne droit et il n'y en aura
+# pas », et la raison etait juste : deux personnes qui ecrivent dans le meme
+# document sans rien pour arbitrer. C'est cette raison-la qui est tombee, avec
+# le verrou de revision — pas la prudence. Ce qui doit tenir :
+#
+#  1. Une amitie se demande et s'accepte. Demander une adresse inconnue ne dit
+#     jamais si le compte existe : ce serait un annuaire.
+#  2. L'ecriture ne se donne qu'a un ami. Sans amitie, le droit retombe en
+#     lecture, et on le dit au lieu de le taire.
+#  3. La lecture reste la lecture : `/lecture/*` refuse toujours tout verbe.
+#  4. Retirer quelqu'un de ses amis lui retire l'ecriture.
+# ---------------------------------------------------------------------------
+
+echo "-- 23.C les amities"
+verifier "sans session, rien" 401 "$(code - GET /api/amis)"
+verifier "A n'a encore aucun ami" 0 "$(code "$BOCAL_A" GET /api/amis > /dev/null; lire amis.length)"
+verifier "A demande B" oui "$(code "$BOCAL_A" POST /api/amis "{\"email\":\"$EMAIL_B\"}" > /dev/null; contient 'en_attente')"
+verifier "  la demande attend chez B" 1 "$(code "$BOCAL_B" GET /api/amis > /dev/null; lire recues.length)"
+ID_A_VU_PAR_B="$(lire recues.0.id)"
+verifier "  et A la voit partie" 1 "$(code "$BOCAL_A" GET /api/amis > /dev/null; lire envoyees.length)"
+verifier "une adresse inconnue ne se trahit pas" 200 "$(code "$BOCAL_A" POST /api/amis '{"email":"personne-du-tout@exemple.test"}')"
+verifier "  et repond comme les autres" oui "$(contient 'en_attente')"
+verifier "  sans rien ajouter aux demandes" 1 "$(code "$BOCAL_A" GET /api/amis > /dev/null; lire envoyees.length)"
+verifier "redemander ne fait pas doublon" 1 "$(code "$BOCAL_A" POST /api/amis "{\"email\":\"$EMAIL_B\"}" > /dev/null; code "$BOCAL_A" GET /api/amis > /dev/null; lire envoyees.length)"
+
+echo "-- 23.D l'ecriture veut une amitie"
+code "$BOCAL_A" PUT "/api/partages/$ARBRE_PARTAGE/lecteurs" "{\"redacteurs\":[\"$EMAIL_B\"]}" > /dev/null
+verifier "sans amitie, l'ecriture retombe en lecture" lecture "$(lire lecteurs.0.droit)"
+verifier "  et on le nomme" 1 "$(lire sans_amitie.length)"
+verifier "B ne peut pas ecrire" 403 "$(code "$BOCAL_B" POST "/api/partages/$ARBRE_PARTAGE/edition/personnes" '{"prenom":"Trop","nom":"Tot"}')"
+verifier "  et le refus dit quoi faire" oui "$(contient 'parmi ses amis')"
+
+echo "-- B accepte, et le droit devient possible"
+verifier "B accepte la demande de A" oui "$(code "$BOCAL_B" POST "/api/amis/$ID_A_VU_PAR_B/accepter" > /dev/null; contient 'acceptee')"
+verifier "  les deux sont amis" 1 "$(code "$BOCAL_A" GET /api/amis > /dev/null; lire amis.length)"
+verifier "  et plus rien n'attend" 0 "$(lire envoyees.length)"
+verifier "accepter deux fois ne marche pas" 404 "$(code "$BOCAL_B" POST "/api/amis/$ID_A_VU_PAR_B/accepter")"
+code "$BOCAL_A" PUT "/api/partages/$ARBRE_PARTAGE/lecteurs" "{\"redacteurs\":[\"$EMAIL_B\"]}" > /dev/null
+verifier "A confie l'ecriture a B" ecriture "$(lire lecteurs.0.droit)"
+verifier "  sans refus cette fois" 0 "$(lire sans_amitie.length)"
+verifier "  et B le voit dans ses partages" ecriture "$(code "$BOCAL_B" GET /api/partages > /dev/null; lire partages.0.droit)"
+# B vu depuis A : c'est cet identifiant-la qu'il faudra pour defaire l'amitie.
+# Celui lu chez B designait A — l'erreur est facile, le harnais l'a montree.
+code "$BOCAL_A" GET /api/amis > /dev/null
+ID_B_VU_PAR_A="$(lire amis.0.id)"
+
+echo "-- B ecrit vraiment dans l'arbre de A"
+verifier "B cree une fiche chez A" 201 "$(code "$BOCAL_B" POST "/api/partages/$ARBRE_PARTAGE/edition/personnes" '{"prenom":"Ecrit","nom":"ParLautre"}')"
+ID_PAR_B="$(lire personne.id)"
+verifier "  et A la voit" oui "$(code "$BOCAL_A" GET "/api/partages/$ARBRE_PARTAGE/edition/personnes/$ID_PAR_B" > /dev/null; contient 'ParLautre')"
+verifier "B modifie aussi" 200 "$(code "$BOCAL_B" PATCH "/api/partages/$ARBRE_PARTAGE/edition/personnes/$ID_PAR_B" '{"notes":"vu par B"}')"
+verifier "la lecture reste la lecture" 403 "$(code "$BOCAL_B" POST "/api/partages/$ARBRE_PARTAGE/lecture/personnes" '{"prenom":"Intrus"}')"
+verifier "un tiers n'entre pas par l'edition" 403 "$(code "$BOCAL_I" POST "/api/partages/$ARBRE_PARTAGE/edition/personnes" '{"prenom":"Etranger"}')"
+verifier "  ni ne lit par cette porte" 403 "$(code "$BOCAL_I" GET "/api/partages/$ARBRE_PARTAGE/edition/personnes")"
+
+echo "-- defaire l'amitie retire l'ecriture"
+verifier "A retire B de ses amis" 200 "$(code "$BOCAL_A" DELETE "/api/amis/$ID_B_VU_PAR_A")"
+verifier "  plus personne n'est ami" 0 "$(code "$BOCAL_A" GET /api/amis > /dev/null; lire amis.length)"
+verifier "  et B n'ecrit plus" 403 "$(code "$BOCAL_B" POST "/api/partages/$ARBRE_PARTAGE/edition/personnes" '{"prenom":"Apres","nom":"Rupture"}')"
+verifier "  le partage en ecriture a saute avec" 0 "$(code "$BOCAL_B" GET /api/partages > /dev/null; lire partages.length)"
+
+echo "-- 23.C/D cote navigateur"
+code - GET / > /dev/null
+verifier "le rail a un bloc « Amis »" oui "$(contient 'id="bloc-amis"')"
+code - GET /js/api.js > /dev/null
+verifier "un partage peut s'ouvrir en edition" oui "$(contient "EDITION_VISEE ? 'edition' : 'lecture'")"
+code - GET /js/main.js > /dev/null
+verifier "voir et pouvoir ecrire sont deux drapeaux" oui "$(contient 'const PARTAGE_LECTURE =')"
+verifier "  et le bandeau le dit" oui "$(contient 'Écriture partagée')"
+code - GET /css/app.css > /dev/null
+verifier "l'ecriture partagee rend ses commandes" oui "$(contient 'body.en-partage:not(.en-partage-ecriture) #btn-nouveau-profil')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

@@ -18,6 +18,7 @@ import { routesSauvegardes } from './sauvegardes/routes';
 import { routesAdmin } from './admin/routes';
 import { routesDomaine, santeDuMonde } from './domaine/routes';
 import { routesPartages } from './partages/routes';
+import { routesAmis } from './amis/routes';
 import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import { contenuDepart } from './depart/contenu';
 import type { Variables } from './intergiciels';
@@ -172,6 +173,14 @@ app.route('/api/admin', routesAdmin);
  * -------------------------------------------------------------------------- */
 
 app.route('/api/partages', routesPartages);
+
+/* --------------------------------------------------------------------------
+ * Les amities (lot 23.C) : se connaitre entre comptes, pour pouvoir se confier
+ * un monde. Surface separee, montee avant `/api` comme les deux precedentes.
+ * C'est la condition posee a l'ecriture partagee : voir `src/amis/routes.ts`.
+ * -------------------------------------------------------------------------- */
+
+app.route('/api/amis', routesAmis);
 
 /* --------------------------------------------------------------------------
  * Le domaine : l'arbre lui-même, sur le contrat d'adresses de la version

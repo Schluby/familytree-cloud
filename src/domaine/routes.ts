@@ -23,6 +23,7 @@ import { Hono, type Context } from 'hono';
 import { exigerSession, type Variables } from '../intergiciels';
 import {
   ecrireDocument,
+  ErreurConflit,
   ErreurPlafond,
   ficheDe,
   lireTexte as lireDocument,
@@ -175,6 +176,9 @@ function enErreur(c: Contexte, erreur: unknown): Response {
   ) {
     return c.json({ erreur: erreur.message }, 400);
   }
+  // Lot 23.D : quelqu’un d’autre a ecrit pendant qu’on travaillait. 409, comme
+  // le `PUT /contenu` le fait depuis le lot 2 — la meme situation, la meme reponse.
+  if (erreur instanceof ErreurConflit) return c.json({ erreur: erreur.message }, 409);
   if (erreur instanceof ErreurPlafond) {
     return c.json({ erreur: erreur.message, octets: erreur.octets, plafond_octets: erreur.plafond }, 413);
   }

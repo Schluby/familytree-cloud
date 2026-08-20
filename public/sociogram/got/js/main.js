@@ -45,6 +45,9 @@ const elements = {
   listeVues: document.getElementById('liste-vues'),
   listeSauvegardes: document.getElementById('liste-sauvegardes'),
   blocPartages: document.getElementById('bloc-partages'),
+  blocAmis: document.getElementById('bloc-amis'),
+  listeAmis: document.getElementById('liste-amis'),
+  btnAjouterAmi: document.getElementById('btn-ajouter-ami'),
   listePartages: document.getElementById('liste-partages'),
   btnNouvelleSauvegarde: document.getElementById('btn-nouvelle-sauvegarde'),
   btnImporterSauvegarde: document.getElementById('btn-importer-sauvegarde'),
@@ -134,6 +137,17 @@ const elements = {
 const PROCURATION = Api.procuration;
 /** Lot 11.B : on regarde l'arbre de quelqu'un, qui nous l'a ouvert. */
 const PARTAGE = Api.partage;
+/**
+ * Lot 23.D : ce partage-là, on peut l'écrire.
+ *
+ * Les deux drapeaux ne disent pas la même chose et ne se remplacent pas.
+ * `PARTAGE` dit « cet arbre n'est pas le mien » — ce qui reste vrai en
+ * écriture, et qui commande le bandeau, l'absence d'invitation à créer un
+ * compte, et le fait qu'on ne puisse pas le rendre actif. `PARTAGE_LECTURE`
+ * ajoute « et je ne peux rien y écrire », ce qui ferme les éditeurs.
+ */
+const PARTAGE_ECRITURE = !!Api.editionPartagee;
+const PARTAGE_LECTURE = !!PARTAGE && !PARTAGE_ECRITURE;
 
 // Même palette que le moteur de rendu pour les générations.
 const COULEURS_GENERATION = ['#a8559f', '#8265c0', '#5b7fc4', '#2f97a8', '#2f9e78'];
@@ -216,7 +230,7 @@ const menu = creerMenu();
  * `poserLeCarnetEnVolet` / `choisirVue('carnet')` le déplacent.
  */
 const carnet = creerCarnet({
-  lectureSeule: () => !!PARTAGE,
+  lectureSeule: () => PARTAGE_LECTURE,
   placeActuelle: () => etat.carnetPlace,
   // Le seul endroit où l'on écrit longuement de ses propres mots : le dire ici
   // n'est pas une redite du bandeau du haut, c'est le dire là où l'on perdrait
@@ -592,14 +606,26 @@ async function preparerPartage() {
     throw new Error("cet arbre ne vous est plus partagé, ou ne l'a jamais été");
   }
 
+  // Le drapeau d'adresse a été mis par le rail, mais le droit peut avoir été
+  // retiré depuis — ou l'adresse recopiée à la main. Plutôt que de laisser
+  // chaque requête se faire refuser une par une, on renvoie en lecture, où tout
+  // fonctionnera (lot 23.D).
+  if (PARTAGE_ECRITURE && fiche.droit !== 'ecriture') {
+    location.replace(lien(`/?partage=${encodeURIComponent(PARTAGE)}`));
+    return;
+  }
+
   document.body.classList.add('en-partage');
+  document.body.classList.toggle('en-partage-ecriture', PARTAGE_ECRITURE);
   elements.bandeauProcuration.hidden = false;
   elements.bandeauProcuration.replaceChildren(
     ...[
-      ['b', '👁 Lecture seule'],
+      PARTAGE_ECRITURE ? ['b', '✍ Écriture partagée'] : ['b', '👁 Lecture seule'],
       [
         'span',
-        ` — « ${fiche.nom} » appartient à ${fiche.proprietaire_email || 'un autre compte'}, qui vous l’a ouvert. Vous voyez ses modifications ; vous ne pouvez rien y écrire.`,
+        PARTAGE_ECRITURE
+          ? ` — « ${fiche.nom} » appartient à ${fiche.proprietaire_email || 'un autre compte'}, qui vous l’a confié. Ce que vous écrivez ici est écrit chez lui.`
+          : ` — « ${fiche.nom} » appartient à ${fiche.proprietaire_email || 'un autre compte'}, qui vous l’a ouvert. Vous voyez ses modifications ; vous ne pouvez rien y écrire.`,
       ],
     ].map(([balise, texte]) => {
       const element = document.createElement(balise);
@@ -773,9 +799,12 @@ async function dessinerPartages() {
   elements.blocPartages.hidden = partages.length === 0;
   elements.listePartages.replaceChildren(
     ...partages.map((fiche) => {
+      const ecrivable = fiche.droit === 'ecriture';
       const li = document.createElement('li');
       li.className = 'sauvegarde partage';
-      li.title = `Appartient à ${fiche.proprietaire_email} — lecture seule`;
+      li.title = ecrivable
+        ? `Appartient à ${fiche.proprietaire_email} — vous pouvez y écrire`
+        : `Appartient à ${fiche.proprietaire_email} — lecture seule`;
 
       const pastille = document.createElement('span');
       pastille.className = 'sv-pastille';
@@ -787,12 +816,16 @@ async function dessinerPartages() {
       nom.textContent = fiche.nom;
       const meta = document.createElement('div');
       meta.className = 'sv-meta';
-      meta.textContent = `${fiche.proprietaire_email} · ${resumeContenu(fiche)}`;
+      meta.textContent = `${ecrivable ? '✍' : '👁'} ${fiche.proprietaire_email} · ${resumeContenu(fiche)}`;
       corps.append(nom, meta);
 
       li.append(pastille, corps);
       li.addEventListener('click', () => {
-        location.href = lien(`/?partage=${encodeURIComponent(fiche.id)}`);
+        // C'est ici, et seulement ici, qu'on sait si l'arbre s'ouvre pour être
+        // écrit : le droit vient d'arriver avec la liste des partages.
+        const adresse = new URLSearchParams({ partage: fiche.id });
+        if (ecrivable) adresse.set('edition', '1');
+        location.href = lien(`/?${adresse}`);
       });
       return li;
     })
@@ -855,7 +888,7 @@ function menuSauvegarde(fiche, evenement) {
         }),
     },
     {
-      label: 'Partager en lecture…',
+      label: 'Partager…',
       icone: '👁',
       detail: 'montrer cet arbre à d’autres comptes',
       onclick: () => menuPartage(fiche, evenement),
@@ -902,61 +935,89 @@ async function menuPartage(fiche, evenement) {
     return;
   }
 
-  const adresses = lecteurs.map((lecteur) => lecteur.email);
+  // Les deux listes sont séparées dès ici : un lecteur et un rédacteur ne font
+  // pas la même chose de votre monde, et les mélanger dans une seule saisie
+  // obligerait à inventer une syntaxe (lot 23.D).
+  const enLecture = lecteurs.filter((l) => l.droit !== 'ecriture').map((l) => l.email);
+  const enEcriture = lecteurs.filter((l) => l.droit === 'ecriture').map((l) => l.email);
+  const total = enLecture.length + enEcriture.length;
+
   menu.ouvrir(evenement.clientX, evenement.clientY, [
     { titre: `Partager « ${fiche.nom} »` },
     {
-      texte: adresses.length
-        ? `Ouvert à ${pluriel(adresses.length, 'compte')} : ${adresses.join(', ')}`
+      texte: total
+        ? [
+            enLecture.length ? `👁 ${enLecture.join(', ')}` : '',
+            enEcriture.length ? `✍ ${enEcriture.join(', ')}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
         : 'Cet arbre n’est ouvert à personne.',
     },
     {
       texte:
-        'Ceux à qui vous l’ouvrez le voient tel que vous le modifiez, et ne peuvent rien y écrire.',
+        'Un lecteur voit l’arbre tel que vous le modifiez. Un rédacteur y écrit avec vous — et cela ne se donne qu’à un ami.',
     },
     { separateur: true },
     {
-      label: adresses.length ? 'Modifier la liste…' : 'Ouvrir à des comptes…',
+      label: enLecture.length ? 'Modifier les lecteurs…' : 'Ouvrir en lecture…',
       icone: '👁',
-      onclick: () => changerLecteurs(fiche, adresses),
+      onclick: () => changerLecteurs(fiche, enLecture, enEcriture, 'lecture'),
     },
-    adresses.length && {
+    {
+      label: enEcriture.length ? 'Modifier les rédacteurs…' : 'Confier à un ami…',
+      icone: '✍',
+      detail: 'écriture — amis seulement',
+      onclick: () => changerLecteurs(fiche, enLecture, enEcriture, 'ecriture'),
+    },
+    total && {
       label: 'Ne plus le partager',
       icone: '🚫',
       danger: true,
-      onclick: () => enregistrerLecteurs(fiche, []),
+      onclick: () => enregistrerLecteurs(fiche, [], []),
     },
   ]);
 }
 
-function changerLecteurs(fiche, adresses) {
+function changerLecteurs(fiche, enLecture, enEcriture, quoi) {
+  const cible = quoi === 'ecriture' ? enEcriture : enLecture;
   const saisie = prompt(
-    `Les adresses des comptes à qui « ${fiche.nom} » est ouvert, séparées par des virgules.\n` +
-      'Cette liste remplace la précédente : effacer une adresse retire l’accès.',
-    adresses.join(', ')
+    quoi === 'ecriture'
+      ? `Les adresses des amis qui peuvent **écrire** dans « ${fiche.nom} », séparées par des virgules.\n` +
+          'Seuls vos amis peuvent l’obtenir : une autre adresse retombera en lecture.'
+      : `Les adresses des comptes qui peuvent **voir** « ${fiche.nom} », séparées par des virgules.\n` +
+          'Cette liste remplace la précédente : effacer une adresse retire l’accès.',
+    cible.join(', ')
   );
   if (saisie === null) return;
+  const nouvelles = saisie
+    .split(/[,;\s]+/)
+    .map((mot) => mot.trim())
+    .filter(Boolean);
   enregistrerLecteurs(
     fiche,
-    saisie
-      .split(/[,;\s]+/)
-      .map((mot) => mot.trim())
-      .filter(Boolean)
+    quoi === 'ecriture' ? enLecture : nouvelles,
+    quoi === 'ecriture' ? nouvelles : enEcriture
   );
 }
 
-async function enregistrerLecteurs(fiche, adresses) {
+async function enregistrerLecteurs(fiche, adresses, redacteurs = []) {
   try {
-    const reponse = await Api.poserLecteurs(fiche.id, adresses);
+    const reponse = await Api.poserLecteurs(fiche.id, adresses, redacteurs);
     // Les adresses sans compte sont nommées : les taire ferait croire que Jean
     // voit l'arbre alors qu'il ne le verra jamais.
     const perdues = reponse.inconnus?.length
       ? ` Sans compte ici, donc ignorée(s) : ${reponse.inconnus.join(', ')}.`
       : '';
+    // Et celles à qui l'écriture a été refusée faute d'amitié : le silence
+    // ferait croire à un droit qui n'existe pas.
+    const sansAmitie = reponse.sans_amitie?.length
+      ? ` Pas encore ami(e), donc en lecture seule : ${reponse.sans_amitie.join(', ')}.`
+      : '';
     message(
       reponse.lecteurs.length
-        ? `« ${fiche.nom} » est ouvert à ${pluriel(reponse.lecteurs.length, 'compte')}.${perdues}`
-        : `« ${fiche.nom} » n’est plus partagé.${perdues}`
+        ? `« ${fiche.nom} » est ouvert à ${pluriel(reponse.lecteurs.length, 'compte')}.${perdues}${sansAmitie}`
+        : `« ${fiche.nom} » n’est plus partagé.${perdues}${sansAmitie}`
     );
   } catch (erreur) {
     message(`Partage impossible : ${erreur.message}`);
@@ -1205,6 +1266,9 @@ async function rechargerVue({ conserverFocus = false } = {}) {
   majStats();
   // Les compteurs du rail suivent ce que contient réellement la sauvegarde.
   dessinerSauvegardes();
+  // Les amis ne dépendent pas de la vue, mais une demande reçue pendant qu'on
+  // joue doit finir par apparaître : ce rechargement-là est le plus fréquent.
+  dessinerAmis();
   // Le carnet en volet affiche des **noms**, pas des identifiants : un profil
   // renommé, une maison créée, et son catalogue est en retard. Il se recharge
   // sans jamais écraser un texte en cours de frappe (voir `carnet.js`).
@@ -1361,7 +1425,7 @@ async function ouvrirLaCible(genre, id, evenement) {
     await selectionner(id);
     return;
   }
-  if (PARTAGE) return; // en lecture seule, les éditeurs n'ont rien à faire là
+  if (PARTAGE_LECTURE) return; // en lecture seule, les éditeurs n'ont rien à faire là
 
   if (genre === 'm') {
     const maison = (etat.referentiels.maisons || []).find((entree) => entree.id === id);
@@ -1505,7 +1569,7 @@ async function enregistrerPositions(positions) {
  * soixante-sept fois le document entier.
  */
 async function figerLesPositions() {
-  if (PARTAGE) return; // une vue partagée se lit, elle n'écrit rien
+  if (PARTAGE_LECTURE) return; // une vue partagée en lecture n'écrit rien
   if ((etat.vueCourante?.rendu || '') !== 'cartes') return;
   const positions = etat.moteur?.positionsAFiger?.();
   if (!positions) return;
@@ -2762,6 +2826,139 @@ function installerEtirementFiche() {
   });
 }
 
+/* --------------------------------------------------------- les amis (23.C)
+ *
+ * Trois listes dans un seul bloc : les amis, les demandes reçues — celles qui
+ * attendent **une réponse de moi** —, et celles qu'on a envoyées. Ce ne sont
+ * pas trois états d'une même chose : la première donne un pouvoir (confier un
+ * arbre), la deuxième demande un geste, la troisième ne demande rien.
+ */
+async function dessinerAmis() {
+  // Sous procuration ou dans un arbre partagé, ce bloc parlerait de *nos* amis
+  // au milieu du monde de quelqu'un d'autre : il n'y a pas sa place.
+  if (PROCURATION || PARTAGE) {
+    elements.blocAmis.hidden = true;
+    return;
+  }
+  elements.blocAmis.hidden = false;
+
+  let listes = { amis: [], recues: [], envoyees: [] };
+  try {
+    listes = await Api.amis();
+  } catch {
+    // Un service d'amis muet ne doit pas emporter le rail.
+    elements.listeAmis.replaceChildren();
+    return;
+  }
+
+  const ligne = (personne, genre) => {
+    const li = document.createElement('li');
+    li.className = `ami ami-${genre}`;
+
+    const corps = document.createElement('div');
+    corps.className = 'ami-corps';
+    const nom = document.createElement('div');
+    nom.className = 'ami-nom';
+    nom.textContent = personne.nom;
+    const meta = document.createElement('div');
+    meta.className = 'ami-meta';
+    meta.textContent =
+      genre === 'recue' ? 'vous a demandé' : genre === 'envoyee' ? 'demande envoyée' : personne.email;
+    corps.append(nom, meta);
+    li.append(corps);
+
+    const actions = document.createElement('div');
+    actions.className = 'ami-actions';
+    if (genre === 'recue') {
+      const oui = document.createElement('button');
+      oui.className = 'bouton bouton-primaire bouton-plat';
+      oui.type = 'button';
+      oui.textContent = 'Accepter';
+      oui.addEventListener('click', async () => {
+        try {
+          await Api.accepterAmi(personne.id);
+          await dessinerAmis();
+          astuce(`${personne.nom} est maintenant votre ami — vous pouvez lui confier un arbre.`);
+        } catch (erreur) {
+          message(`Impossible d’accepter : ${erreur.message}`);
+        }
+      });
+      actions.append(oui);
+    }
+    const non = document.createElement('button');
+    non.className = 'bouton bouton-icone';
+    non.type = 'button';
+    non.textContent = '✕';
+    non.title =
+      genre === 'recue' ? 'Refuser' : genre === 'envoyee' ? 'Annuler la demande' : 'Retirer de mes amis';
+    non.addEventListener('click', async () => {
+      // Retirer un ami retire aussi les arbres qu'on lui avait confiés : c'est
+      // le serveur qui s'en charge, on ne fait que le dire.
+      if (genre === 'ami' && !confirm(`Retirer ${personne.nom} de vos amis ? Les arbres que vous lui avez confiés en écriture lui seront retirés.`)) {
+        return;
+      }
+      try {
+        await Api.retirerAmi(personne.id);
+        await Promise.all([dessinerAmis(), dessinerSauvegardes()]);
+      } catch (erreur) {
+        message(`Impossible : ${erreur.message}`);
+      }
+    });
+    actions.append(non);
+    li.append(actions);
+    return li;
+  };
+
+  const entete = (texte) => {
+    const li = document.createElement('li');
+    li.className = 'ami-entete';
+    li.textContent = texte;
+    return li;
+  };
+
+  const enfants = [];
+  if (listes.recues.length) {
+    enfants.push(entete(`${pluriel(listes.recues.length, 'demande')} reçue(s)`));
+    enfants.push(...listes.recues.map((p) => ligne(p, 'recue')));
+  }
+  if (listes.amis.length) {
+    if (enfants.length) enfants.push(entete('Mes amis'));
+    enfants.push(...listes.amis.map((p) => ligne(p, 'ami')));
+  }
+  if (listes.envoyees.length) {
+    enfants.push(entete('En attente'));
+    enfants.push(...listes.envoyees.map((p) => ligne(p, 'envoyee')));
+  }
+  if (!enfants.length) {
+    const vide = document.createElement('li');
+    vide.className = 'ami-vide';
+    vide.textContent = 'Personne encore. Le ＋ demande quelqu’un par son adresse.';
+    enfants.push(vide);
+  }
+  elements.listeAmis.replaceChildren(...enfants);
+}
+
+async function demanderUnAmi() {
+  const adresse = prompt(
+    'L’adresse du compte à qui envoyer une demande d’ami.\n' +
+      'Il devra l’accepter avant que vous puissiez lui confier un arbre.'
+  );
+  if (!adresse?.trim()) return;
+  try {
+    const reponse = await Api.demanderAmi(adresse.trim());
+    await dessinerAmis();
+    // La réponse ne dit jamais si le compte existe — voir `src/amis/routes.ts`.
+    // Le message ne peut donc pas le dire non plus, et c'est voulu.
+    astuce(
+      reponse.etat === 'acceptee'
+        ? 'Vous étiez déjà demandé de l’autre côté : vous voilà amis.'
+        : 'Demande envoyée. Elle apparaîtra chez cette personne si elle a un compte ici.'
+    );
+  } catch (erreur) {
+    message(`Demande impossible : ${erreur.message}`);
+  }
+}
+
 /* ------------------------------------------------- copier, coller (lot 23.B)
  *
  * Un extrait est **du texte**, et c'est tout le dessein : il va dans le
@@ -3029,6 +3226,7 @@ elements.btnAnneePlus.addEventListener('click', () =>
 );
 elements.btnVueGenerale.addEventListener('click', () => vueGenerale());
 elements.btnCarnet.addEventListener('click', () => basculerLeCarnet());
+elements.btnAjouterAmi?.addEventListener('click', () => demanderUnAmi());
 
 construireBarreFormes();
 elements.btnFormes.addEventListener('click', () => {

@@ -22,10 +22,24 @@
  *   au domaine ne suffirait pas à ouvrir une brèche ici, parce que le verbe est
  *   refusé avant que la route ne soit choisie. Et le garde du verbe est posé
  *   **avant** la substitution du compte — l'ordre compte, il est vérifié.
- * - **Aucun partage en écriture.** Deux personnes qui écrivent dans le même
- *   document sans rien pour arbitrer entre elles, c'est un verrou de révision
- *   qui rejette l'une des deux au hasard. La procuration (8.F) reste la seule
- *   écriture chez autrui, et elle est journalisée.
+ * - **La lecture reste la lecture.** `/:arbre/lecture/*` n'a pas changé d'un
+ *   iota : le verbe y est refusé avant que la route ne soit choisie.
+ *
+ * **Ce qui a changé au lot 23.D : le partage en écriture existe.**
+ *
+ * Ce module disait « aucun partage en écriture », et la raison donnée était
+ * juste : « deux personnes qui écrivent dans le même document sans rien pour
+ * arbitrer entre elles ». C'est cette raison-là qui est tombée, pas la prudence
+ * qui l'accompagnait. `ecrireDocument` porte désormais un **verrou de révision**
+ * (lot 23.D) : une écriture fondée sur une lecture périmée est refusée — 409 —
+ * au lieu d'écraser silencieusement le travail de l'autre.
+ *
+ * Deux conditions, sur une surface à part (`/:arbre/edition/*`) : le partage
+ * porte `droit = 'ecriture'`, **et** l'amitié tient (lot 23.C). On ne donne pas
+ * le droit de modifier son monde à quelqu'un qui n'a jamais dit oui.
+ *
+ * La procuration (8.F) reste autre chose : elle est le pouvoir d'un
+ * administrateur sur l'arbre d'un membre, et elle est journalisée.
  *
  * Le mécanisme est celui de la procuration, à l'envers : on **substitue le
  * compte** du contexte par le propriétaire de l'arbre, et le domaine sert ses
@@ -38,6 +52,7 @@ import { routesDomaine } from '../domaine/routes';
 import type { Objet } from '../domaine/models';
 import { exigerSession, type Variables } from '../intergiciels';
 import { CHAMPS_FICHE, ficheDe, maintenant, type Fiche } from '../sauvegardes/depot';
+import { amisDe } from '../amis/routes';
 
 type Contexte = { Bindings: Env; Variables: Variables };
 
@@ -76,7 +91,10 @@ routesPartages.get('/', async (c) => {
             s.revision, s.cree_le, s.modifie_le,
             s.utilisateur_id AS proprietaire_id,
             u.email          AS proprietaire_email,
-            u.nom_affiche    AS proprietaire_nom
+            u.nom_affiche    AS proprietaire_nom,
+            -- Lot 23.D : le rail doit savoir s'il ouvre cet arbre pour le lire
+            -- ou pour l'écrire ; les deux ne passent pas par la même surface.
+            p.droit
        FROM partages p
        JOIN sauvegardes s  ON s.id = p.sauvegarde_id
        JOIN utilisateurs u ON u.id = s.utilisateur_id
@@ -103,7 +121,7 @@ routesPartages.get('/:arbre/lecteurs', async (c) => {
   if (!fiche) return c.json({ erreur: 'sauvegarde introuvable' }, 404);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT p.utilisateur_id AS id, u.email, u.nom_affiche
+    `SELECT p.utilisateur_id AS id, p.droit, u.email, u.nom_affiche
        FROM partages p
        JOIN utilisateurs u ON u.id = p.utilisateur_id
       WHERE p.sauvegarde_id = ?
@@ -112,7 +130,16 @@ routesPartages.get('/:arbre/lecteurs', async (c) => {
     .bind(fiche.id)
     .all<Objet>();
 
-  return c.json({ sauvegarde: fiche, lecteurs: results });
+  // Les amis sont renvoyés avec : c'est à eux, et à eux seuls, qu'on peut
+  // confier l'écriture, et l'interface doit pouvoir le proposer sans un second
+  // aller-retour.
+  const amis = await amisDe(c.env.DB, moi.id);
+
+  return c.json({
+    sauvegarde: fiche,
+    lecteurs: results,
+    amis: [...amis],
+  });
 });
 
 /**
@@ -151,10 +178,16 @@ routesPartages.put('/:arbre/lecteurs', async (c) => {
   }
 
   const corps = await c.req.json<Objet>().catch(() => ({}) as Objet);
-  const bruts = Array.isArray(corps.lecteurs) ? corps.lecteurs : [];
-  const demandes = [
-    ...new Set(bruts.map((v: unknown) => String(v ?? '').trim().toLowerCase()).filter(Boolean)),
-  ];
+  const adresses = (valeur: unknown) =>
+    Array.isArray(valeur)
+      ? [...new Set(valeur.map((v: unknown) => String(v ?? '').trim().toLowerCase()).filter(Boolean))]
+      : [];
+
+  const voulusEnLecture = adresses(corps.lecteurs);
+  // Lot 23.D : la même liste, en écriture. Un compte cité des deux côtés est
+  // rédacteur — le droit le plus fort gagne, sinon l'ordre des listes déciderait.
+  const voulusEnEcriture = adresses(corps.redacteurs);
+  const demandes = [...new Set([...voulusEnLecture, ...voulusEnEcriture])];
   if (demandes.length > MAX_LECTEURS) {
     return c.json({ erreur: `au plus ${MAX_LECTEURS} lecteurs par arbre` }, 400);
   }
@@ -176,23 +209,48 @@ routesPartages.put('/:arbre/lecteurs', async (c) => {
   const reconnus = new Set(trouves.map((ligne) => ligne.email_norm));
   const inconnus = demandes.filter((demande) => !reconnus.has(demande));
 
+  /* ------------------------------------------------ l'écriture veut une amitié
+   *
+   * Donner le droit de modifier son monde à quelqu'un qui n'a jamais dit oui,
+   * ce serait pouvoir faire écrire n'importe qui n'importe où — et, pour celui
+   * qui reçoit, voir un arbre inconnu apparaître dans son rail avec le pouvoir
+   * d'y toucher. Une adresse qui n'est pas celle d'un ami retombe donc en
+   * **lecture**, et on le dit : rien n'est plus déroutant qu'un droit qu'on
+   * croit avoir donné et qui n'existe pas.
+   */
+  const amis = await amisDe(c.env.DB, moi.id);
+  const enEcriture = new Set(voulusEnEcriture);
+  const refuses: string[] = [];
+  const droitDe = (lecteur: { id: string; email_norm: string }) => {
+    if (!enEcriture.has(lecteur.email_norm)) return 'lecture';
+    if (amis.has(lecteur.id)) return 'ecriture';
+    refuses.push(lecteur.email_norm);
+    return 'lecture';
+  };
+
   const instant = maintenant();
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM partages WHERE sauvegarde_id = ?').bind(fiche.id),
     ...trouves.map((lecteur) =>
       c.env.DB
         .prepare(
-          `INSERT INTO partages (sauvegarde_id, utilisateur_id, cree_le, pose_par)
-           VALUES (?, ?, ?, ?)`
+          `INSERT INTO partages (sauvegarde_id, utilisateur_id, cree_le, pose_par, droit)
+           VALUES (?, ?, ?, ?, ?)`
         )
-        .bind(fiche.id, lecteur.id, instant, moi.id)
+        .bind(fiche.id, lecteur.id, instant, moi.id, droitDe(lecteur))
     ),
   ]);
 
   return c.json({
     ok: true,
-    lecteurs: trouves.map((lecteur) => ({ id: lecteur.id, email: lecteur.email })),
+    lecteurs: trouves.map((lecteur) => ({
+      id: lecteur.id,
+      email: lecteur.email,
+      droit: enEcriture.has(lecteur.email_norm) && amis.has(lecteur.id) ? 'ecriture' : 'lecture',
+    })),
     inconnus,
+    // Ceux à qui l'écriture a été refusée faute d'amitié, nommés.
+    sans_amitie: refuses,
   });
 });
 
@@ -279,3 +337,68 @@ const parPartage: MiddlewareHandler<Contexte> = async (c, next) => {
 routesPartages.use('/:arbre/lecture/*', verbeDeLecture);
 routesPartages.use('/:arbre/lecture/*', parPartage);
 routesPartages.route('/:arbre/lecture', routesDomaine);
+
+/* --------------------------------------------------------------------------
+ * Écrire un arbre partagé — le domaine entier, à deux (lot 23.D)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Le droit d'abord, comme le verbe pour la lecture.
+ *
+ * Posé **avant** `parPartage`, donc avant que le compte ne soit substitué : un
+ * défaut d'ordre se traduirait par un refus, jamais par une écriture au nom du
+ * propriétaire. Et posé sur le chemin plutôt que sur chaque route, pour que le
+ * jour où le domaine gagne une route d'écriture, elle soit protégée sans que
+ * personne n'ait à y penser.
+ *
+ * La condition est double, et les deux comptent : le partage doit porter
+ * `droit = 'ecriture'`, **et** l'amitié doit tenir encore. Retirer quelqu'un de
+ * ses amis lui retire l'écriture le temps d'une requête, sans qu'il faille
+ * penser à défaire les partages un par un — même si `DELETE /api/amis/:autre`
+ * les efface aussi, pour ne pas laisser de lignes qui mentent.
+ */
+const droitDEcriture: MiddlewareHandler<Contexte> = async (c, next) => {
+  const moi = c.get('compte');
+  const arbre = c.req.param('arbre');
+  if (!arbre) return c.json({ erreur: 'sauvegarde non nommée' }, 400);
+
+  const ligne = await c.env.DB.prepare(
+    `SELECT 1 AS ok
+       FROM sauvegardes s
+      WHERE s.id = ?1
+        AND (
+          -- Le propriétaire, d'abord : cette porte est aussi la sienne. Sans
+          -- cette ligne, celui qui a partagé son arbre se ferait refuser sur
+          -- l'adresse qu'il vient d'envoyer aux autres.
+          s.utilisateur_id = ?2
+          OR EXISTS (
+            SELECT 1 FROM partages p
+             WHERE p.sauvegarde_id = s.id
+               AND p.utilisateur_id = ?2
+               AND p.droit = 'ecriture'
+               AND EXISTS (SELECT 1 FROM amities a
+                            WHERE a.etat = 'acceptee'
+                              AND ((a.demandeur_id = ?2 AND a.destinataire_id = s.utilisateur_id)
+                                OR (a.demandeur_id = s.utilisateur_id AND a.destinataire_id = ?2)))
+          )
+        )`
+  )
+    .bind(arbre, moi.id)
+    .first<{ ok: number }>();
+
+  if (!ligne) {
+    return c.json(
+      {
+        erreur: 'cet arbre ne vous est pas ouvert en écriture',
+        indice:
+          'son propriétaire doit vous compter parmi ses amis et vous donner le droit d’écrire',
+      },
+      403
+    );
+  }
+  await next();
+};
+
+routesPartages.use('/:arbre/edition/*', droitDEcriture);
+routesPartages.use('/:arbre/edition/*', parPartage);
+routesPartages.route('/:arbre/edition', routesDomaine);
