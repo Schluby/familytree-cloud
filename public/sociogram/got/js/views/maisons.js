@@ -225,6 +225,9 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       // Les unités juste sous les caractéristiques (lot 20.E) : ce sont les
       // deux blocs chiffrés, et on passe de « ce qu'elle a » à « ce qu'elle
       // peut envoyer » sans changer de moitié d'écran.
+      // Les compétences d'armée s'intercalent (lot 24) : elles valent pour la
+      // troupe entière, et on les lit avant le détail des bannières.
+      blocCompetencesArmee(maison),
       blocUnites(maison),
       blocNotes(maison),
       blocLiens(maison)
@@ -396,6 +399,16 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
         champUniteEtiquete('Défense', nombreUnite(maison, index, 'defense', { max: 100, suffixe: '%' })),
         champUniteEtiquete('Santé', nombreUnite(maison, index, 'sante', { max: 100, suffixe: '%' })),
         champUniteEtiquete('Attaque', nombreUnite(maison, index, 'attaque')),
+        // Lot 24, quatrième page du classeur : la ligne de bataille d'une
+        // unité. Elle prolonge les trois champs du lot 20.E au lieu de les
+        // remplacer — « Défense » et « Santé » sont déjà remplies dans les
+        // mondes existants, et les renommer aurait vidé leurs fiches en
+        // silence.
+        champUniteEtiquete('Dégâts CC', nombreUnite(maison, index, 'degats_cc')),
+        champUniteEtiquete('Dégâts à distance', nombreUnite(maison, index, 'degats_dis')),
+        champUniteEtiquete('Valeur d’armure', nombreUnite(maison, index, 'va')),
+        champUniteEtiquete('Discipline', nombreUnite(maison, index, 'discipline')),
+        champUniteEtiquete('Mouvement', champUnite(maison, index, 'mouvement', '4, à cheval…')),
         champUniteEtiquete('Arme', champUnite(maison, index, 'arme', 'Pique, arc long…')),
         champUniteEtiquete(
           'Équipement spécial',
@@ -412,6 +425,53 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       h('span', { texte: libelle }),
       controle,
     ]);
+  }
+
+  /* --------------------------------------- compétences d'armée (lot 24)
+   *
+   * Onze des dix-neuf compétences du jeu — celles qui ont un sens pour une
+   * troupe. Elles se posent sur la maison et non sur chaque unité : une armée
+   * s'entraîne ensemble, et recopier onze rangs sur douze bannières n'aurait
+   * rien décrit de plus.
+   *
+   * Le bloc reste replié tant qu'aucun rang n'est noté : une maison de la
+   * cour n'a pas d'armée, et onze champs vides sur sa fiche ne diraient rien.
+   */
+  function blocCompetencesArmee(maison) {
+    if (!maison.competences_armee || typeof maison.competences_armee !== 'object') {
+      maison.competences_armee = {};
+    }
+    const rangs = maison.competences_armee;
+    const liste = payload.competences_armee_liste || [];
+    const remplies = liste.filter((competence) => rangs[competence.id]).length;
+
+    const champ = (competence) =>
+      h('label', { class: 'mz-carac' }, [
+        h('span', { class: 'mz-carac-nom', texte: competence.label }),
+        h('input', {
+          type: 'number',
+          min: 0,
+          max: 20,
+          value: rangs[competence.id] ?? '',
+          placeholder: '—',
+          oninput: (evenement) => {
+            const brut = evenement.target.value;
+            // Zéro et vide reviennent au même : le serveur n'écrit pas les
+            // rangs nuls, et les garder ici ferait diverger l'affichage.
+            if (brut === '' || Number(brut) === 0) delete rangs[competence.id];
+            else rangs[competence.id] = Number(brut);
+            modifier(maison.id, { competences_armee: rangs });
+          },
+        }),
+      ]);
+
+    const details = h('details', { class: 'mz-bloc' }, [
+      h('summary', { texte: remplies ? `Compétences d’armée (${remplies})` : 'Compétences d’armée' }),
+      h('div', { class: 'mz-caracs' }, liste.map(champ)),
+    ]);
+    // Ouvert dès qu'il y a quelque chose à lire.
+    if (remplies) details.open = true;
+    return details;
   }
 
   function blocUnites(maison) {
@@ -443,6 +503,11 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
               arme: '',
               equipement: '',
               notes: '',
+              degats_cc: null,
+              degats_dis: null,
+              va: null,
+              discipline: null,
+              mouvement: '',
             });
             modifier(maison.id, { unites: courante().unites }, { immediat: true });
             dessiner();

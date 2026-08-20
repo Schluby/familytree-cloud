@@ -10,6 +10,7 @@
  * routes, qui seules touchent au document.
  */
 
+import { normaliserCompetencesArmee } from './feuille';
 import { arrondir, versEntier } from './python';
 import type { Objet } from './models';
 
@@ -130,6 +131,9 @@ export const CHAMPS_MAISON = [
   'liens',
   // Lot 20.E : ce qu'elle peut mettre sur le champ de bataille.
   'unites',
+  // Lot 24 : les compétences de sa troupe, quatrième page du classeur. Elles
+  // valent pour l'armée entière, là où `unites` détaille chaque bannière.
+  'competences_armee',
 ] as const;
 
 /**
@@ -220,6 +224,16 @@ function unites(brut: unknown): Objet[] {
         arme: texte(entree.arme, 120),
         equipement: texte(entree.equipement, 160),
         notes: texte(entree.notes, 4000),
+        // Lot 24, quatrième page du classeur : la ligne de statistiques qu'une
+        // unité porte en bataille. Elles complètent les trois d'au-dessus au
+        // lieu de les remplacer — `defense` et `sante` sont les mêmes colonnes,
+        // déjà remplies dans les mondes existants, et les renommer aurait vidé
+        // leurs fiches sans rien dire.
+        degats_cc: versEntier(entree.degats_cc),
+        degats_dis: versEntier(entree.degats_dis),
+        va: versEntier(entree.va),
+        discipline: versEntier(entree.discipline),
+        mouvement: texte(entree.mouvement, 60),
       };
     })
     // Une unité sans nom ni type n'est rien : c'est une ligne ajoutée puis
@@ -356,6 +370,11 @@ export function appliquerMaison(base: Objet | null, patch: Objet): Objet {
     const liste = unites(patch.unites);
     if (liste.length) fiche.unites = liste;
     else delete fiche.unites;
+  }
+  if (fourni(patch, 'competences_armee')) {
+    const rangs = normaliserCompetencesArmee(patch.competences_armee);
+    if (Object.keys(rangs).length) fiche.competences_armee = rangs;
+    else delete fiche.competences_armee;
   }
 
   if (!fiche.label) throw new ErreurReferentiel("une maison a besoin d'un nom");

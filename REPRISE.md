@@ -1217,6 +1217,59 @@ sa propre carte, et se tromperait au premier déménagement.
 onglet voudrait dire qu'un bouton de la barre peut devenir invisible selon
 l'onglet actif — la panne réparée au lot 12.A.
 
+## La feuille de personnage (lot 24)
+
+**Le filtre de `d3.zoom` doit écarter Ctrl.** `d3-zoom` appelle
+`stopImmediatePropagation` dès qu'il accepte un `mousedown`, ce qui **tue les
+écouteurs enregistrés après lui sur le même élément**. Tant que le filtre
+acceptait Ctrl, le cadre de sélection de `views/cartes.js` ne pouvait pas
+s'ouvrir — il était posé plus bas sur `plan`. Toute nouvelle touche modificatrice
+qu'on voudra faire vivre sur le plan devra passer par ce filtre d'abord.
+
+**Un `MouseEvent` d'essai doit porter `view: window`.** Sans lui, le
+gestionnaire de d3 lève avant `stopImmediatePropagation` — une exception dans un
+écouteur n'arrête pas les suivants — et le code testé s'exécute sur un chemin
+qu'aucune souris ne prend. C'est ce détail qui a fait « passer » un cadre de
+sélection qui n'a jamais fonctionné.
+
+**`feuille` est `null` par défaut, et le redevient.** C'est un champ de la
+personne (`PERSONNE_CHAMPS`), normalisé par `normaliserFeuille`
+(`src/domaine/feuille.ts`), écrit seulement s'il porte quelque chose. Un rang à
+zéro n'est pas écrit ; une compétence jamais touchée non plus. Un monde qui ne
+joue pas les feuilles ressort octet pour octet.
+
+**Les valeurs dérivées ont une jumelle.** `derives()`
+(`src/domaine/feuille.ts`) et `calculerDerives()`
+(`js/views/perso.js`) calculent la même chose : le serveur pour le payload, le
+navigateur pour que le chiffre bouge sous les doigts. **Si l'une change, l'autre
+doit suivre** — le harnais compare les formules mot à mot, faute de pouvoir les
+comparer autrement.
+
+**Le malus d'armure se retranche.** Le classeur d'origine l'additionne, en
+attendant un nombre négatif. Nous nous en écartons sciemment, et c'est le seul
+écart : le champ n'accepte que du positif.
+
+**La ligne d'attente des rounds n'est pas un round.** Dans la popup d'intrigue,
+son objet n'entre dans `intrigue.rounds` qu'au moment où l'on écrit dedans.
+Sinon chaque redessin en crée un vide.
+
+**Les champs de nombres de l'intrigue ne redessinent pas le panneau.** Ils
+mettent à jour le total de leur ligne et le résumé. Seuls les menus et les cases
+à cocher redessinent — un redessin par chiffre frappé perd le curseur.
+
+**La feuille d'armée n'est pas une vue.** C'est le bloc « Unités de guerre » de
+la vue « Maisons » (lot 20.E), enrichi au lot 24. Les champs ajoutés
+(`degats_cc`, `degats_dis`, `va`, `discipline`, `mouvement`) **complètent**
+`defense`, `sante` et `attaque` : ces trois-là sont déjà remplis dans les mondes
+existants, et les renommer aurait vidé leurs fiches sans un mot.
+
+**Un libellé doit traverser une fonction que `relever-textes.mjs` connaît.**
+Le relevé ne voit ni les tableaux ni les arguments d'une fonction inconnue.
+« Défense de combat », écrit dans un tableau, est resté en français dans la
+version anglaise ; ses voisins passaient parce qu'ils existaient *ailleurs* sous
+un porteur reconnu. La liste des porteurs est nominative dans l'outil : y
+ajouter sa fonction fait partie du travail, au même titre que la traduction.
+
 ## Pour repartir
 
 ```bash

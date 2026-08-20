@@ -2727,3 +2727,125 @@ Sans les profils, il ne reste que des liens : ils se posent sur les fiches que
 l'hôte **a déjà**, retrouvées par leur identifiant. De quoi rejouer un réseau de
 relations sur un monde qu'on a par ailleurs — et la seule raison pour laquelle
 `coller` accepte un extrait sans aucune fiche.
+
+## 24.0 — Le cadre de sélection, qui n'a jamais existé
+
+*Signalé après essai : « ctrl + clic sur profil = profil sélectionné, mais dès
+que je clique sur un autre profil ça me retire la sélection », et le rectangle
+de sélection promis au lot 23.G restait introuvable.*
+
+Deux défauts, une même cause de fond : Ctrl a été chargé d'un second rôle sans
+qu'on vérifie ce qui l'utilisait déjà.
+
+**Le cadre ne pouvait pas s'ouvrir.** `d3-zoom` appelle
+`stopImmediatePropagation` dès qu'il accepte un `mousedown` — ce qui **tue les
+écouteurs posés après lui sur le même élément**. Notre filtre de zoom acceptait
+Ctrl ; le nôtre, enregistré plus bas sur `plan`, n'était donc jamais appelé. Le
+filtre d'origine de d3 écarte Ctrl précisément pour cela, et nous l'avions
+remplacé sans reprendre la clause. Ctrl + glisser dans le vide ne dessinait rien
+et déplaçait la vue.
+
+**Et l'essai qui l'avait « vérifié » mentait.** Il envoyait des `MouseEvent`
+fabriqués, sans `view`. Privé de `event.view`, le gestionnaire de d3 lève avant
+d'atteindre `stopImmediatePropagation` — une exception dans un écouteur
+n'empêche pas les suivants — et notre cadre s'ouvrait. **Le test passait sur un
+chemin qu'aucune souris ne prend.** Les essais du navigateur portent désormais
+`view: window` : c'est ce seul mot qui sépare un contrôle d'un décor.
+
+**Ctrl + clic défaisait ce qu'il devait composer.** `demarrerDeplacement`
+commençait par `if (!selection.has(id)) viderSelection()` — juste tant que Ctrl
+ne servait qu'à déplacer, faux depuis qu'il sert aussi à choisir. La ligne est
+partie ; le groupe qui se déplace est `selection.has(id) ? [...selection] : [id]`,
+donc prendre une fiche hors sélection ne déplace toujours qu'elle, sans effacer
+le reste.
+
+Au passage, la bascule lisait `!deport` pour distinguer un clic d'un glisser —
+or `deport` est remis à zéro avant que le clic n'arrive, si bien que **tout
+déplacement ajoutait la fiche à la sélection**. Elle lit maintenant si quelque
+chose a bougé.
+
+## 24.A — La feuille de personnage
+
+Portée du classeur de la table (`Perso copie.xlsx`), page 1. Une vue à elle
+seule, **entre le sociogramme et les maisons** : on descend du monde à la
+personne, puis on remonte à sa maison.
+
+À gauche l'identité et les dix-neuf compétences, chacune avec jusqu'à trois
+spécialités ; à droite ce qu'on relit en jeu — les valeurs dérivées, l'armure,
+les armes, l'équipement, la bourse, l'état, les textes libres.
+
+**Une feuille n'existe que si on la remplit.** `feuille` est un champ de la
+personne, `null` par défaut, et le serveur le ramène à `null` dès qu'on l'a
+vidé. Une campagne de soixante-dix fiches et cinq personnages joués n'écrit donc
+cinq feuilles, pas soixante-dix ; un rang à zéro n'est pas écrit non plus, ni les
+douze compétences qu'on n'a jamais touchées. C'est la règle du projet depuis le
+lot 8, appliquée au plus gros des champs facultatifs.
+
+**Les valeurs dérivées ne sont jamais enregistrées** : ce sont des sommes de
+rangs, et les stocker créerait deux vérités qui divergeraient au premier rang
+modifié. Elles sont calculées deux fois — `derives()` côté serveur pour le
+payload, `calculerDerives()` côté navigateur pour que le chiffre bouge sous les
+doigts. Cette jumelle est une dette assumée : le harnais vérifie que la formule
+est **écrite pareil des deux côtés**, faute de pouvoir la vérifier autrement.
+
+**Un écart avec le classeur, un seul.** La formule d'origine *additionne* la
+case « Malus de défense », en comptant sur qui la remplit pour y écrire un
+nombre négatif. Un champ nommé « malus » qui augmente la défense quand on y tape
+2 est un piège : ici il se retranche, et le champ n'accepte que du positif.
+
+## 24.B — L'intrigue
+
+Page 2 du classeur, en popup. Une intrigue est un combat social : on annonce une
+intention (bonne ou mauvaise, ce qui décide du test — Persuasion ou Duperie) et
+une technique parmi sept, l'humeur de la cible donne un modificateur de dés, et
+l'on tient les rounds jusqu'à ce que le sang-froid ou la patience cède.
+
+Tout ce qui se lisait par `XLOOKUP` est dit en clair : le modificateur ne dépend
+que du couple (intention, humeur) ; l'objectif et la spécialité changent avec
+l'intention — séduire de bonne foi relève de la séduction, séduire en mentant
+relève du bluff ; et l'action « Influence », qui n'a pas de test à elle,
+emprunte celui de l'intention.
+
+**L'intrigue est enregistrée dans la feuille.** Elle tient une séance entière :
+la perdre en rafraîchissant la page la rendrait inutilisable à la table.
+
+Deux règles de rendu, apprises en la cassant :
+
+- **La ligne d'attente n'est pas un round.** Son objet n'entre dans l'intrigue
+  qu'au moment où l'on écrit dedans. La créer d'avance ajoutait un round vide à
+  chaque redessin — trois choix de menu suffisaient à faire quatre lignes.
+- **Les champs de nombres ne redessinent jamais le panneau.** Ils mettent à jour
+  le total de leur ligne et le résumé. Un redessin par chiffre frappé, c'est un
+  curseur perdu à chaque frappe.
+
+## 24.C — La feuille d'armée
+
+Page 4 du classeur. **Elle n'a jamais été une vue** : ce qu'on cherchait, ce
+sont les « unités de guerre » du lot 20.E, dans la vue « Maisons », sous les
+caractéristiques. Elles gagnent la ligne de bataille qui leur manquait — dégâts
+au contact, à distance, valeur d'armure, discipline, mouvement — et la maison
+gagne les onze compétences de sa troupe, dans un bloc replié tant qu'aucun rang
+n'est noté.
+
+Les nouveaux champs **complètent** `defense`, `sante` et `attaque` au lieu de
+les remplacer : ces trois-là sont déjà remplis dans les mondes existants, et les
+renommer aurait vidé leurs fiches en silence.
+
+## 24.D — Le relevé de textes qui ne relevait pas
+
+Le contrôle « aucune chaîne sans traduction » répondait zéro sur des écrans
+entièrement en français. `outils/relever-textes.mjs` ne connaissait que les
+libellés portés par une propriété (`texte:`, `title:`) ou par le second argument
+d'une poignée de constructeurs. **Les étiquettes passées en premier argument
+n'entraient dans aucun relevé** : les sept champs d'une unité de guerre depuis
+le lot 20.E, puis toute la feuille de personnage — trente-trois chaînes.
+
+Un relevé qui ne voit pas est pire qu'absent : il rassure. La règle ajoutée
+(`etiquete`, `caseCalcul`, `champUniteEtiquete`) les fait toutes apparaître.
+
+Et une leçon de plus, découverte en regardant l'écran anglais plutôt que le
+compteur : **« Défense de combat » était écrit dans un tableau**, donc invisible
+au relevé, et restait en français. Les trois libellés voisins passaient parce
+qu'ils existaient *ailleurs* sous un porteur reconnu — une chance, pas une
+garantie. Ils passent tous par `caseCalcul` désormais. Un libellé doit toujours
+traverser une fonction que le relevé connaît.

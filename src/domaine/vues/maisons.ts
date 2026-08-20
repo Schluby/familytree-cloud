@@ -23,6 +23,7 @@
  * rechercher. C'est ce qui rend les mentions cliquables sans second appel.
  */
 
+import { COMPETENCES_ARMEE } from '../feuille';
 import { calculerGenerations } from '../genealogie';
 import { Dataset, type Objet } from '../models';
 import { arrondir } from '../python';
@@ -207,6 +208,8 @@ export class VueMaisons extends Vue {
           // Lot 20.E, tel quel : contrairement aux événements, une unité ne
           // cite personne — il n'y a rien à aller enrichir ailleurs.
           unites: (fiche.unites as Objet[]) ?? [],
+          // Lot 24 : les compétences de sa troupe, sur le même principe.
+          competences_armee: (fiche.competences_armee as Objet) ?? {},
           notes: fiche.notes ?? '',
           evenements: evenementsEcrits,
           evenements_lies: evenementsLies.get(id) ?? [],
@@ -234,6 +237,8 @@ export class VueMaisons extends Vue {
         // d'un seul côté (`referentiels.ts`).
         etats_unite: ETATS_UNITE.map((e) => ({ ...e })),
         entrainements_unite: ENTRAINEMENTS_UNITE.map((e) => ({ ...e })),
+        // Les onze compétences d’une armée (lot 24), descendues de même.
+        competences_armee_liste: COMPETENCES_ARMEE.map((c) => ({ ...c })),
         annee_courante: dataset.meta.annee_courante ?? '',
         noeuds,
         stats: {

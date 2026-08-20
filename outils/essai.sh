@@ -2475,6 +2475,124 @@ verifier "  la demonstration n'y figure pas" oui "$(contient 'filter((fiche) => 
 verifier "  et confier a l'un n'evince pas les autres" oui "$(contient 'const { lecteurs = [] } = await Api.lecteurs(fiche.id)')"
 
 # ---------------------------------------------------------------------------
+# Lot 24 : la feuille de personnage, l'intrigue et la feuille d'armee
+#
+# Portees du classeur de la table. Ce qui doit tenir :
+#
+#  1. La vue existe et se tient ENTRE le sociogramme et les maisons. Le rang
+#     n'est pas cosmetique : c'est celui du rail, et la premiere vue est celle
+#     qui s'ouvre au chargement.
+#  2. Une feuille ne s'ecrit que si elle porte quelque chose. Un monde ou
+#     personne ne joue ne doit pas gagner un octet — c'est la regle du projet
+#     depuis le lot 8, et elle vaut pour le plus gros des champs facultatifs.
+#  3. Les valeurs derivees sont des sommes de rangs, jamais des valeurs
+#     stockees. On les eprouve sur une feuille connue.
+#  4. Le calcul du navigateur est la JUMELLE de celui du serveur. Les deux
+#     doivent dire la meme chose ; le seul controle qu'un harnais de texte peut
+#     offrir, c'est de verifier que la formule est ecrite pareil des deux cotes.
+#     C'est peu, mais un ecart se voit alors tout de suite.
+# ---------------------------------------------------------------------------
+
+echo "-- 24.A la vue « Feuille de personnage »"
+code "$BOCAL_A" GET /api/vues > /dev/null
+verifier "la vue existe" oui "$(contient '"id":"perso"')"
+verifier "  entre le sociogramme et les maisons" oui "$(contient '"id":"perso","label":"Feuille de personnage"')"
+verifier "  le sociogramme reste le premier" sociogramme "$(lire vues.0.id)"
+verifier "  et la feuille vient juste apres" perso "$(lire vues.1.id)"
+verifier "  puis les maisons" maisons "$(lire vues.2.id)"
+
+verifier "un profil a qui faire une feuille" 201 "$(code "$BOCAL_A" POST /api/personnes '{"prenom":"Sansa","nom":"Stark"}')"
+FEUILLE_ID="$(lire personne.id)"
+verifier "  il n'a pas de feuille" "" "$(code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null; lire personne.feuille)"
+
+code "$BOCAL_A" GET /api/vue/perso > /dev/null
+verifier "la vue descend les dix-neuf competences" 19 "$(lire competences.length)"
+verifier "  les sept humeurs de l'intrigue" 7 "$(lire intrigue.humeurs.length)"
+verifier "  les deux intentions" 2 "$(lire intrigue.intentions.length)"
+verifier "  les sept techniques" 7 "$(lire intrigue.techniques.length)"
+verifier "  et les dix actions" 10 "$(lire intrigue.actions.length)"
+verifier "une technique dit avec quoi la cible resiste" oui "$(contient '"influence":"VOL"')"
+verifier "  et ce que l'intention en fait" oui "$(contient '"mauvaise":{"objectif":"Tromperie","specialite":"Comédie"}')"
+
+echo "-- 24.A ce qui s'ecrit, et ce qui ne s'ecrit pas"
+verifier "on remplit huit rangs" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"VIG":{"rang":3},"ING":{"rang":2},"STA":{"rang":4},"VOL":{"rang":5},"AGI":{"rang":2},"ATH":{"rang":3},"END":{"rang":4},"CAC":{"rang":0}},"age":31}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  les sept rangs non nuls sont la" 3 "$(lire personne.feuille.competences.VIG.rang)"
+verifier "  l'age aussi" 31 "$(lire personne.feuille.age)"
+verifier "  le rang zero n'est pas ecrit" non "$(contient '"CAC"')"
+verifier "  ni les onze competences jamais touchees" non "$(contient '"LAR"')"
+
+code "$BOCAL_A" GET /api/vue/perso > /dev/null
+verifier "defense d'intrigue = VIG + ING + STA" oui "$(contient '"defense_intrigue":9')"
+verifier "sang-froid = VOL x 3" oui "$(contient '"sang_froid":15')"
+verifier "defense de combat = AGI + ATH + VIG" oui "$(contient '"defense_combat":8')"
+verifier "sante = END x 3" oui "$(contient '"sante":12')"
+verifier "la frustration se compte contre la Volonte" oui "$(contient '"base_frustration":5')"
+
+verifier "le malus d'armure se retranche" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"AGI":{"rang":2},"ATH":{"rang":3},"VIG":{"rang":3}},"armure":{"valeur":4,"bonus":2,"malus":1}}}')"
+code "$BOCAL_A" GET /api/vue/perso > /dev/null
+verifier "  8 + 2 - 1 = 9" oui "$(contient '"defense_combat":9')"
+verifier "  et la valeur d'armure se lit telle quelle" oui "$(contient '"valeur_armure":4')"
+
+echo "-- 24.A la feuille effacee disparait"
+verifier "on vide la feuille" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  le champ n'est plus la du tout" non "$(contient '"feuille"')"
+verifier "  et la personne se lit toujours" Sansa "$(lire personne.prenom)"
+
+echo "-- 24.B l'intrigue"
+verifier "une intrigue s'enregistre avec la feuille" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"DUP":{"rang":4},"VOL":{"rang":5}},"intrigue":{"cible":"Littlefinger","humeur":"antipathique","intention":"mauvaise","technique":"intimider","rounds":[{"action":"embobiner","lance":10,"perte":5,"frustration":true}]}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  la cible tient" Littlefinger "$(lire personne.feuille.intrigue.cible)"
+verifier "  le round aussi" embobiner "$(lire personne.feuille.intrigue.rounds.0.action)"
+verifier "une humeur inventee ne passe pas" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"DUP":{"rang":4}},"intrigue":{"humeur":"euphorique","technique":"intimider"}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  elle est simplement oubliee" "" "$(lire personne.feuille.intrigue.humeur)"
+verifier "  et la technique, elle, reste" intimider "$(lire personne.feuille.intrigue.technique)"
+verifier "un round entierement vide n'est pas garde" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"DUP":{"rang":4}},"intrigue":{"cible":"Personne","rounds":[{"action":"","lance":null,"perte":null,"calmer":null,"frustration":false}]}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  la liste des rounds a disparu" non "$(contient '"rounds"')"
+
+echo "-- 24.C la feuille d'armee"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "les onze competences d'armee descendent" 11 "$(lire competences_armee_liste.length)"
+verifier "  dont le corps a corps" oui "$(contient '"id":"CAC","label":"Corps à corps"')"
+verifier "une maison a qui donner une armee" 201 "$(code "$BOCAL_A" POST /api/maisons '{"label":"Karstark","couleur":"#3b5b7a"}')"
+MAISON_ARMEE="$(lire maison.id)"
+verifier "on lui pose des rangs" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"competences_armee":{"CAC":4,"TIR":2,"DRE":0}}')"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "  ils sont la" oui "$(contient '"competences_armee":{"CAC":4,"TIR":2}')"
+verifier "  et le rang zero n'est pas ecrit" non "$(contient '"DRE":0')"
+verifier "une unite porte sa ligne de bataille" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"unites":[{"nom":"Piquiers","type":"infanterie","degats_cc":5,"degats_dis":2,"va":3,"discipline":4,"mouvement":"4"}]}')"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "  les degats au contact" oui "$(contient '"degats_cc":5')"
+verifier "  a distance" oui "$(contient '"degats_dis":2')"
+verifier "  la valeur d'armure" oui "$(contient '"va":3')"
+verifier "  la discipline" oui "$(contient '"discipline":4')"
+verifier "  et le mouvement" oui "$(contient '"mouvement":"4"')"
+
+echo "-- 24 cote navigateur"
+code - GET /js/views/perso.js > /dev/null
+verifier "le module de rendu se sert" oui "$(contient "enregistrerRendu('perso'")"
+# La jumelle du calcul serveur. Si l'une des deux formules change sans l'autre,
+# c'est ici que l'ecart se dit — avant qu'un joueur ne lise deux chiffres
+# differents pour la meme feuille.
+verifier "la defense d'intrigue s'ecrit pareil qu'au serveur" oui "$(contient "rang('VIG') + rang('ING') + rang('STA')")"
+verifier "  le sang-froid aussi" oui "$(contient "sang_froid: rang('VOL') * 3")"
+verifier "  et la defense de combat" oui "$(contient "rang('AGI') + rang('ATH') + rang('VIG') + bonus - malus")"
+# La ligne d'attente des rounds : elle n'entre dans l'intrigue qu'une fois
+# ecrite. Sans cela, trois choix de menu suffisaient a creer quatre rounds.
+verifier "la ligne d'attente n'est pas un round" oui "$(contient 'if (!intrigue.rounds[index]) intrigue.rounds[index] = round;')"
+# Les nombres ne redessinent jamais : la frappe serait interrompue a chaque
+# chiffre, et le curseur perdu.
+verifier "les nombres ne redessinent pas le panneau" oui "$(contient 'if (redessine) redessiner();')"
+verifier "le bandeau d'onglets se filtre" oui "$(contient "class: 'fp-recherche'")"
+code - GET /js/views/maisons.js > /dev/null
+verifier "la maison montre ses competences d'armee" oui "$(contient 'function blocCompetencesArmee')"
+code - GET /css/app.css > /dev/null
+verifier "la feuille a son habillage" oui "$(contient '.vue-perso {')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

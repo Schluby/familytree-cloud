@@ -15,6 +15,7 @@
  */
 
 import * as echelle from './humeur';
+import { normaliserFeuille } from './feuille';
 import * as migrations from './migrations';
 import * as portraits from './portraits';
 import { arrondir, estVide, versEntier, versFlottant } from './python';
@@ -88,6 +89,9 @@ export const PERSONNE_CHAMPS = [
   // Lot 21.D : les deux autres quarts de la carte du plan.
   'role',
   'ville',
+  // Lot 24 : la feuille de personnage du JDR. Un seul champ pour tout un
+  // classeur — `feuille.ts` en dit la forme et la normalise.
+  'feuille',
 ] as const;
 
 export const STATUTS = ['vivant', 'mort', 'inconnu'] as const;
@@ -260,6 +264,15 @@ export class Personne {
   role = '';
   /** La ville, sous la région de `lieu` : Winterfell dans le Nord (lot 21.D). */
   ville = '';
+  /**
+   * Sa feuille de personnage (lot 24), ou `null` — et `null` est le cas normal.
+   *
+   * Une campagne compte soixante-dix fiches et cinq personnages joués : la
+   * feuille n'existe que sur ces cinq-là. C'est pour cette raison qu'elle est
+   * un bloc à part et non vingt champs de plus sur la personne — vingt champs
+   * vides sur soixante-cinq fiches, c'est un fichier qui triple pour rien.
+   */
+  feuille: Objet | null = null;
   notes = '';
   tags: unknown[] = [];
   relations_joueurs: Record<string, NoteJoueur> = {};
@@ -315,6 +328,10 @@ export class Personne {
     // rien, on nettoie.
     personne.bordure = normaliserBordure(personne.bordure) ?? null;
 
+    // Même esprit qu'au-dessus : à la lecture on nettoie, on ne refuse rien.
+    // Une feuille bricolée à la main s'ouvre, amputée de ce qui ne tenait pas.
+    personne.feuille = normaliserFeuille(personne.feuille);
+
     const statut = texteOuVide(personne.statut, 'inconnu').toLowerCase();
     personne.statut = (STATUTS as readonly string[]).includes(statut) ? statut : 'inconnu';
 
@@ -357,6 +374,8 @@ export class Personne {
       // sert pas ne les voit jamais passer dans son fichier.
       ...(this.role ? { role: this.role } : {}),
       ...(this.ville ? { ville: this.ville } : {}),
+      // Et pour la feuille, qui est de loin le plus gros des champs facultatifs.
+      ...(this.feuille ? { feuille: this.feuille } : {}),
       ...this.extra,
     };
   }
@@ -410,6 +429,10 @@ export class Personne {
         const bordure = normaliserBordure(brut);
         if (bordure === undefined) continue; // pas une couleur : on ne touche à rien
         valeur = bordure;
+      } else if (champ === 'feuille') {
+        // Une feuille dont on a tout effacé vaut `null` : le champ disparaît
+        // alors de la personne, et la sauvegarde retrouve sa taille d'avant.
+        valeur = normaliserFeuille(brut);
       } else if (champ === 'role' || champ === 'ville') {
         // Deux textes libres, bornés comme partout où le réseau écrit dans la
         // sauvegarde. Vide efface : c'est ce que veut dire une case qu'on vide.

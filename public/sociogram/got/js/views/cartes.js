@@ -126,6 +126,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     .filter((evenement) => {
       // On laisse cliquer les cartes ; le glisser sur une carte déplace la vue.
       if (evenement.type === 'wheel') return true;
+      // Ctrl appartient à la sélection, pas au panoramique — et il faut le dire
+      // **ici**, pas seulement plus bas : dès qu'il accepte un `mousedown`,
+      // d3-zoom appelle `stopImmediatePropagation`, ce qui tue net les
+      // écouteurs posés après lui sur le même élément. Tant que ce filtre
+      // acceptait Ctrl, le cadre de sélection ne pouvait pas exister. Le filtre
+      // d'origine de d3 écarte Ctrl pour cette raison ; en le remplaçant, nous
+      // avions laissé tomber la clause.
+      if (evenement.ctrlKey || evenement.metaKey) return false;
       return !evenement.button;
     })
     .on('zoom', (evenement) => {
@@ -226,6 +234,8 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   // plusieurs fiches peuvent partir ensemble — voir `selection`.
   let deport = null;
   let finDeplacement = 0;
+  /** Le dernier geste a-t-il vraiment bougé une fiche ? Sinon c'était un clic. */
+  let bougeAuDernierDeplacement = false;
   /** Les fiches choisies, qui se déplacent d'un bloc. */
   const selection = new Set();
 
@@ -251,9 +261,10 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     if (!boite) return;
     const curseur = pointMonde(evenement);
     // Prendre une fiche hors sélection, c'est ne déplacer qu'elle : sinon on
-    // emporterait sans le vouloir un groupe choisi il y a dix minutes.
-    if (!selection.has(id)) viderSelection();
-    const groupe = selection.size ? [...selection] : [id];
+    // emporterait sans le vouloir un groupe choisi il y a dix minutes. Mais
+    // sans **défaire** la sélection au passage : Ctrl sert aussi à la composer,
+    // et un second Ctrl + clic doit ajouter une fiche, pas remplacer les autres.
+    const groupe = selection.has(id) ? [...selection] : [id];
     deport = {
       id,
       quoi: groupe
@@ -301,6 +312,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     const bouges = quoi.filter(
       ({ boite, depart }) => Math.round(boite.x - depart.x) || Math.round(boite.y - depart.y)
     );
+    bougeAuDernierDeplacement = bouges.length > 0;
     if (!bouges.length) return; // simple ctrl-clic
 
     const positions = {};
@@ -321,12 +333,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     contexte.surPositions?.(positions);
   }
 
-  // ------------------------------------------- choisir plusieurs fiches (Maj)
+  // ------------------------------------------ choisir plusieurs fiches (Ctrl)
   //
-  // Maj + glisser dans le vide trace un cadre et prend tout ce qu'il touche.
-  // Maj, et non Ctrl : sur une fiche, Ctrl est déjà « déplacer » et Maj est
-  // déjà « lien rapide » — dans le vide, les deux sont libres, et le cadre de
-  // sélection est un geste du vide.
+  // Ctrl + glisser dans le vide trace un cadre et prend tout ce qu'il touche.
+  // Ctrl et non Maj : c'est le geste du bureau, et Maj reste au lien rapide.
+  // Le filtre de `zoom` plus haut doit écarter Ctrl, sans quoi d3 avale le
+  // `mousedown` avant nous — voir le commentaire qui s'y trouve.
   const bandeSelection = document.createElement('div');
   bandeSelection.className = 'bande-selection';
   bandeSelection.hidden = true;
@@ -486,8 +498,12 @@ export function creerRenduCartes(conteneur, contexte = {}) {
           evenement.stopPropagation();
           if (evenement.ctrlKey || evenement.metaKey) {
             // Ctrl + glisser déplace ; Ctrl + clic sans glisser ajoute ou
-            // retire la fiche de la main qu'on est en train de composer.
-            if (performance.now() - finDeplacement < 250 && !deport) basculerSelection(noeud.id);
+            // retire la fiche de la main qu'on est en train de composer. On lit
+            // `bougeAuDernierDeplacement` et non `deport`, qui est déjà remis à
+            // zéro quand ce clic nous parvient : après un vrai déplacement, la
+            // fiche entrait dans la sélection sans qu'on l'ait demandé.
+            if (performance.now() - finDeplacement < 250 && !bougeAuDernierDeplacement)
+              basculerSelection(noeud.id);
             return;
           }
           if (performance.now() - finDeplacement < 250) return;

@@ -12,11 +12,15 @@
 import type { Vue } from './vues/base';
 import { VueCarnet } from './vues/carnet';
 import { VueMaisons } from './vues/maisons';
+import { VuePerso } from './vues/perso';
 import { VueSociogramme } from './vues/sociogramme';
 import { VueTableau } from './vues/tableau';
 
 const VUES: Vue[] = [
   new VueSociogramme(),
+  // Lot 24, entre le plan et les maisons : on descend du monde à la personne,
+  // puis on remonte à sa maison. L'ordre du rail est celui de cette descente.
+  new VuePerso(),
   new VueMaisons(),
   new VueCarnet(),
   new VueTableau(),

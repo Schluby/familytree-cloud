@@ -178,6 +178,19 @@ function textesDe(source, html) {
   const arguments_ = /\b(champTexte|champSelection|champListe|ligneInfo|ligne)\(\s*(['"])(?:\\.|(?!\2)[^\n])*\2\s*,\s*(['"])((?:\\.|(?!\3)[^\n])*?)\3/g;
   for (const m of source.matchAll(arguments_)) ajouter(m[4]);
 
+  // Et ceux dont le libellé est le **premier** argument : `etiquete('Âge', …)`,
+  // `caseCalcul('Test', …)`, `champUniteEtiquete('Défense', …)`. La règle
+  // au-dessus vise les constructeurs `(identifiant, libellé)` ; celle-ci les
+  // étiquettes, qui n'ont pas d'identifiant à porter.
+  //
+  // Sans elle, une quarantaine de libellés n'entraient dans aucun relevé — les
+  // sept champs d'une unité de guerre depuis le lot 20.E, puis toute la feuille
+  // de personnage — et le contrôle répondait « zéro manquante » sur des écrans
+  // entièrement en français. Un relevé qui ne voit pas est pire qu'absent : il
+  // rassure.
+  const etiquettes = /\b(etiquete|caseCalcul|champUniteEtiquete)\(\s*(['"])((?:\\.|(?!\2)[^\n])*?)\2/g;
+  for (const m of source.matchAll(etiquettes)) ajouter(m[3]);
+
   return trouves;
 }
 

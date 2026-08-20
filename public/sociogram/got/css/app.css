@@ -2696,3 +2696,216 @@ body.collectif #btn-panneau { display: none; }
    blocs en tête du tiroir. C'est le bon ordre pour l'arbre d'une personne, et
    le mauvais pour un plan collectif, où l'on cherche d'abord ses membres — vu
    à l'essai, la légende des maisons passait devant la liste des joueurs. */
+
+/* =====================================================================
+   Feuille de personnage (lot 24)
+
+   Même charpente que la vue « Maisons » — des onglets, deux colonnes qui
+   défilent séparément — parce que c'est le même geste : on choisit une fiche
+   et on la lit en entier. Les classes portent leur propre préfixe (`fp-`)
+   plutôt que de réemployer `mz-` : les deux vues divergeront, et partager des
+   classes rendrait chaque retouche risquée des deux côtés.
+   ===================================================================== */
+.vue-perso {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--fond-2);
+}
+.fp-onglets {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 0;
+  border-bottom: 1px solid var(--bord); flex: 0 0 auto;
+}
+.fp-onglets-liste {
+  display: flex; gap: 2px; flex-wrap: wrap;
+  max-height: 26vh; overflow-y: auto;
+}
+.fp-recherche {
+  align-self: flex-start; width: min(320px, 100%);
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
+  padding: 5px 9px; font-size: 13px; outline: none;
+  font-family: inherit; color: inherit;
+}
+.fp-recherche:focus { border-color: var(--accent); }
+.fp-onglet {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0; padding: 7px 13px; cursor: pointer;
+  color: var(--texte-doux); font-size: 13.5px; font-family: inherit;
+}
+.fp-onglet:hover { color: var(--texte); background: var(--fond-3); }
+.fp-onglet.actif {
+  color: var(--texte); background: var(--fond); border-color: var(--bord);
+  border-bottom: 1px solid var(--fond); margin-bottom: -1px; font-weight: 600;
+}
+.fp-onglet-pastille {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--couleur-fiche);
+}
+.fp-onglet-joueur {
+  font-size: 11.5px; color: var(--texte-faible); background: var(--fond-3);
+  border-radius: 9px; padding: 0 6px;
+}
+.fp-onglet .nombre {
+  font-size: 11.5px; color: var(--texte-faible); background: var(--fond-3);
+  border-radius: 9px; padding: 0 6px;
+}
+
+.fp-colonnes { flex: 1; display: flex; min-height: 0; }
+.fp-colonne { flex: 1 1 50%; min-width: 0; overflow-y: auto; padding: 16px 18px 40px; }
+.fp-competences { border-right: 1px solid var(--bord); }
+.fp-fiche { background: var(--fond); }
+
+.fp-bloc { padding: 14px 0; border-bottom: 1px solid var(--bord); }
+.fp-bloc:last-child { border-bottom: 0; }
+.fp-bloc h3 {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texte-faible); margin: 0 0 10px;
+}
+.fp-entete-bloc { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.fp-entete-bloc h3 { margin: 0; }
+.fp-entete-bloc .bouton { margin-left: auto; }
+.fp-aide { font-size: 12.5px; color: var(--texte-faible); line-height: 1.5; margin: 6px 0 0; }
+.fp-barre-etat { display: flex; justify-content: flex-end; min-height: 16px; }
+.fp-etat { font-size: 12px; color: var(--texte-faible); }
+.fp-etat.erreur { color: #c0392b; }
+.fp-alerte {
+  margin: 8px 0 0; padding: 6px 9px; border-radius: 7px; font-size: 13px;
+  background: color-mix(in srgb, #c0392b 12%, transparent);
+  color: #c0392b; border: 1px solid color-mix(in srgb, #c0392b 34%, transparent);
+}
+
+/* L'en-tête : le portrait, le nom, la maison, et le joueur derrière la fiche. */
+.fp-entete-fiche { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.fp-portrait {
+  width: 58px; height: 58px; border-radius: 10px; object-fit: cover;
+  border: 1px solid var(--bord); flex: 0 0 58px;
+}
+.fp-portrait-vide { background: var(--fond-3); }
+.fp-titre-fiche h2 { font-size: 17px; margin: 0; }
+.fp-sous-titre { margin: 2px 0 0; font-size: 13px; color: var(--texte-doux); }
+.fp-joueur { margin: 2px 0 0; font-size: 12.5px; color: var(--texte-faible); }
+
+/* Les champs : une grille qui se replie d'elle-même sur une colonne étroite. */
+.fp-grille {
+  display: grid; gap: 8px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+.fp-champ { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.fp-champ.pleine { grid-column: 1 / -1; margin-top: 8px; }
+.fp-champ > span { color: var(--texte-faible); }
+.fp-champ input, .fp-champ textarea, .fp-champ select,
+.fp-ligne-haut input, .fp-effets input, .fp-specialite input {
+  width: 100%; background: var(--fond-3); border: 1px solid var(--bord);
+  border-radius: 7px; padding: 5px 8px; font-size: 13.5px; outline: none;
+  font-family: inherit; color: inherit;
+}
+.fp-champ textarea { line-height: 1.5; resize: vertical; }
+.fp-champ input:focus, .fp-champ textarea:focus, .fp-champ select:focus,
+.fp-ligne-haut input:focus, .fp-effets input:focus, .fp-specialite input:focus {
+  border-color: var(--accent);
+}
+.fp-lecture { font-size: 13.5px; padding: 5px 0; color: var(--texte-doux); }
+
+/* Les dix-neuf compétences : le code, le nom, le rang, puis les spécialités. */
+.fp-liste-competences { display: flex; flex-direction: column; gap: 3px; }
+.fp-competence { padding: 3px 0; }
+.fp-competence-haut { display: flex; align-items: center; gap: 9px; }
+.fp-code {
+  flex: 0 0 34px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+  color: var(--texte-faible); font-variant-numeric: tabular-nums;
+}
+.fp-nom-competence { flex: 1; font-size: 13.5px; }
+.fp-rang {
+  flex: 0 0 56px; text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
+  padding: 4px 6px; font-size: 13.5px; outline: none; color: inherit;
+  font-family: inherit;
+}
+.fp-rang:focus { border-color: var(--accent); }
+.fp-ajout-spe { flex: 0 0 auto; }
+.fp-specialite {
+  display: flex; align-items: center; gap: 6px;
+  margin: 4px 0 0 43px; padding-left: 10px;
+  border-left: 2px solid var(--bord-clair);
+}
+.fp-spe-nom { flex: 1 1 auto; }
+.fp-spe-rang { flex: 0 0 56px; text-align: center; }
+.fp-spe-exp { flex: 0 0 64px; text-align: center; }
+
+/* Les valeurs dérivées : quatre grands chiffres, parce qu'on les lit de loin
+   en pleine partie et qu'on ne les saisit jamais. */
+.fp-derives, .fp-intrigue-tableau {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.fp-case {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--fond-3); border: 1px solid var(--bord);
+  border-radius: 9px; padding: 9px 6px;
+}
+.fp-case-valeur {
+  font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.fp-case-nom {
+  font-size: 11.5px; color: var(--texte-faible); text-align: center; line-height: 1.35;
+}
+
+/* Armes et équipement : une ligne de tête, puis trois effets sur la suivante. */
+.fp-ligne-objet { border-bottom: 1px solid var(--bord-clair); padding: 8px 0; }
+.fp-ligne-objet:last-child { border-bottom: 0; }
+.fp-ligne-haut { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+.fp-large { flex: 2 1 120px; }
+.fp-court { flex: 0 0 84px; }
+.fp-effets { display: flex; gap: 6px; margin-top: 5px; padding-left: 4px; }
+
+/* La popup d'intrigue : elle porte sa propre largeur, et elle défile. */
+.flottant-intrigue { width: min(560px, calc(100vw - 24px)); }
+.fp-intrigue { max-height: min(66vh, 620px); overflow-y: auto; }
+.fp-intrigue h4 {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--texte-faible); margin: 16px 0 8px;
+}
+.fp-intrigue-choix {
+  display: grid; gap: 8px 12px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.fp-intrigue-effet {
+  margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+  background: var(--fond-3); border: 1px solid var(--bord); font-size: 13px;
+}
+.fp-intrigue-effet p { margin: 0 0 4px; }
+.fp-intrigue-effet p:last-child { margin-bottom: 0; }
+.fl-sous { font-size: 12px; color: var(--texte-faible); margin-left: 8px; }
+
+/* Les rounds : une table dense, tabulaire, qu'on remplit de gauche à droite. */
+.fp-rounds { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.fp-rounds th {
+  text-align: left; font-weight: 500; color: var(--texte-faible);
+  font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+  padding: 0 4px 5px; border-bottom: 1px solid var(--bord);
+}
+.fp-rounds td { padding: 3px 4px; border-bottom: 1px solid var(--bord-clair); }
+.fp-rounds td:first-child {
+  color: var(--texte-faible); font-variant-numeric: tabular-nums; width: 22px;
+}
+.fp-rounds input[type="number"] {
+  width: 100%; min-width: 46px; background: var(--fond-3);
+  border: 1px solid var(--bord); border-radius: 6px; padding: 3px 5px;
+  font-size: 12.5px; outline: none; color: inherit; font-family: inherit;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+.fp-rounds select {
+  width: 100%; min-width: 96px; background: var(--fond-3);
+  border: 1px solid var(--bord); border-radius: 6px; padding: 3px 5px;
+  font-size: 12.5px; outline: none; color: inherit; font-family: inherit;
+}
+.fp-total {
+  font-variant-numeric: tabular-nums; font-weight: 600; text-align: center;
+}
+
+/* Sous 900 px les deux colonnes se rangent l'une sous l'autre : à cette
+   largeur, une feuille en deux colonnes ne montre plus que des demi-mots. */
+@media (max-width: 900px) {
+  .fp-colonnes { flex-direction: column; overflow-y: auto; }
+  .fp-competences { border-right: 0; border-bottom: 1px solid var(--bord); }
+  .fp-colonne { flex: 0 0 auto; overflow-y: visible; }
+}

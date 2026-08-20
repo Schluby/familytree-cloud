@@ -285,19 +285,6 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
     /**
      * Un panneau grandit **après** avoir été placé (lot 23.A).
      *
-     * `placer` mesure au moment du montage. Or plusieurs éditeurs se remplissent
-     * ensuite — l'éditeur de filtre ajoute ses segments et sa bande de dégradé,
-     * l'éditeur d'une forme se reconstruit quand on change sa portée. Le panneau
-     * gagne alors cent pixels vers le bas, et son pied — donc son bouton
-     * « Enregistrer » — passe sous le bord de l'écran, sans que rien ne le
-     * rattrape : c'est exactement ce qu'on nous a signalé sur le filtre.
-     *
-     * On le replace donc à chaque changement de taille. `placer` sait déjà
-     * remonter ce qui dépasse ; il lui manquait seulement d'être rappelé.
-     */
-    /**
-     * Un panneau grandit **après** avoir été placé (lot 23.A).
-     *
      * `placer` mesure au montage. Or plusieurs éditeurs se remplissent ensuite :
      * celui des filtres calcule son aperçu — variable, segments, bande de
      * dégradé — par un aller-retour avec le serveur, et gagne alors cent

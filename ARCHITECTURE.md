@@ -388,6 +388,40 @@ Deux conséquences assumées :
   pour le monde d'accueil. Ce qui ne se retrouve pas devient du texte : **jamais
   une citation qui pointe à côté**, c'est la règle qui a décidé du reste.
 
+### La feuille de personnage est un champ de la personne — décidé le 20/08/2026
+
+Une feuille de JDR, c'est une trentaine de champs, dix-neuf compétences avec
+leurs spécialités, deux listes d'objets et une intrigue en cours. La tentation
+est d'en faire une table. Elle est rangée dans `feuille`, **un champ de la
+personne**, pour les mêmes trois raisons que le carnet — le contrat d'adresses
+tient (`PATCH /api/personnes/<id>`, rien à router), tout ce qui existe déjà
+s'applique (plafond, point d'écriture unique, export, procuration de
+l'administrateur), et une sauvegarde exportée emporte ses feuilles.
+
+S'y ajoute une raison propre à ce champ-ci : **une feuille appartient à un
+personnage, pas à un compte**. Un maître de jeu tient des feuilles pour ses
+personnages importants comme les joueurs pour les leurs ; confier la feuille au
+compte aurait empêché de partager un monde entier, ce que les lots 23.C et 23.D
+viennent justement de rendre possible.
+
+Ce que ça coûte, et qui est assumé : les feuilles **comptent dans le plafond de
+la sauvegarde**. D'où la règle, plus stricte ici qu'ailleurs, que **rien n'est
+écrit tant que rien n'est renseigné** : `feuille` vaut `null` par défaut et le
+redevient dès qu'on l'a vidée, un rang à zéro n'est pas écrit, une compétence
+jamais touchée non plus. Une campagne de soixante-dix fiches et cinq
+personnages joués porte cinq feuilles. Mesuré sur une feuille complète — huit
+compétences, une armure, deux armes, une intrigue de deux rounds — 722 octets,
+soit de quoi en tenir près de trois mille sous le plafond de 2 Mo.
+
+Ce que ça coûte aussi : **la version Python locale ne connaît pas ce champ**,
+comme pour le carnet. Un document qui ferait l'aller-retour par elle perdrait ses
+feuilles.
+
+Les **valeurs dérivées** (défense d'intrigue, sang-froid, défense de combat,
+santé) ne sont pas dans ce champ et ne le seront jamais : ce sont des sommes de
+rangs, et les stocker créerait deux vérités qui divergeraient au premier rang
+modifié. La vue les recalcule à chaque appel.
+
 ### Les deux langues se posent devant le DOM — décidé le 15/08/2026
 
 L'interface est traduite **à l'affichage**, par un dictionnaire qui parcourt les
