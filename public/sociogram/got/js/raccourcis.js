@@ -27,9 +27,22 @@ const GROUPES = [
     titre: 'Sur le plan',
     lignes: [
       [['Maj', 'clic'], 'Sur deux fiches : les relier sans quitter la vue'],
-      [['Ctrl', 'glisser'], 'Déplacer une fiche à la main'],
+      [['Ctrl', 'glisser'], 'Déplacer une fiche à la main — ou toute la sélection'],
       [['Clic droit'], 'Sur une fiche, sur un lien ou dans le vide : le menu'],
       [['Appui long'], 'Au doigt, il remplace le clic droit'],
+    ],
+  },
+  // Lots 22.D et 23.B. Ces gestes-là ne s'annonçaient nulle part, et personne
+  // ne devine « Maj + glisser dans le vide ». Groupés à part parce qu'ils
+  // forment une suite : prendre, copier, poser.
+  {
+    titre: 'Prendre, copier, coller',
+    lignes: [
+      [['Maj', 'glisser'], 'Dans le vide : encadrer des fiches pour les prendre'],
+      [['Ctrl', 'clic'], 'Sur une fiche : l’ajouter à la sélection, ou l’en retirer'],
+      [['Clic'], 'Dans le vide : reposer la sélection'],
+      [['Ctrl', 'C'], 'Copier les fiches prises, avec leurs liens'],
+      [['Ctrl', 'V'], 'Coller — ici, dans un autre de vos arbres, ou chez un ami'],
     ],
   },
   {

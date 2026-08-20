@@ -2436,6 +2436,17 @@ verifier "  et le bandeau le dit" oui "$(contient 'Écriture partagée')"
 code - GET /css/app.css > /dev/null
 verifier "l'ecriture partagee rend ses commandes" oui "$(contient 'body.en-partage:not(.en-partage-ecriture) #btn-nouveau-profil')"
 
+# 23.F : les deux gestes existaient et ne se trouvaient pas. On verifie qu'ils
+# s'annoncent — c'est tout ce qu'un harnais peut faire d'une decouvrabilite.
+echo "-- 23.F les gestes s'annoncent"
+code - GET /js/raccourcis.js > /dev/null
+verifier "le depliant ⌨ annonce la selection" oui "$(contient 'encadrer des fiches pour les prendre')"
+verifier "  et le copier-coller" oui "$(contient 'Copier les fiches prises')"
+code - GET /js/main.js > /dev/null
+verifier "un ami se voit confier un arbre depuis sa ligne" oui "$(contient 'async function confierUnArbre')"
+verifier "  la demonstration n'y figure pas" oui "$(contient 'filter((fiche) => !fiche.demo)')"
+verifier "  et confier a l'un n'evince pas les autres" oui "$(contient 'const { lecteurs = [] } = await Api.lecteurs(fiche.id)')"
+
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------

@@ -2869,6 +2869,19 @@ async function dessinerAmis() {
 
     const actions = document.createElement('div');
     actions.className = 'ami-actions';
+    // Le geste qui manquait (lot 23.F) : on pouvait ajouter un ami, et rien de
+    // plus. Confier un arbre vivait dans le clic droit d'une sauvegarde, à
+    // l'autre bout du rail — personne ne faisait le lien entre les deux. Le
+    // voici là où l'on regarde l'ami.
+    if (genre === 'ami') {
+      const confier = document.createElement('button');
+      confier.className = 'bouton bouton-icone';
+      confier.type = 'button';
+      confier.textContent = '✍';
+      confier.title = `Confier un arbre à ${personne.nom}`;
+      confier.addEventListener('click', (evenement) => confierUnArbre(personne, evenement));
+      actions.append(confier);
+    }
     if (genre === 'recue') {
       const oui = document.createElement('button');
       oui.className = 'bouton bouton-primaire bouton-plat';
@@ -2936,6 +2949,58 @@ async function dessinerAmis() {
     enfants.push(vide);
   }
   elements.listeAmis.replaceChildren(...enfants);
+}
+
+/**
+ * Confier un arbre à un ami, depuis la liste des amis (lot 23.F).
+ *
+ * Le même partage que par le clic droit sur une sauvegarde, pris par l'autre
+ * bout : on part de la personne plutôt que de l'arbre. C'est le sens dans lequel
+ * on y pense — « je veux que Jean écrive avec moi », pas « cet arbre, à qui ? ».
+ *
+ * On **ajoute** au lieu de remplacer : la liste envoyée au serveur est toujours
+ * la liste entière, donc il faut relire ce qui existe avant, sinon confier un
+ * arbre à Jean retirerait discrètement Marie.
+ */
+async function confierUnArbre(ami, evenement) {
+  const miennes = (etat.sauvegardes || []).filter((fiche) => !fiche.demo);
+  if (!miennes.length) {
+    message('Aucun arbre à confier : la démonstration ne se partage pas, elle n’est pas conservée.');
+    return;
+  }
+
+  const partager = async (fiche) => {
+    try {
+      const { lecteurs = [] } = await Api.lecteurs(fiche.id);
+      const enLecture = lecteurs.filter((l) => l.droit !== 'ecriture').map((l) => l.email);
+      const enEcriture = lecteurs.filter((l) => l.droit === 'ecriture').map((l) => l.email);
+      if (enEcriture.includes(ami.email)) {
+        astuce(`${ami.nom} écrit déjà dans « ${fiche.nom} ».`);
+        return;
+      }
+      enEcriture.push(ami.email);
+      await enregistrerLecteurs(
+        fiche,
+        enLecture.filter((adresse) => adresse !== ami.email),
+        enEcriture
+      );
+      await dessinerSauvegardes();
+    } catch (erreur) {
+      message(`Impossible de confier cet arbre : ${erreur.message}`);
+    }
+  };
+
+  menu.ouvrir(evenement.clientX, evenement.clientY, [
+    { titre: `Confier un arbre à ${ami.nom}` },
+    { texte: 'Il pourra l’ouvrir et y écrire, comme vous. Vous restez le propriétaire.' },
+    { separateur: true },
+    ...miennes.map((fiche) => ({
+      label: fiche.nom,
+      icone: '✍',
+      detail: resumeContenu(fiche),
+      onclick: () => partager(fiche),
+    })),
+  ]);
 }
 
 async function demanderUnAmi() {
