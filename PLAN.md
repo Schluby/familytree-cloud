@@ -2506,3 +2506,171 @@ Elles interrogent maintenant le corps brut de la réponse.
   son panneau, donc être en mode dessin. Les rendre cliquables au repos rouvrirait
   ce que le lot 20.D avait tranché : un rectangle qui attrape les clics empêche
   de faire glisser le plan là où il est posé.
+
+---
+
+# Lot 23 — Un panneau qui tient dans l'écran, des amis, et un arbre à deux  ☑
+
+*Demandé le 20/08/2026. Trois demandes, dont deux commençaient par « si c'est
+pas trop compliqué » — c'était une invitation à mesurer avant de promettre, et
+la mesure a changé l'ordre des choses.*
+
+| # | Ce qui a été fait | Où ça vit |
+| --- | --- | --- |
+| 23.A | Un panneau flottant ne sort plus de l'écran. | `css/app.css`, `js/dom.js` |
+| 23.B | Copier des fiches et leurs liens, les coller ailleurs — jusque chez quelqu'un d'autre. | `src/domaine/presse_papiers.ts`, `js/main.js` |
+| 23.C | Des amitiés entre comptes : on se demande, on accepte. | `migrations/0011`, `src/amis/routes.ts` |
+| 23.D | Un arbre confié **en écriture** à un ami — et le verrou qui rend la chose tenable. | `depot.ts`, `src/partages/routes.ts` |
+
+## Le bouton « Enregistrer » sous le bord de la fenêtre
+
+Deux causes, et il fallait les deux corrections — c'est pour ça que la première
+n'a rien changé.
+
+**Seul le corps du panneau était borné** (`.fl-corps`, 62vh). L'entête et le pied
+s'ajoutaient par-dessus, si bien que l'éditeur de filtre — le plus chargé, avec
+sa variable, ses segments, son dégradé et ses tests — montait à 657 px. Le
+panneau entier est désormais borné à `calc(100vh - 20px)`, et c'est le corps qui
+se rétrécit et défile.
+
+**Et `placer()` mesure au montage**, alors que cet éditeur-là se remplit
+*ensuite* : son aperçu vient du serveur et lui fait gagner cent cinquante pixels
+vers le bas, après coup. Il est donc replacé à la frame suivante, puis à 120 et
+500 ms, et à chaque redimensionnement de la fenêtre.
+
+**`ResizeObserver` n'est pas le filet principal, et c'est délibéré.** La première
+version ne reposait que sur lui, et ne marchait pas : *il ne se déclenche jamais
+dans un onglet qui ne peint pas*. Un observateur posé sur un simple `<div>` de
+test n'a reçu aucun rappel. Il est resté — il attrape ce que les minuteurs
+manqueraient — mais il ne peut pas être seul.
+
+Mesuré avant : bouton à 724‑758 dans une fenêtre de 720. Après : panneau 233‑890
+dans 900, bouton à 847‑880 ; en 600 de haut, le corps défile et le pied reste
+dans le cadre. Les quatre autres panneaux tiennent dans l'écran et se ferment par
+Échap.
+
+## Un extrait est du texte, et c'est tout son propos
+
+Le serveur ne garde **rien** entre le copier et le coller. Il n'y a donc pas de
+presse-papiers de compte à administrer, à vider ni à cloisonner — et c'est
+précisément ce qui permet d'envoyer un bout d'arbre par message à quelqu'un qui
+le collera chez lui.
+
+L'extrait emporte **les référentiels qu'il cite** — les maisons, les types de
+lien — sans quoi une fiche collée ailleurs perdrait sa maison et ses liens leur
+type. Il n'écrase jamais ce que l'hôte possède déjà : une maison « stark » qui
+existe là-bas reste la sienne, avec sa couleur et son blason. Il n'emporte **pas
+les portraits** : trois images et l'extrait passe de dix kilo-octets à quatre
+cents, ce qui rend illusoire le « je te l'envoie ».
+
+**Les liens qui sortent de la sélection** deviennent une fiche de rappel portant
+le nom de l'absent, comme demandé. Mesuré sur le monde de démonstration : deux
+Stark traînent vingt-deux liens vers des enfants et des bannerets qu'on n'a pas
+pris, donc une vingtaine de fiches de rappel pour deux vraies. Le menu annonce le
+compte et propose « Coller les fiches seules » — la règle demandée reste la règle
+par défaut, mais elle se refuse.
+
+Vérifié : deux fiches collées dans une sauvegarde vierge y arrivent avec la
+maison Stark créée, leur mariage, et l'écart de 198 px qu'elles avaient — le
+groupe garde sa forme et tombe à l'endroit demandé.
+
+## Ce qui empêchait vraiment le partage en écriture
+
+La migration 0007 disait : « *Il n'y a pas de colonne « droit » et il n'y en aura
+pas : un partage en écriture, ce serait deux personnes qui écrivent dans le même
+document sans que rien n'arbitre entre elles.* » C'était juste, et ce n'était pas
+un problème d'autorisations.
+
+**Chaque modification réécrit la sauvegarde entière.** Ajouter un profil relit
+tout le document, le change en mémoire et le réécrit en bloc. À deux, ce n'est
+pas un champ qui se perd : celui qui enregistre en second efface **tout le
+travail de l'autre**, silencieusement. Et il n'y fallait pas deux personnes —
+deux onglets suffisaient.
+
+`ecrireDocument` porte donc la révision lue au chargement, dans ses **deux**
+instructions, et le contenu s'écrit avant que le compteur ne bouge : dans l'ordre
+inverse, la première ferait avancer la révision et la seconde ne reconnaîtrait
+plus la sienne, si bien qu'aucune écriture ne passerait jamais. Zéro ligne
+touchée ⇒ 409, et le document de l'autre est intact.
+
+C'est un gain **pour tout le monde**, pas seulement pour les arbres partagés :
+deux onglets de son propre compte étaient déjà exposés.
+
+## L'écriture ne se donne qu'à un ami
+
+Une adresse suffit pour *montrer* quelque chose : le pire qui puisse arriver est
+qu'on regarde un arbre sans intérêt. Donner le droit de **modifier** son monde à
+quelqu'un qui n'a jamais dit oui, c'est autre chose — et, pour celui qui reçoit,
+voir apparaître dans son rail un arbre inconnu avec le pouvoir d'y toucher.
+
+D'où une relation réciproque, et une surface séparée
+(`/api/partages/:arbre/edition/*`) où le droit est vérifié **avant** la
+substitution du compte, exactement comme le verbe l'est pour la lecture : un
+défaut d'ordre se traduirait par un refus, jamais par une écriture au nom du
+propriétaire.
+
+Deux choix qui méritent d'être relus :
+
+- **Une adresse inconnue ne se trahit jamais** : « demande envoyée » dans tous
+  les cas, que le compte existe ou non. Sinon cette route serait un annuaire des
+  inscrits.
+- **Refuser efface la ligne** au lieu de la marquer. Une demande « refusée » qui
+  traîne interdit de se redemander plus tard : c'est un blocage qui ne dit pas
+  son nom, et le blocage n'a pas été demandé.
+
+Retirer quelqu'un de ses amis lui retire l'écriture — la garde le vérifie à
+chaque requête, **et** les partages qui la portaient sont effacés, pour ne pas
+laisser en base des lignes qui mentent.
+
+## Le contrôle qui manquait, et ce qu'il a coûté de ne pas l'avoir
+
+Une édition maladroite a mangé les apostrophes de `js/api.js`. Le fichier est
+devenu impossible à analyser, **l'application ne démarrait plus du tout** — et le
+harnais a répondu « 939/939 ».
+
+Il ne pouvait pas faire autrement : il interroge le serveur et cherche des
+chaînes dans ce qui est servi, or un fichier cassé est servi tout aussi bien
+qu'un autre. Et `tsc` ne couvre que `src/` : **rien ne compilait l'interface**,
+qui est du JavaScript ordinaire servi tel quel.
+
+D'où `outils/verifier-syntaxe.mjs`, ajouté à `npm run verif` : 35 modules, un
+`node --check` chacun. Il n'attrape qu'une chose — un module qui ne se lit plus —
+mais c'est très exactement celle que le harnais ne peut pas voir.
+
+## Vérification
+
+**939/939** au harnais, contre 876 à la fin du lot 22. Les vérifications neuves
+couvrent notamment : un extrait qui nomme l'absent d'un lien sortant, un
+identifiant renégocié quand on colle deux fois dans le même monde, une maison
+recréée la première fois et pas la seconde, l'écriture qui retombe en lecture
+faute d'amitié **et le nom de celui à qui elle a été refusée**, la lecture qui
+reste la lecture, un tiers refusé sur `/edition`, et l'amitié défaite qui retire
+l'écriture.
+
+Le verrou de révision est vérifié à part : les deux instructions portent la même
+condition, une révision périmée ne change aucune ligne (mesuré : la révision
+reste à 2 après deux tentatives), et les centaines d'écritures du harnais
+prouvent que `meta.changes` est bien renseigné dans le runtime Workers — sans
+quoi *toutes* les écritures échoueraient.
+
+**0 chaîne sans traduction sur 984 relevées** (42 ajoutées).
+
+## Ce qui n'est pas fait, et pourquoi
+
+- **Aucune édition en direct.** On ne voit pas l'autre travailler, et il n'y a ni
+  curseur ni présence. Deux personnes sur le même arbre voient les modifications
+  de l'autre **au rechargement suivant**, et une collision répond 409 : « refaites
+  ce geste ». Le temps réel demanderait des Durable Objects et un chemin
+  d'écriture par opérations plutôt que par document entier — ce n'est pas un lot,
+  c'est un chantier.
+- **Un 409 perd le geste, pas le travail.** On ne rejoue pas automatiquement la
+  modification refusée : elle a été appliquée à un document périmé, et la rejouer
+  demanderait de savoir *ce qu'elle voulait dire*, pas seulement ce qu'elle a
+  changé. La fenêtre de collision est de quelques millisecondes.
+- **Le partage en lecture reste ouvert à toute adresse**, sans amitié. C'est le
+  comportement du lot 11.B, et le changer casserait les partages existants —
+  seule l'écriture demande une amitié.
+- **Les amis ne servent qu'à ça.** Pas de messages, pas de profil visible, pas
+  de liste d'amis communs. C'est une relation, pas un réseau social.
+- **Un extrait ne se colle pas au doigt.** Ctrl+C et Ctrl+V, ou le clic droit ;
+  au tactile, il n'y a que le menu long-press, qui porte « Coller ici ».

@@ -6,8 +6,18 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 22** — des tranches qui
+**Les sept lots du plan sont livrés, puis les lots 8 à 23** — des tranches qui
 n'étaient pas au plan d'origine, demandées entre le 10 et le 20/08/2026.
+
+Le lot 23 (20/08) ouvre l'application aux autres : des **amitiés** entre comptes,
+et un arbre qu'on peut confier **en écriture** à un ami. Ce qui l'empêchait
+n'était pas une question de droits mais d'écrasement — chaque modification
+réécrit la sauvegarde entière, et le second à enregistrer effaçait tout le
+travail du premier, sans un mot, y compris entre deux onglets d'un même compte.
+Un **verrou de révision** répond désormais 409 au lieu d'écraser. Le lot apporte
+aussi le **copier-coller** d'un morceau de plan (un extrait est du texte, donc il
+s'envoie par message) et répare un panneau flottant qui sortait de l'écran. Voir
+« Écrire à deux, et le verrou qui le permet (lot 23) » plus bas.
 
 **L'application n'est plus à la racine du domaine** (lot 18, 16/08). Elle est
 montée sous `/sociogram/got`, parce que `myschlub.com` porte désormais deux
@@ -970,6 +980,99 @@ dans tout le Nord ; le bouton « ▭ Formes » ouvre le mode dessin.
 Deux de plus au lot 21.D — `role` et `ville`. C'est la règle de tout ce dépôt —
 un monde qui ne s'en sert pas doit ressortir octet pour octet comme il est
 entré — et le harnais la vérifie dans les deux sens.
+
+## Écrire à deux, et le verrou qui le permet (lot 23)
+
+### Le verrou de révision — à comprendre avant de toucher à une écriture
+
+`ecrireDocument` (`src/sauvegardes/depot.ts`) porte désormais la révision lue au
+chargement. Trois choses à savoir :
+
+1. **Les deux instructions portent la même condition**, et le contenu s'écrit
+   **avant** que le compteur ne bouge. Dans l'ordre inverse, la première ferait
+   avancer la révision et la seconde ne reconnaîtrait plus la sienne : plus
+   aucune écriture ne passerait jamais. Si vous réordonnez ce `batch`, relisez
+   ceci.
+2. **`meta.changes` de la seconde instruction décide.** Zéro ⇒ `ErreurConflit`
+   ⇒ 409. Si un jour ce champ n'était plus renseigné, *toutes* les écritures
+   échoueraient d'un coup — ce qui est bruyant, donc préférable au silence.
+3. **`fiche.revision` doit venir de la même lecture que le dataset.** `monde(c)`
+   les rend ensemble ; ne fabriquez pas une `Fiche` à la main pour appeler
+   `ecrireDocument`.
+
+Ce verrou protège **aussi** un compte seul avec deux onglets : ce n'est pas une
+protection réservée aux arbres partagés.
+
+### La surface d'écriture partagée
+
+`/api/partages/:arbre/edition/*` monte le domaine entier, comme `/lecture/*`,
+avec deux différences :
+
+- `droitDEcriture` est posé **avant** `parPartage` — donc avant la substitution
+  du compte. Un défaut d'ordre se traduit par un refus, jamais par une écriture
+  au nom du propriétaire. C'est la même doctrine que `verbeDeLecture`.
+- La condition est double : `partages.droit = 'ecriture'` **et** l'amitié tient.
+  Le propriétaire passe aussi (c'est sa porte à lui), sans quoi celui qui partage
+  se ferait refuser sur l'adresse qu'il vient d'envoyer.
+
+Côté navigateur, `?edition=1` s'ajoute à `?partage=<id>` : c'est le rail qui le
+met, après avoir lu le droit dans la liste des partages. **Le serveur ne s'en
+remet jamais à ce drapeau** — il revérifie à chaque requête. Si le droit a été
+retiré depuis, `preparerPartage` renvoie en lecture plutôt que de laisser chaque
+requête se faire refuser une par une.
+
+`PARTAGE` et `PARTAGE_LECTURE` (`main.js`) ne se remplacent pas : le premier dit
+« cet arbre n'est pas le mien » (bandeau, pas d'invitation à créer un compte, pas
+d'activation), le second ajoute « et je ne peux rien y écrire » (éditeurs fermés).
+
+### Les amitiés
+
+`src/amis/routes.ts`. Deux règles à ne pas défaire :
+
+- **Aucune révélation** : demander une adresse inconnue répond exactement comme
+  une adresse connue. Cette route ne doit jamais devenir un moyen de savoir qui
+  est inscrit.
+- **Refuser efface la ligne.** Une ligne « refusée » qui traîne interdit de se
+  redemander : c'est un blocage, et le blocage n'a pas été demandé.
+
+`amisDe(base, moi)` est l'utilitaire partagé ; `partages/routes.ts` s'en sert
+pour décider qui peut recevoir l'écriture.
+
+### Copier / coller
+
+`src/domaine/presse_papiers.ts`, deux fonctions pures (`extraire`, `coller`) et
+deux routes. **Aucun état côté serveur** : un extrait est du texte, et c'est ce
+qui permet de l'envoyer à quelqu'un d'autre.
+
+Trois choses qu'on casse facilement en y retouchant :
+
+- `coller` **n'écrase jamais** un référentiel que l'hôte possède déjà. Une maison
+  « stark » qui existe là-bas garde sa couleur.
+- Les identifiants sont renégociés (`idsLibres`) : coller deux fois le même
+  extrait doit donner deux groupes, pas un écrasé.
+- `position` est translatée en bloc pour que le groupe garde sa forme ;
+  `decalage` est supprimé au passage (il visait une mise en page qui n'existe pas
+  dans ce monde-là).
+
+### Le panneau qui débordait
+
+Deux corrections, et il fallait les deux : `.flottant` borné à
+`calc(100vh - 20px)` (le corps se rétrécit et défile), **et** un replacement
+après coup, parce que `placer()` mesure au montage alors que certains éditeurs se
+remplissent ensuite.
+
+**`ResizeObserver` ne suffit pas comme unique filet** : il ne se déclenche pas
+dans un onglet qui ne peint pas — vérifié, un observateur sur un `<div>` de test
+ne reçoit aucun rappel dans le navigateur d'inspection. D'où `requestAnimationFrame`
+plus deux minuteurs, qui ne dépendent que de l'horloge.
+
+### `npm run verif` compile enfin l'interface
+
+`outils/verifier-syntaxe.mjs` passe `node --check` sur les 35 modules de
+`public/`. Il existe parce qu'un fichier `js/` cassé passait tous les contrôles :
+`tsc` ne couvre que `src/`, et le harnais cherche des chaînes dans ce qui est
+servi — or un fichier illisible est servi comme un autre. **Le harnais a répondu
+939/939 sur une application qui ne démarrait pas.** Ne retirez pas ce contrôle.
 
 ## Le plan qui obéit (lot 22)
 
