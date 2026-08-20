@@ -2674,3 +2674,56 @@ quoi *toutes* les écritures échoueraient.
   de liste d'amis communs. C'est une relation, pas un réseau social.
 - **Un extrait ne se colle pas au doigt.** Ctrl+C et Ctrl+V, ou le clic droit ;
   au tactile, il n'y a que le menu long-press, qui porte « Coller ici ».
+
+## 23.G — Le connecteur qui s'arrêtait dans le vide
+
+*Signalé sur des données réelles : « Olenna et Mace Tyrell, le trait ne va pas
+d'un profil à l'autre, il est tout droit et s'arrête cash ».*
+
+Le diagnostic était juste : c'est bien une suite du lot 22.D, et le défaut
+dormait depuis.
+
+Un connecteur de descendance est fait d'un tronc — les pattes des parents, leur
+barre, la tige — puis d'une **barre des enfants** d'où repartent leurs pattes.
+Cette barre ne courait qu'entre le premier et le dernier enfant, et seulement
+s'il y en avait **plusieurs**. Tant que la mise en page posait les enfants sous
+leurs parents, la tige tombait forcément dedans, et personne ne pouvait voir le
+problème.
+
+Depuis que les fiches ont une position à elles, elles vont où on les met. La
+tige descend alors à l'aplomb des parents, la barre est ailleurs, et rien ne les
+relie : deux traits bien droits qui s'arrêtent chacun dans le vide. Mesuré sur
+la seule démonstration — **quatre familles sur quinze**, dont une où la tige
+tombait à x = 2261 pendant que la barre courait de 1239 à 157.
+
+La barre s'étend désormais jusqu'à la tige (`Math.min` / `Math.max`), et la prise
+de clic suit exactement le même tracé — une géométrie de clic qui ne suit pas le
+trait laisserait un connecteur visible et pourtant insaisissable. Un enfant
+unique posé de travers gagne au passage son coude, là où il n'avait aucun trait.
+
+**La leçon transposable** : une géométrie qui n'est juste que parce que la mise
+en page la rend juste devient fausse le jour où l'on rend les positions libres.
+Le lot 22.D a retiré une garantie sans que rien ne le signale, parce qu'aucune
+vérification ne portait sur la *continuité* du tracé — seulement sur sa présence.
+Le harnais compte maintenant les troncs dont la tige ne retombe sur aucune barre.
+
+## 23.G — Le copier-coller, revu à l'usage
+
+Trois changements, tous demandés après essai :
+
+- **La sélection passe de Maj à Ctrl.** Ctrl prend et déplace d'un bout à
+  l'autre ; Maj reste au lien rapide. Un clic simple dans le vide repose la main
+  (il testait `shiftKey`, il teste `ctrlKey`).
+- **Les liens qui sortent de la sélection ne sont plus copiés du tout.** Le lot
+  23.B en faisait des « fiches de rappel » : fidèle à la demande, mauvais à
+  l'usage — deux Stark en traînaient vingt-deux. Copier Eddard et Catelyn rend
+  maintenant deux fiches et un lien, là où il en rendait vingt-trois.
+- **Plus aucune question au collage.** Ce qu'on emporte se règle une fois dans
+  « ⚙ Réglages » : les profils, les liens entre eux, ou les deux. Réglé à la
+  **copie** et non au collage — le texte obtenu ne réserve alors pas de surprise
+  à qui le colle, ce qui compte puisqu'il s'envoie par message.
+
+Sans les profils, il ne reste que des liens : ils se posent sur les fiches que
+l'hôte **a déjà**, retrouvées par leur identifiant. De quoi rejouer un réseau de
+relations sur un monde qu'on a par ailleurs — et la seule raison pour laquelle
+`coller` accepte un extrait sans aucune fiche.

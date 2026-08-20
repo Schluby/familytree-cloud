@@ -1038,6 +1038,17 @@ d'activation), le second ajoute « et je ne peux rien y écrire » (éditeurs fe
 `amisDe(base, moi)` est l'utilitaire partagé ; `partages/routes.ts` s'en sert
 pour décider qui peut recevoir l'écriture.
 
+### Le connecteur de descendance : sa barre doit passer sous la tige
+
+Défaut du lot 22.D, réparé au 23.G. La barre des enfants ne courait qu'entre le
+premier et le dernier enfant, et seulement s'il y en avait plusieurs : tant que
+la mise en page posait les enfants sous leurs parents, la tige tombait dedans.
+Les positions étant libres depuis le lot 22.D, elle tombait ailleurs — et le
+connecteur s'arrêtait dans le vide (quatre familles sur quinze, sur la seule
+démonstration). La barre s'étend maintenant jusqu'à la tige, et **la prise de
+clic suit le même tracé**. Si vous retouchez cette géométrie, gardez les deux
+d'accord : un trait visible et insaisissable est pire qu'un trait absent.
+
 ### Copier / coller
 
 `src/domaine/presse_papiers.ts`, deux fonctions pures (`extraire`, `coller`) et
