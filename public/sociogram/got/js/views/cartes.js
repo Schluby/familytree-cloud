@@ -182,7 +182,11 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     }
     // Un clic simple dans le vide repose la main : sans ça, une sélection
     // oubliée emporterait tout un groupe au prochain glisser.
-    if (!evenement.shiftKey && (evenement.target === plan || evenement.target === monde)) {
+    if (
+      !evenement.ctrlKey &&
+      !evenement.metaKey &&
+      (evenement.target === plan || evenement.target === monde)
+    ) {
       viderSelection();
     }
     // Cliquer dans le vide ne quitte plus le focus : on ne perd pas sa vue
@@ -332,7 +336,11 @@ export function creerRenduCartes(conteneur, contexte = {}) {
   let finBande = 0;
 
   plan.addEventListener('mousedown', (evenement) => {
-    if (evenement.button !== 0 || !evenement.shiftKey) return;
+    // Ctrl (ou ⌘) + glisser dans le vide (lot 23.G — c'était Maj auparavant).
+    // Ctrl devient ainsi la touche de la sélection d'un bout à l'autre : sur une
+    // fiche elle la prend et la déplace, dans le vide elle encadre. Maj reste au
+    // lien rapide, qui est un tout autre geste.
+    if (evenement.button !== 0 || !(evenement.ctrlKey || evenement.metaKey)) return;
     if (evenement.target.closest('.carte, .forme')) return;
     evenement.preventDefault();
     // Indispensable, et pas seulement poli : d3-zoom écoute ici et poserait ses
@@ -344,7 +352,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       x0: evenement.clientX - cadre.left,
       y0: evenement.clientY - cadre.top,
       cadre,
-      // Maj + glisser **ajoute** à ce qui est déjà pris : on compose une main
+      // Un nouveau cadre **ajoute** à ce qui est déjà pris : on compose une main
       // en plusieurs passes plutôt que de tout reprendre à chaque fois.
       avant: new Set(selection),
     };
@@ -1415,6 +1423,26 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         centresParents[centresParents.length - 1],
       ]);
 
+      /* La barre des enfants doit passer **sous la tige** (lot 23.G).
+       *
+       * Elle ne courait qu'entre le premier et le dernier enfant, et seulement
+       * s'il y en avait plusieurs. Tant que la mise en page posait les enfants
+       * sous leurs parents, la tige tombait dedans et personne ne voyait le
+       * problème. Depuis que les fiches ont une position à elles (lot 22.D),
+       * elles vont où on les met : la tige descendait alors à mille pixels de
+       * la barre, et le connecteur s'arrêtait net dans le vide — mesuré à
+       * quatre familles sur quinze rien que sur la démonstration.
+       *
+       * On étend donc la barre jusqu'à la tige. Un enfant unique posé de
+       * travers gagne au passage son coude, là où il n'avait aucun trait.
+       */
+      const gaucheEnfants = Math.min(tige, centresEnfants[0]);
+      const droiteEnfants = Math.max(tige, centresEnfants[centresEnfants.length - 1]);
+      const barreDesEnfants =
+        droiteEnfants - gaucheEnfants > 0.5
+          ? `M${gaucheEnfants},${barreEnfants}H${droiteEnfants}`
+          : '';
+
       const chemin = [];
       parents.forEach((boite) => {
         chemin.push(`M${boite.x + boite.l / 2},${boite.y + boite.h}V${barreParents}`);
@@ -1425,11 +1453,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         );
       }
       chemin.push(`M${tige},${barreParents}V${barreEnfants}`);
-      if (enfants.length > 1) {
-        chemin.push(
-          `M${centresEnfants[0]},${barreEnfants}H${centresEnfants[centresEnfants.length - 1]}`
-        );
-      }
+      if (barreDesEnfants) chemin.push(barreDesEnfants);
       morceaux.push(
         `<path class="lien-famille" d="${chemin.join(' ')}" stroke="${couleurFiliation}" />`
       );
@@ -1459,11 +1483,9 @@ export function creerRenduCartes(conteneur, contexte = {}) {
           );
         }
         tronc.push(`M${tige},${barreParents}V${barreEnfants}`);
-        if (enfants.length > 1) {
-          tronc.push(
-            `M${centresEnfants[0]},${barreEnfants}H${centresEnfants[centresEnfants.length - 1]}`
-          );
-        }
+        // La même barre que ce qui est dessiné : une prise de clic qui ne suit
+        // pas le trait laisse un connecteur visible et pourtant insaisissable.
+        if (barreDesEnfants) tronc.push(barreDesEnfants);
         prises.push(
           `<path class="lien-prise" data-relations="${liens.map((a) => a.id).join(',')}"
                  d="${tronc.join(' ')}" />`

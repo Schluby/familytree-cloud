@@ -46,6 +46,8 @@ const elements = {
   listeSauvegardes: document.getElementById('liste-sauvegardes'),
   blocPartages: document.getElementById('bloc-partages'),
   blocAmis: document.getElementById('bloc-amis'),
+  copieProfils: document.getElementById('copie-profils'),
+  copieLiens: document.getElementById('copie-liens'),
   listeAmis: document.getElementById('liste-amis'),
   btnAjouterAmi: document.getElementById('btn-ajouter-ami'),
   listePartages: document.getElementById('liste-partages'),
@@ -1827,30 +1829,14 @@ function menuFond(evenement, point) {
       detail: 'Ctrl + C',
       onclick: () => copierLaSelection(),
     },
-    ...(() => {
-      const extrait = lireExtrait(null);
-      if (!extrait) return [];
-      const sortants = liensSortants(extrait);
-      return [
-        {
-          label: 'Coller ici',
-          icone: '📋',
-          detail: sortants
-            ? `${pluriel(extrait.personnes.length, 'fiche')} · ${pluriel(sortants, 'lien')} vers l’extérieur`
-            : 'Ctrl + V',
-          onclick: () => collerLExtrait(null, point),
-        },
-        // L'échappatoire : deux fiches copiées peuvent traîner vingt liens vers
-        // des gens qu'on n'a pas pris, donc vingt fiches de rappel. On le dit
-        // avec le compte, et on laisse refuser.
-        sortants && {
-          label: 'Coller les fiches seules',
-          icone: '📋',
-          detail: `sans les ${pluriel(sortants, 'lien')} vers l’extérieur`,
-          onclick: () => collerLExtrait(null, point, { rappels: false }),
-        },
-      ].filter(Boolean);
-    })(),
+    // Une seule entrée, sans question (lot 23.G) : ce qu'on emporte se décide
+    // dans « ⚙ Réglages », une fois, et le collage ne demande plus rien.
+    lireExtrait(null) && {
+      label: 'Coller ici',
+      icone: '📋',
+      detail: 'Ctrl + V',
+      onclick: () => collerLExtrait(null, point),
+    },
     { separateur: true },
     { label: 'Vue générale', icone: '⇱', onclick: () => vueGenerale() },
     { label: 'Ajuster à l’écran', icone: '⤢', onclick: () => etat.moteur?.recentrer() },
@@ -3040,14 +3026,49 @@ async function demanderUnAmi() {
  */
 const PRESSE_PAPIERS = cle('familytree-presse-papiers');
 
+/**
+ * Ce que la copie emporte (lot 23.G).
+ *
+ * Un réglage, et non une question posée à chaque collage : on décide une fois
+ * dans « ⚙ Réglages », et les deux raccourcis se font ensuite sans rien
+ * demander. Retenu d'une séance à l'autre, comme le reste du rail.
+ */
+const COPIE_PROFILS = cle('familytree-copie-profils');
+const COPIE_LIENS = cle('familytree-copie-liens');
+const optionsCopie = () => ({
+  profils: localStorage.getItem(COPIE_PROFILS) !== '0',
+  liens: localStorage.getItem(COPIE_LIENS) !== '0',
+});
+
+function installerOptionsCopie() {
+  const cases = [
+    [elements.copieProfils, COPIE_PROFILS],
+    [elements.copieLiens, COPIE_LIENS],
+  ];
+  for (const [boite, memoire] of cases) {
+    if (!boite) continue;
+    boite.checked = localStorage.getItem(memoire) !== '0';
+    boite.addEventListener('change', () => {
+      // Tout décocher ne copierait rien : on rallume l'autre plutôt que de
+      // laisser un raccourci qui ne fait rien et qu'on croira cassé.
+      if (!elements.copieProfils.checked && !elements.copieLiens.checked) {
+        const autre = boite === elements.copieProfils ? elements.copieLiens : elements.copieProfils;
+        autre.checked = true;
+        localStorage.setItem(autre === elements.copieProfils ? COPIE_PROFILS : COPIE_LIENS, '1');
+      }
+      localStorage.setItem(memoire, boite.checked ? '1' : '0');
+    });
+  }
+}
+
 async function copierLaSelection() {
   const ids = etat.moteur?.selection?.() || [];
   if (!ids.length) {
-    astuce('Rien de choisi — Maj + glisser dans le vide pour prendre des fiches.');
+    astuce('Rien de choisi — Ctrl + glisser dans le vide pour prendre des fiches.');
     return;
   }
   try {
-    const { extrait } = await Api.extrait(ids);
+    const { extrait } = await Api.extrait(ids, optionsCopie());
     const texte = JSON.stringify(extrait);
     localStorage.setItem(PRESSE_PAPIERS, texte);
     // Peut échouer (permission, page non focalisée) : le double local suffit à
@@ -3077,27 +3098,25 @@ function lireExtrait(texte) {
   return null;
 }
 
-async function collerLExtrait(texte, point, { rappels = true } = {}) {
+async function collerLExtrait(texte, point) {
   const extrait = lireExtrait(texte);
   if (!extrait) {
     astuce('Rien à coller — copiez d’abord des fiches, ou collez le texte d’un extrait.');
     return;
   }
   try {
-    const bilan = await Api.coller(extrait, point || etat.moteur?.centreVisible?.(), { rappels });
+    const bilan = await Api.coller(extrait, point || etat.moteur?.centreVisible?.());
     await rechargerVue({ conserverFocus: true });
-    const rappelees = bilan.rappels?.length
-      ? ` · ${pluriel(bilan.rappels.length, 'fiche')} de rappel pour les liens qui sortaient de la sélection`
-      : '';
-    astuce(`${pluriel(bilan.personnes.length, 'fiche')} collée(s)${rappelees}.`);
+    // Un extrait de liens seuls ne pose aucune fiche : le dire par le nombre de
+    // liens plutôt que par « 0 fiche collée », qui ressemblerait à un échec.
+    astuce(
+      bilan.personnes.length
+        ? `${pluriel(bilan.personnes.length, 'fiche')} et ${pluriel(bilan.relations, 'lien')} collés.`
+        : `${pluriel(bilan.relations, 'lien')} posés entre les fiches déjà là.`
+    );
   } catch (erreur) {
     message(`Collage impossible : ${erreur.message}`);
   }
-}
-
-/** Combien de liens de cet extrait sortaient de la sélection copiée. */
-function liensSortants(extrait) {
-  return (extrait?.relations || []).filter((lien) => lien.absent).length;
 }
 
 /**
@@ -3325,6 +3344,7 @@ installerTelephone(elements);
 // alors dans sa forme définitive, et l'état retenu s'y applique une seule fois.
 installerRail();
 installerEtirementFiche();
+installerOptionsCopie();
 // Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
 // pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
 elements.btnNouveauProfil.addEventListener('click', (evenement) => {

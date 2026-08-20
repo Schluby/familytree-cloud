@@ -252,6 +252,30 @@
           <div class="options" id="options-vue"></div>
         </section>
 
+        <!-- Copier-coller (lot 23.G). Un réglage, et non une question posée à
+             chaque collage : on décide une fois ce qu'on emporte, et les deux
+             raccourcis se font ensuite sans rien demander. -->
+        <section class="rail-bloc rail-pliable" id="bloc-copie">
+          <div class="rail-bloc-entete">
+            <h2>Copier-coller</h2>
+            <button class="rail-plier" type="button" title="Replier">▾</button>
+          </div>
+          <div class="rail-bloc-contenu">
+            <!-- Une seule phrase, sans <kbd> : le dictionnaire traduit des
+                 nœuds de texte, et une balise au milieu la couperait en trois
+                 morceaux dont aucun ne se traduit tout seul. -->
+            <p class="rail-aide">Ce que Ctrl + C emporte. Les liens vers des profils non copiés ne sont jamais pris.</p>
+            <label class="option-copie">
+              <input type="checkbox" id="copie-profils" checked />
+              <span>Les profils</span>
+            </label>
+            <label class="option-copie">
+              <input type="checkbox" id="copie-liens" checked />
+              <span>Les liens entre eux</span>
+            </label>
+          </div>
+        </section>
+
         <!-- Le bloc « Édition » est parti dans le dépliant ⌨ de la barre du
              haut (lot 16.D) : ces gestes se cherchent une fois, et occupaient
              un écran entier du rail à chaque partie. Le bloc « Sélection » est

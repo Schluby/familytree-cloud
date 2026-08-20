@@ -22,12 +22,24 @@
  *
  * ── Les liens qui sortent de la sélection ────────────────────────────────────
  *
- * Un lien dont un seul bout est copié pose une question sans bonne réponse :
- * l'oublier, c'est perdre l'information qu'il existait ; le garder, c'est
- * pointer vers quelqu'un qu'on n'a pas. On garde, et on crée à l'arrivée une
- * **fiche de rappel** portant le nom de l'absent et rien d'autre. Elle dit
- * « il y avait là quelqu'un » — ce qui est précisément ce qu'on veut savoir —
- * et se supprime d'un clic si on ne veut pas d'elle.
+ * Ils ne sont **pas** copiés. Un extrait ne contient que les liens dont les deux
+ * bouts sont là.
+ *
+ * Le lot 23.B avait tranché l'inverse : le lien était gardé et l'absent devenait
+ * une « fiche de rappel » portant son nom. C'était fidèle à la demande, et
+ * mauvais à l'usage — deux Stark traînent vingt-deux liens vers des enfants et
+ * des bannerets qu'on n'a pas pris, donc une vingtaine de fiches fantômes pour
+ * deux vraies. On copie ce qu'on a montré du doigt, rien de plus.
+ *
+ * ── Ce qu'on copie, et ce qu'on ne copie pas ─────────────────────────────────
+ *
+ * `profils` et `liens` disent lesquelles des deux moitiés partent. Les régler à
+ * la copie plutôt qu'au collage est un choix : on sait ce qu'on prend au moment
+ * où on le prend, et le texte obtenu ne réserve pas de surprise à qui le colle.
+ *
+ * Sans les profils, il ne reste que des liens : ils se posent alors entre des
+ * fiches **qui existent déjà** chez l'hôte, retrouvées par leur identifiant. De
+ * quoi rejouer un réseau de relations sur un monde qu'on a par ailleurs.
  */
 
 import { Dataset, Personne, Relation, idsLibres, type Objet } from './models';
@@ -52,7 +64,13 @@ function estObjet(valeur: unknown): valeur is Objet {
  * Pure : elle ne touche pas au monde d'origine. Ce qu'elle rend est du JSON
  * ordinaire, lisible à l'œil et recollable ailleurs.
  */
-export function extraire(dataset: Dataset, idsDemandes: string[]): Objet {
+export function extraire(
+  dataset: Dataset,
+  idsDemandes: string[],
+  { profils = true, liens: avecLiens = true }: { profils?: boolean; liens?: boolean } = {}
+): Objet {
+  if (!profils && !avecLiens) throw new ErreurExtrait('il n’y a rien à copier');
+
   const choisies = new Set(idsDemandes);
   const personnes = dataset.personnes.filter((personne) => choisies.has(personne.id));
   if (!personnes.length) throw new ErreurExtrait('aucune fiche à copier');
@@ -63,26 +81,12 @@ export function extraire(dataset: Dataset, idsDemandes: string[]): Objet {
   // sinon un lien vers une fiche disparue passerait pour « dedans ».
   const dedans = new Set(personnes.map((personne) => personne.id));
 
-  const nomDe = (id: string) => dataset.personne(id)?.nomComplet || '';
-
-  const liens: Objet[] = [];
-  for (const relation of dataset.relations) {
-    const source = dedans.has(relation.source);
-    const cible = dedans.has(relation.cible);
-    if (!source && !cible) continue;
-    const brut = relation.versDict();
-    if (source && cible) {
-      liens.push(brut);
-      continue;
-    }
-    // Un seul bout : on note lequel manque et sous quel nom, pour la fiche de
-    // rappel que le collage fabriquera.
-    liens.push({
-      ...brut,
-      absent: source ? 'cible' : 'source',
-      absent_nom: nomDe(source ? relation.cible : relation.source),
-    });
-  }
+  // Les deux bouts, et rien d'autre. Voir l'entête pour le pourquoi.
+  const liens: Objet[] = avecLiens
+    ? dataset.relations
+        .filter((relation) => dedans.has(relation.source) && dedans.has(relation.cible))
+        .map((relation) => relation.versDict())
+    : [];
 
   // Les référentiels cités, et eux seuls : emporter tout le catalogue ferait
   // arriver quarante maisons pour trois fiches.
@@ -103,13 +107,15 @@ export function extraire(dataset: Dataset, idsDemandes: string[]): Objet {
     // Sans valeur pour la machine ; utile à qui reçoit le texte et se demande
     // d'où il sort.
     origine: String(dataset.meta?.sauvegarde || dataset.meta?.titre || ''),
-    personnes: personnes.map((personne) => {
-      const brut = personne.versDict();
-      delete brut.avatar; // voir l'entête : un extrait doit rester un texte
-      return brut;
-    }),
+    personnes: profils
+      ? personnes.map((personne) => {
+          const brut = personne.versDict();
+          delete brut.avatar; // voir l'entête : un extrait doit rester un texte
+          return brut;
+        })
+      : [],
     relations: liens,
-    maisons,
+    maisons: profils ? maisons : {},
     types_relations: types,
   };
 }
@@ -117,7 +123,6 @@ export function extraire(dataset: Dataset, idsDemandes: string[]): Objet {
 /** Ce qu'on rend à l'appelant après un collage. */
 export interface Collage {
   personnes: string[];
-  rappels: string[];
   relations: number;
   maisons: number;
   types: number;
@@ -131,31 +136,20 @@ export interface Collage {
  * avaient. Sans lui, elles retomberaient à leurs coordonnées d'origine, qui ne
  * veulent rien dire dans un autre monde.
  */
-export function coller(
-  dataset: Dataset,
-  brut: unknown,
-  point?: { x: number; y: number },
-  /**
-   * Créer les fiches de rappel pour les liens qui sortaient de la sélection.
-   *
-   * Vrai par défaut : c'est ce qui a été demandé, et c'est le comportement qui
-   * ne perd rien. Mais il faut pouvoir le refuser — copier deux Stark emporte
-   * vingt-deux liens vers des enfants et des bannerets qu'on n'a pas pris, donc
-   * vingt fiches de rappel pour deux vraies. Quand on voulait juste deux fiches,
-   * c'est du bruit.
-   */
-  rappelsDemandes = true
-): Collage {
+export function coller(dataset: Dataset, brut: unknown, point?: { x: number; y: number }): Collage {
   if (!estObjet(brut) || brut.format !== FORMAT) {
     throw new ErreurExtrait('ce texte n’est pas un extrait de sociogramme');
   }
   const personnesBrutes = Array.isArray(brut.personnes) ? brut.personnes : [];
-  if (!personnesBrutes.length) throw new ErreurExtrait('extrait vide');
+  const liensBruts = Array.isArray(brut.relations) ? brut.relations : [];
+  // Un extrait de liens seuls n'a pas de fiches, et c'est légitime : il se pose
+  // sur celles que l'hôte a déjà.
+  if (!personnesBrutes.length && !liensBruts.length) throw new ErreurExtrait('extrait vide');
   if (personnesBrutes.length > MAX_FICHES) {
     throw new ErreurExtrait(`${MAX_FICHES} fiches au plus dans un extrait`);
   }
 
-  const resultat: Collage = { personnes: [], rappels: [], relations: 0, maisons: 0, types: 0 };
+  const resultat: Collage = { personnes: [], relations: 0, maisons: 0, types: 0 };
 
   /* -------------------------------------------------- les référentiels d'abord
    *
@@ -216,44 +210,27 @@ export function coller(
 
   /* ------------------------------------------------------------- les liens */
   const prisRelations = new Set(dataset.relations.map((relation) => relation.id));
-  const rappels = new Map<string, string>(); // ancien id absent -> fiche de rappel
 
-  /** La fiche de rappel d'un absent : son nom, et rien d'autre. */
-  const rappelPour = (ancien: string, nom: string) => {
-    const dejaLa = rappels.get(ancien);
-    if (dejaLa) return dejaLa;
-    const id = idsLibres(pris, ancien || 'absent');
-    pris.add(id);
-    const personne = Personne.depuisDict({
-      id,
-      // Un nom vide rendrait la fiche introuvable dans la liste et impossible à
-      // désigner. Celui de l'absent est ce qui reste de plus vrai.
-      nom: nom || '?',
-      notes: 'Fiche de rappel : le lien venait d’un extrait, cette personne n’a pas été copiée.',
-    });
-    dataset.personnes.push(personne);
-    rappels.set(ancien, id);
-    resultat.rappels.push(id);
-    return id;
+  /**
+   * Où poser un bout de lien.
+   *
+   * D'abord la fiche qu'on vient de coller. Sinon, **une fiche que l'hôte a
+   * déjà sous le même identifiant** : c'est ce qui donne son sens au collage de
+   * liens seuls, et ce qui permet de rejouer un réseau de relations sur un monde
+   * qu'on a par ailleurs. Rien d'autre — un lien dont un bout manque ne se
+   * dessine pas et fait trébucher la généalogie.
+   */
+  const bout = (ancien: string) => {
+    const neuf = nouveauId.get(ancien);
+    if (neuf) return neuf;
+    return dataset.personne(ancien) ? ancien : '';
   };
 
-  for (const lien of Array.isArray(brut.relations) ? brut.relations : []) {
+  for (const lien of liensBruts) {
     if (!estObjet(lien)) continue;
     const donnees: Objet = { ...lien };
-    const absent = String(lien.absent || '');
-    if (absent && !rappelsDemandes) continue;
-    delete donnees.absent;
-    delete donnees.absent_nom;
-
-    const bout = (cote: 'source' | 'cible') => {
-      const ancien = String(lien[cote] || '');
-      if (absent === cote) return rappelPour(ancien, String(lien.absent_nom || ''));
-      return nouveauId.get(ancien) || '';
-    };
-    const source = bout('source');
-    const cible = bout('cible');
-    // Les deux bouts doivent exister : un lien qui pend ne se dessine pas et
-    // fait trébucher la généalogie.
+    const source = bout(String(lien.source || ''));
+    const cible = bout(String(lien.cible || ''));
     if (!source || !cible) continue;
 
     donnees.source = source;

@@ -799,6 +799,13 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 /* --------------------------------------------------------------- panneau */
 
+/* Les deux cases de « Copier-coller » (lot 23.G). */
+.option-copie {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 2px; font-size: 12.5px; cursor: pointer;
+}
+.option-copie input { accent-color: var(--accent); }
+
 /* Les amis (lot 23.C). Trois listes dans un bloc, séparées par des intertitres
    plutôt que par trois cadres : ce sont les mêmes gens à trois moments. */
 .liste-amis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }

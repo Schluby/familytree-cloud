@@ -396,13 +396,20 @@ export const Api = {
 
   /* Copier / coller (lot 23.B) : un extrait est du texte, le serveur n'en
      garde aucune trace entre les deux. */
-  extrait: (ids) => requete(`${DOMAINE}/extrait${versQuery({ ids: ids.join(',') })}`),
-  coller: (extrait, point, { rappels = true } = {}) =>
+  /** `{ profils, liens }` : ce qu'on emporte se règle à la copie (lot 23.G). */
+  extrait: (ids, { profils = true, liens = true } = {}) =>
+    requete(
+      `${DOMAINE}/extrait${versQuery({
+        ids: ids.join(','),
+        profils: profils ? '1' : '0',
+        liens: liens ? '1' : '0',
+      })}`
+    ),
+  coller: (extrait, point) =>
     requete(`${DOMAINE}/coller`, {
       method: 'POST',
       body: JSON.stringify({
         extrait,
-        rappels,
         ...(point ? { x: Math.round(point.x), y: Math.round(point.y) } : {}),
       }),
     }),

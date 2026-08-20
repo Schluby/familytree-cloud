@@ -567,8 +567,15 @@ routesDomaine.get('/extrait', async (c) => {
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);
+  // `profils=0` / `liens=0` (lot 23.G) : ce qu'on emporte se règle **à la
+  // copie**, pas au collage. Absents, on prend tout — c'est ce qu'on veut neuf
+  // fois sur dix.
   try {
-    return c.json({ extrait: pressePapiers.extraire(courant.dataset, ids) });
+    const extrait = pressePapiers.extraire(courant.dataset, ids, {
+      profils: c.req.query('profils') !== '0',
+      liens: c.req.query('liens') !== '0',
+    });
+    return c.json({ extrait });
   } catch (erreur) {
     return enErreur(c, erreur);
   }
@@ -584,12 +591,7 @@ routesDomaine.post('/coller', async (c) => {
       ? undefined
       : { x: Number(corps.x), y: Number(corps.y) };
   try {
-    const bilan = pressePapiers.coller(
-      courant.dataset,
-      corps.extrait,
-      point,
-      corps.rappels !== false
-    );
+    const bilan = pressePapiers.coller(courant.dataset, corps.extrait, point);
     await enregistrer(c, courant);
     return c.json(bilan, 201);
   } catch (erreur) {

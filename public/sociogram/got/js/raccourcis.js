@@ -38,7 +38,7 @@ const GROUPES = [
   {
     titre: 'Prendre, copier, coller',
     lignes: [
-      [['Maj', 'glisser'], 'Dans le vide : encadrer des fiches pour les prendre'],
+      [['Ctrl', 'glisser'], 'Dans le vide : encadrer des fiches pour les prendre'],
       [['Ctrl', 'clic'], 'Sur une fiche : l’ajouter à la sélection, ou l’en retirer'],
       [['Clic'], 'Dans le vide : reposer la sélection'],
       [['Ctrl', 'C'], 'Copier les fiches prises, avec leurs liens'],
