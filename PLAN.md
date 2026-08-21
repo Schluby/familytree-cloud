@@ -2825,7 +2825,8 @@ sont les « unités de guerre » du lot 20.E, dans la vue « Maisons », sous le
 caractéristiques. Elles gagnent la ligne de bataille qui leur manquait — dégâts
 au contact, à distance, valeur d'armure, discipline, mouvement — et la maison
 gagne les onze compétences de sa troupe, dans un bloc replié tant qu'aucun rang
-n'est noté.
+n'est noté. *(Ces onze-là sont descendues sur chaque unité au lot 25.A : une
+maison n'a pas une armée, elle a des unités.)*
 
 Les nouveaux champs **complètent** `defense`, `sante` et `attaque` au lieu de
 les remplacer : ces trois-là sont déjà remplis dans les mondes existants, et les
@@ -2849,3 +2850,205 @@ au relevé, et restait en français. Les trois libellés voisins passaient parce
 qu'ils existaient *ailleurs* sous un porteur reconnu — une chance, pas une
 garantie. Ils passent tous par `caseCalcul` désormais. Un libellé doit toujours
 traverser une fonction que le relevé connaît.
+
+## 25.A — Les compétences d'armée descendent sur l'unité
+
+*Signalé après essai : « les compétences d'armées doivent être dispo pour
+chaque unité de guerre (donc les rendre plus compacte aussi) ».*
+
+Le lot 24 les avait posées sur la **maison** — onze rangs pour toute la
+bannière — en se disant qu'une armée s'entraîne ensemble. C'était une lecture
+trop rapide du classeur : une maison lève des piquiers, des archers et une
+garde, et leur donner le même rang de Tir revient à ne rien noter du tout.
+
+Elles vivent donc sur **l'unité**, avec le reste de sa ligne de bataille.
+Vérifié avant de déplacer : aucune sauvegarde en production ne portait le champ
+de la maison, donc rien à migrer et rien de perdu.
+
+**Et plus compactes**, parce qu'il le fallait : onze champs par unité, sur douze
+unités, feraient cent trente-deux cases. Le bloc reste replié tant qu'aucun rang
+n'est noté, et chaque case porte le **code de trois lettres** plutôt que le nom
+entier — c'est déjà le vocabulaire de la colonne C du classeur, et le nom
+complet reste en infobulle. Onze cases tiennent alors sur une ligne ou deux.
+
+## 25.B — Les spécialités en colonnes, à droite des compétences
+
+*« Rajouter à côté des compétences une possibilité d'ajout de colonnes de
+spécialités sous cette forme "Spécialité 1 / Rang 1 / Exp 1" (voir Excel) »*
+
+Le lot 24 empilait les spécialités **sous** la compétence, une par ligne,
+ajoutées au bouton. C'était plus compact à vide et illisible une fois rempli :
+on ne pouvait plus comparer deux compétences d'un coup d'œil, ce que le tableau
+du classeur permet depuis toujours. Les dix-neuf compétences reprennent donc la
+forme du classeur — un tableau, les spécialités en colonnes à droite.
+
+**On peut ouvrir des colonnes.** Trois est la largeur d'une page A4, pas une
+règle du jeu ; le bouton « ＋ Spécialité » en ouvre un triplet de plus, jusqu'à
+huit. Le plafond est descendu dans le payload (`max_specialites`) plutôt que
+recopié dans le navigateur : deux plafonds qui divergent, c'est un bouton qui
+promet une colonne que le serveur jettera.
+
+**La colonne « Spécialité » est une zone de texte**, et c'est le point : on y
+écrit ce que la spécialité permet de faire, pas seulement son nom. Six cents
+signes au lieu de quatre-vingts.
+
+**Une colonne sautée garde sa place.** La règle du lot 24 écartait toute
+spécialité sans nom, ce qui tassait la liste : écrire dans la troisième colonne
+la faisait remonter dans la première au rechargement, et la colonne ouverte pour
+elle disparaissait. Le serveur ne coupe désormais que ce qui traîne **après** la
+dernière case remplie. Une case vide au milieu coûte trente octets, et seulement
+à qui saute volontairement une colonne.
+
+## 25.C — Ce que la copie emporte d'une fiche
+
+*« Une case à cocher pour ajouter ou retirer les notes associées aux profils
+lors d'un copier-coller, en sous-catégorie du profil » — puis les humeurs et la
+feuille de personnage.*
+
+Trois morceaux appartiennent à la fiche mais pas à ce qu'on montre du doigt :
+les **notes** disent ce qui s'est passé dans *cette* campagne, les **humeurs**
+visent *ces* joueurs-là — et le collage les poserait chez un hôte dont les
+joueurs n'ont rien à voir —, la **feuille** est le personnage joué, pas le
+personnage. Trois cases, en retrait sous « Les profils », réglées à la copie
+comme le reste (lot 23.G) et retenues d'une séance à l'autre.
+
+**Décocher une catégorie décoche toutes ses sous-catégories**, et les éteint :
+une case qu'on peut cocher alors qu'elle ne s'appliquera pas est un mensonge
+poli. Rallumer la catégorie ne rallume pas les sous-cases — on redit ce qu'on
+veut, et rien ne repart sans qu'on l'ait demandé.
+
+## 25.D — Le relevé ne voyait toujours pas les listes du serveur
+
+Le contrôle « aucune chaîne sans traduction » répondait encore zéro sur un
+panneau d'intrigue **entièrement en français**. `outils/relever-textes.mjs` ne
+lisait, côté serveur, que le nom et la description des vues : les sept humeurs,
+les deux intentions, les sept techniques, les dix actions, les dix-neuf
+compétences et ce que chacune produit lui échappaient — quatre-vingt-huit
+chaînes, dont les états et les niveaux d'entraînement d'une unité (lot 20.E) et
+les quatre caractéristiques d'une maison (lot 8.E).
+
+Pire que muet : deux d'entre elles étaient traduites **par accident**.
+« Calmer » et « Replier » existent ailleurs dans le dictionnaire — l'un comme
+colonne, l'autre comme bouton du rail — et l'action d'intrigue « Replier »
+s'affichait « Collapse » au milieu d'une liste française. Une traduction fausse
+est pire que pas de traduction : l'action s'appelle « Se replier » désormais,
+deux sens, deux libellés, l'identifiant inchangé.
+
+Trois corrections de fond, pour que le compteur cesse de mentir :
+
+- `feuille.ts` et `referentiels.ts` entrent dans le relevé, et les porteurs
+  `label`, `resultat`, `objectif`, `specialite` y sont lus ;
+- une chaîne de plus de trois cents signes n'est plus du texte mais un
+  accident — un commentaire citant une propriété entre accolades dorsales avait
+  fait remonter deux mille caractères de code ;
+- **`npm run verif` lance le contrôle**. Il existait, il fallait y penser, et
+  c'est ainsi que trente-trois chaînes avaient traversé quatre lots.
+## 26.A — Relire sans recharger la page
+
+*« Un bouton (reload) pour mettre à jour les nouvelles données, sans avoir à
+recharger la page au complet. »*
+
+Deux personnes autour de la même sauvegarde depuis le lot 23 : celle qui n'écrit
+pas doit pouvoir voir arriver ce que l'autre pose. F5 le fait déjà — au prix du
+plan, du zoom, de la fiche ouverte et du chargement complet de l'application.
+Le bouton **⟳ Recharger** de la barre du bas ne redemande que les données :
+la vue, les référentiels, la fiche de droite et le carnet. Le plan ne bouge pas.
+
+Deux précautions, et elles ne sont pas décoratives.
+
+**Ce qui attend part d'abord.** Les vues « Perso » et « Maisons » postent une
+demi-seconde après la frappe, la fiche de droite aussi, le carnet à sept
+dixièmes. Relire le serveur avant que le patch soit parti ferait revenir le
+champ à sa valeur d'avant **sous les yeux de qui vient de l'écrire**, puis
+repartir tout seul une demi-seconde plus tard. C'est le pire tour qu'un bouton
+« recharger » puisse jouer : il donnerait l'impression d'effacer. Chaque vue
+répond donc à `viderEnvois()`, et `MOTEUR_MUET` en porte la version vide — une
+vue sans écriture différée n'a rien à répondre, mais elle doit répondre.
+
+**Un seul rechargement à la fois.** Le bouton s'éteint et son icône tourne le
+temps du tour : deux rechargements concurrents rendraient deux payloads dans un
+ordre que personne ne contrôle.
+
+Défaut trouvé en chemin, et réparé : **la vue « Maisons » ne vidait pas sa file
+en partant**. Quitter la vue dans la demi-seconde suivant une frappe la perdait,
+sans rien dire. `perso.js`, écrit après elle, le faisait déjà.
+
+## 26.B — Les formes de fond, prises et copiées avec les fiches
+
+*« Sélectionner les formes en vue générale sans être dans le mode formes, et du
+coup pouvoir les copier-coller avec les fiches ; ajouter dans les paramètres de
+copier-coller de pouvoir sélectionner les formes ou non. »*
+
+Le mode dessin existait pour une raison qui tient toujours : **une forme couvre
+de la surface**, et si elle attrape les clics en permanence, un rectangle tracé
+autour du Nord empêche de faire glisser le plan dans tout le Nord. Rendre les
+formes cliquables au repos aurait donc défait le lot 20.D.
+
+La sélection hors mode dessin passe donc par la **géométrie**, pas par les
+clics. Les formes vivent en coordonnées de monde, exactement celles où le plan
+calcule ses boîtes de fiches : le cadre Ctrl compare des rectangles, et un
+Ctrl + clic teste un point (`sousLePoint`). Aucune forme ne redevient cliquable,
+et le plan reste traversable partout.
+
+Deux sélections coexistent désormais dans `js/formes.js`, et ce ne sont pas les
+mêmes gestes : `choisie`, une seule forme, celle qu'on modifie en mode dessin ;
+`prises`, autant qu'on veut, celles qui partiront au copier-coller.
+
+**Ce qui voyage, ce sont les formes qu'on a montrées du doigt.** Une forme ne
+contient personne (voir `formes.ts`) : rien ne permettrait de deviner laquelle
+« accompagne » un groupe, et prendre tout ce qui les recouvre emporterait le
+grand rectangle du Nord avec deux Stark. D'où une liste d'identifiants
+(`formes_ids`) et non une devinette sur les recouvrements.
+
+**Le collage garde la forme du groupe.** Le coin haut-gauche compte maintenant
+les formes et non plus les seules fiches : un rectangle tracé *autour* d'un
+groupe commence plus haut et plus à gauche que la première fiche, et l'oublier
+reposait le cadre décalé de ce qu'il entoure.
+
+**La portée suit les fiches.** « Visible en centrant sur Daenerys » ne veut rien
+dire chez l'hôte tant que Daenerys n'y est pas : chaque identifiant devient
+celui de la fiche qu'on vient de coller, ou reste tel quel si l'hôte le possède
+déjà. S'il n'en survit aucun, la forme repasse au **plan général** — mal placée
+se corrige d'un glisser, invisible ne se corrige pas.
+
+**Une nouvelle case, au premier niveau.** « Les formes de fond prises avec »
+rejoint « Les profils » et « Les liens entre eux » — et non les sous-cases du
+lot 25, puisqu'une forme ne dépend d'aucune fiche et se copie seule. La règle
+« au moins une catégorie cochée » a dû changer avec elle : le lot 23.G en
+rallumait une **autre** à la place, ce qui tenait tant qu'il n'y en avait que
+deux ; à trois, on ne saurait plus laquelle. La dernière cochée refuse
+maintenant de s'éteindre, et le dit.
+
+Enfin, un refus qui était exact et incompréhensible : ne montrer qu'une forme
+avec la case décochée répondait « aucune fiche à copier » — alors qu'on n'avait
+justement pas montré de fiche. La vraie raison est un réglage, elle est nommée.
+
+**Ce qui n'est pas fait :** déplacer une forme hors du mode dessin. Elle s'y
+prend et s'y copie ; pour la bouger, la redimensionner ou l'écrire, c'est
+toujours ▭ Formes. C'est ce qui garde le plan glissable.
+
+## 26.C — « Entrée » n'enregistre rien, et c'est voulu
+
+*« Est-ce qu'une section de texte est enregistrée en appuyant juste sur
+"Entrée" ? Pour la date, des notes, etc. »*
+
+Réponse : non, et il n'y a rien à appuyer. Trois régimes coexistent, et ils sont
+délibérés.
+
+- **L'année de campagne** est le seul champ où Entrée fait quelque chose de
+  particulier : elle valide tout de suite, Échap annule. Sortir du champ vaut
+  aussi validation — on ne pense pas à appuyer sur Entrée quand on va cliquer
+  ailleurs de toute façon (lot 22.A).
+- **Tout ce qui s'écrit longuement** — notes, fiche de droite, feuille de
+  personnage, maisons, carnet, texte d'une forme — s'enregistre **seul**, après
+  une pause de frappe : 500 ms, 700 ms pour le carnet, 400 ms pour une forme.
+  Entrée y ajoute une ligne, ce qui est le comportement attendu d'une zone de
+  texte.
+- **Les fenêtres de création** (nouveau profil, nouveau lien, nouvelle maison,
+  nouveau type) valident au contraire à Entrée : ce sont de vrais formulaires,
+  courts, qu'on remplit au clavier.
+
+Un trou connu, laissé tel quel faute d'avoir été demandé : **fermer l'onglet
+dans la demi-seconde qui suit une frappe perd cette frappe.** Changer de vue,
+fermer la fiche ou quitter le carnet vident la file ; fermer l'onglet, non. Une
+ligne sur `pagehide` le réglerait.

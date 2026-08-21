@@ -13,7 +13,7 @@
     "base:ligne": "wrangler d1 migrations apply familytree --remote",
     "deploy": "wrangler d1 migrations apply familytree --remote && wrangler deploy",
     "types": "wrangler types",
-    "verif": "node outils/verifier-prefixe.mjs && node outils/verifier-syntaxe.mjs && tsc --noEmit && wrangler deploy --dry-run"
+    "verif": "node outils/verifier-prefixe.mjs && node outils/verifier-syntaxe.mjs && node outils/relever-textes.mjs --manquants && tsc --noEmit && wrangler deploy --dry-run"
   },
   "dependencies": {
     "hono": "^4.6.14"

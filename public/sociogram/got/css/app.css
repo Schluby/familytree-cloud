@@ -427,6 +427,10 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 .formes.actives .forme { pointer-events: auto; cursor: move; }
 .formes.actives .forme:hover { outline: 1px dashed var(--accent); outline-offset: 2px; }
 .formes.actives .forme.choisie { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Prises pour le copier-coller (lot 26.B). Le liseré ne dépend **pas** de
+   `.actives` : on prend des formes hors du mode dessin, c'est tout le propos.
+   Pointillé comme celui des fiches, parce que c'est la même main. */
+.forme.prise { outline: 2px dashed var(--accent); outline-offset: 3px; }
 /* La poignée de redimensionnement, au coin bas-droit. Invisible hors mode
    dessin : elle n'a rien à signaler quand on ne peut pas s'en servir. */
 .forme-poignee { display: none; }
@@ -710,6 +714,13 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   background: rgba(47, 158, 143, .10);
 }
 
+/* Le bouton « ⟳ Recharger » pendant qu'il travaille (lot 26.A). Seule l'icône
+   tourne : faire tourner le bouton entier emporterait son libellé. */
+#btn-recharger .ico { display: inline-block; }
+#btn-recharger.tourne .ico { animation: tourne-ico .9s linear infinite; }
+#btn-recharger[disabled] { opacity: .7; }
+@keyframes tourne-ico { to { transform: rotate(360deg); } }
+
 /* niveau de détail : au loin, seuls les bandeaux restent lisibles */
 /* Niveau de détail : de loin, on ne dessine plus ce qu'on ne peut pas lire.
  *
@@ -799,12 +810,22 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 
 /* --------------------------------------------------------------- panneau */
 
-/* Les deux cases de « Copier-coller » (lot 23.G). */
+/* Les cases de « Copier-coller » (lot 23.G, sous-cases au lot 25). */
 .option-copie {
   display: flex; align-items: center; gap: 7px;
   padding: 4px 2px; font-size: 12.5px; cursor: pointer;
 }
 .option-copie input { accent-color: var(--accent); }
+/* Les sous-cases d'une catégorie : en retrait, sous un filet, pour qu'on voie
+   d'un coup d'œil qu'elles dépendent de celle du dessus. Éteintes, elles
+   restent lisibles — on doit comprendre ce qu'on rallumerait. */
+.option-copie-sous {
+  margin: 0 0 2px 9px; padding-left: 10px;
+  border-left: 2px solid var(--bord-clair);
+}
+.option-copie-sous .option-copie { font-size: 12px; padding: 3px 2px; }
+.option-copie-sous.eteint { opacity: .5; }
+.option-copie-sous.eteint .option-copie { cursor: default; }
 
 /* Les amis (lot 23.C). Trois listes dans un bloc, séparées par des intertitres
    plutôt que par trois cadres : ce sont les mêmes gens à trois moments. */
@@ -1702,6 +1723,33 @@ body.sombre .menu-item.danger:hover { background: #3a1f1c; }
   font-family: inherit;
 }
 .mz-unite-notes textarea:focus { border-color: var(--accent); }
+
+/* Les onze compétences d'une unité (lot 25) : onze cases sur une ligne ou
+   deux, pas onze lignes. Le code de trois lettres tient au-dessus d'un champ
+   de quarante pixels ; le nom complet est dans l'infobulle du `<label>`. */
+.mz-unite-competences { margin-top: 8px; }
+.mz-unite-competences summary {
+  font-size: 12px; color: var(--texte-faible); cursor: pointer;
+  text-transform: uppercase; letter-spacing: .07em;
+  display: flex; align-items: center; gap: 6px;
+}
+.mz-unite-competences summary .nombre {
+  font-size: 11px; background: var(--fond-3); border-radius: 9px; padding: 0 6px;
+  letter-spacing: 0;
+}
+.mz-comps-armee { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.mz-comp-armee { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mz-comp-code {
+  font-size: 10.5px; letter-spacing: .06em; color: var(--texte-faible);
+  font-variant-numeric: tabular-nums;
+}
+.mz-comp-armee input {
+  width: 40px; text-align: center;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 6px;
+  padding: 4px 2px; font-size: 13px; outline: none; color: inherit;
+  font-family: inherit;
+}
+.mz-comp-armee input:focus { border-color: var(--accent); }
 
 .mz-rang-ligne { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .mz-rang-titre { flex: 0 0 92px; font-size: 13px; color: var(--texte-doux); }
@@ -2805,31 +2853,53 @@ body.collectif #btn-panneau { display: none; }
 }
 .fp-lecture { font-size: 13.5px; padding: 5px 0; color: var(--texte-doux); }
 
-/* Les dix-neuf compétences : le code, le nom, le rang, puis les spécialités. */
-.fp-liste-competences { display: flex; flex-direction: column; gap: 3px; }
-.fp-competence { padding: 3px 0; }
-.fp-competence-haut { display: flex; align-items: center; gap: 9px; }
-.fp-code {
-  flex: 0 0 34px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
-  color: var(--texte-faible); font-variant-numeric: tabular-nums;
+/* Les dix-neuf compétences (lot 25) : un tableau, comme le classeur. Le code
+   et le nom, le rang, puis autant de triplets « Spécialité / Rang / Exp »
+   qu'on en ouvre. Trois triplets ne tiennent pas dans une demi-largeur
+   d'écran : la table défile chez elle, jamais la page. */
+.fp-tableau { overflow-x: auto; }
+.fp-table-competences { border-collapse: collapse; font-size: 13px; }
+.fp-table-competences th {
+  text-align: left; font-weight: 600; font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--texte-faible);
+  padding: 4px 6px; border-bottom: 1px solid var(--bord);
+  white-space: nowrap; vertical-align: bottom;
 }
-.fp-nom-competence { flex: 1; font-size: 13.5px; }
-.fp-rang {
-  flex: 0 0 56px; text-align: center; font-variant-numeric: tabular-nums;
-  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 7px;
-  padding: 4px 6px; font-size: 13.5px; outline: none; color: inherit;
+.fp-th-groupe {
+  text-align: center; border-left: 1px solid var(--bord); color: var(--texte-doux);
+}
+.fp-th-spe { border-left: 1px solid var(--bord); min-width: 150px; }
+.fp-table-competences td {
+  padding: 3px 6px; border-bottom: 1px solid var(--bord-clair);
+  vertical-align: top;
+}
+.fp-table-competences tbody tr:hover { background: var(--fond-2); }
+.fp-td-nom { white-space: nowrap; padding-top: 9px; }
+.fp-td-spe { border-left: 1px solid var(--bord-clair); }
+.fp-code {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  color: var(--texte-faible); background: var(--fond-3);
+  border-radius: 5px; padding: 1px 5px; margin-right: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.fp-nom-competence { font-size: 13.5px; }
+.fp-rang, .fp-spe-rang, .fp-spe-exp {
+  width: 54px; text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 6px;
+  padding: 5px 4px; font-size: 13px; outline: none; color: inherit;
   font-family: inherit;
 }
-.fp-rang:focus { border-color: var(--accent); }
-.fp-ajout-spe { flex: 0 0 auto; }
-.fp-specialite {
-  display: flex; align-items: center; gap: 6px;
-  margin: 4px 0 0 43px; padding-left: 10px;
-  border-left: 2px solid var(--bord-clair);
+.fp-rang { font-weight: 600; }
+.fp-rang:focus, .fp-spe-rang:focus, .fp-spe-exp:focus { border-color: var(--accent); }
+/* La colonne « Spécialité » est une zone de texte, et c'est le point : on y
+   décrit ce que la spécialité permet de faire, pas seulement son nom. */
+.fp-spe-nom {
+  width: 100%; min-width: 150px; resize: vertical; line-height: 1.45;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: 6px;
+  padding: 5px 7px; font-size: 13px; outline: none; color: inherit;
+  font-family: inherit;
 }
-.fp-spe-nom { flex: 1 1 auto; }
-.fp-spe-rang { flex: 0 0 56px; text-align: center; }
-.fp-spe-exp { flex: 0 0 64px; text-align: center; }
+.fp-spe-nom:focus { border-color: var(--accent); }
 
 /* Les valeurs dérivées : quatre grands chiffres, parce qu'on les lit de loin
    en pleine partie et qu'on ne les saisit jamais. */

@@ -4,6 +4,9 @@
  * popup d'intrigue. À gauche l'identité et les dix-neuf compétences, à droite
  * ce qu'on relit en jeu — les valeurs dérivées, l'armure, les armes, l'état.
  *
+ * Les compétences ont pris la forme du classeur au lot 25 : un tableau, avec
+ * les spécialités **en colonnes à droite** de chacune.
+ *
  * Tout s'enregistre au fil de la frappe, comme dans la vue « Maisons ». Et
  * comme pour les unités de guerre, **chaque modification renvoie la feuille
  * entière** : elle n'a pas d'identifiant par ligne, donc rien ne permettrait au
@@ -15,6 +18,9 @@ import { h, creerFlottant } from '../dom.js';
 import { enregistrerRendu } from '../registry.js';
 
 const DELAI_ENVOI = 500;
+
+/** Les trois triplets de colonnes du classeur ; on peut en ouvrir d'autres. */
+const COLONNES_SPE_MINIMUM = 3;
 
 /**
  * Les valeurs dérivées, calculées ici pour l'affichage immédiat.
@@ -254,69 +260,95 @@ export function creerRenduPerso(conteneur, contexte = {}) {
     dessinerFiche(personnage);
   }
 
-  /* ------------------------------------------------------- les compétences
+  /* ------------------------------------------ les compétences, en colonnes
    *
-   * Dix-neuf lignes, et jusqu'à trois spécialités par ligne. Les spécialités
-   * sont repliées tant qu'il n'y en a pas : dix-neuf blocs dépliés feraient
-   * quatre écrans pour une feuille où l'on n'en remplit qu'une poignée.
+   * Dix-neuf lignes, et les spécialités **à droite** de chacune, en colonnes,
+   * comme dans le classeur : « Spécialité / Rang / Exp », trois fois.
+   *
+   * Le lot 24 les empilait sous la compétence, une par ligne, ajoutées au
+   * bouton. C'était plus compact à vide et illisible une fois rempli : on ne
+   * pouvait plus comparer deux compétences d'un coup d'œil, ce que le tableau
+   * du classeur permet depuis toujours. Le lot 25 rend cette forme-là, et
+   * laisse ouvrir un triplet de colonnes de plus quand trois ne suffisent pas.
+   *
+   * L'en-tête tient sur deux rangées, et ce n'est pas un caprice de mise en
+   * page : « Spécialité 1 » écrit d'un bloc serait une chaîne assemblée, que
+   * le dictionnaire de traduction ne reconnaîtrait jamais. Le numéro vit donc
+   * au-dessus, seul, et les trois libellés en dessous, entiers.
    */
 
-  function ligneSpecialite(personnage, code, index) {
-    const feuille = feuilleDe(personnage);
-    const entree = feuille.competences[code];
-    const spe = entree.specialites[index];
-    const majSpe = (cle) => (evenement) => {
-      const brut = evenement.target.value;
-      spe[cle] = cle === 'nom' ? brut : brut === '' ? null : Number(brut);
-      modifier(personnage.id);
-    };
-    return h('div', { class: 'fp-specialite' }, [
-      h('input', {
-        type: 'text',
-        class: 'fp-spe-nom',
-        value: spe.nom ?? '',
-        placeholder: 'Spécialité',
-        oninput: majSpe('nom'),
-      }),
-      h('input', {
-        type: 'number',
-        class: 'fp-spe-rang',
-        min: 0,
-        max: 20,
-        value: spe.rang ?? '',
-        title: 'Rang',
-        placeholder: '—',
-        oninput: majSpe('rang'),
-      }),
-      h('input', {
-        type: 'number',
-        class: 'fp-spe-exp',
-        min: 0,
-        value: spe.exp ?? '',
-        title: 'Expérience',
-        placeholder: 'Exp',
-        oninput: majSpe('exp'),
-      }),
-      h('button', {
-        class: 'bouton bouton-icone',
-        type: 'button',
-        texte: '✕',
-        title: 'Retirer cette spécialité',
-        onclick: () => {
-          entree.specialites.splice(index, 1);
-          modifier(personnage.id, { immediat: true });
-          dessiner();
-        },
-      }),
-    ]);
+  /** Combien de triplets sont ouverts en plus des trois du classeur. */
+  let colonnesEnPlus = 0;
+
+  /** Le plafond du serveur, descendu dans le payload : une seule vérité. */
+  const maxSpecialites = () => payload?.max_specialites || COLONNES_SPE_MINIMUM;
+
+  function nombreDeColonnes(personnage) {
+    const utilisees = competences().reduce((maximum, competence) => {
+      const liste = personnage.feuille?.competences?.[competence.id]?.specialites;
+      return Math.max(maximum, Array.isArray(liste) ? liste.length : 0);
+    }, 0);
+    return Math.min(
+      maxSpecialites(),
+      Math.max(COLONNES_SPE_MINIMUM, utilisees, COLONNES_SPE_MINIMUM + colonnesEnPlus)
+    );
   }
 
-  function ligneCompetence(personnage, competence) {
+  function entreeCompetence(personnage, code) {
     const feuille = feuilleDe(personnage);
     if (!feuille.competences) feuille.competences = {};
-    if (!feuille.competences[competence.id]) feuille.competences[competence.id] = { rang: 0 };
-    const entree = feuille.competences[competence.id];
+    if (!feuille.competences[code]) feuille.competences[code] = { rang: 0 };
+    const entree = feuille.competences[code];
     if (!Array.isArray(entree.specialites)) entree.specialites = [];
+    return entree;
+  }
+
+  /**
+   * Une case de spécialité.
+   *
+   * `colonne` est un rang de colonne, pas un indice de tableau plein : écrire
+   * dans la troisième alors que les deux premières sont vides doit marcher. On
+   * comble donc les trous à l'écriture, et le serveur ne coupe que ce qui
+   * traîne après la dernière case remplie — la colonne où l'on a écrit garde
+   * sa place au rechargement.
+   */
+  function celluleSpecialite(personnage, code, colonne, champ) {
+    const entree = entreeCompetence(personnage, code);
+    const spe = entree.specialites[colonne] || null;
+
+    const ecrire = (valeur) => {
+      while (entree.specialites.length <= colonne) {
+        entree.specialites.push({ nom: '', rang: 0, exp: 0 });
+      }
+      entree.specialites[colonne][champ] = valeur;
+      modifier(personnage.id);
+    };
+
+    if (champ === 'nom') {
+      // Une zone de texte, et non un champ d'une ligne : la colonne sert aussi
+      // à dire ce que la spécialité permet de faire.
+      return h('textarea', {
+        class: 'fp-spe-nom',
+        rows: 2,
+        texte: spe?.nom ?? '',
+        placeholder: 'Spécialité, et ce qu’elle fait',
+        oninput: (evenement) => ecrire(evenement.target.value),
+      });
+    }
+    return h('input', {
+      type: 'number',
+      class: champ === 'rang' ? 'fp-spe-rang' : 'fp-spe-exp',
+      min: 0,
+      ...(champ === 'rang' ? { max: 20 } : {}),
+      value: spe?.[champ] || '',
+      placeholder: '—',
+      oninput: (evenement) =>
+        ecrire(evenement.target.value === '' ? 0 : Number(evenement.target.value)),
+    });
+  }
+
+  function ligneCompetence(personnage, competence, colonnes) {
+    const entree = entreeCompetence(personnage, competence.id);
 
     const rang = h('input', {
       type: 'number',
@@ -334,45 +366,80 @@ export function creerRenduPerso(conteneur, contexte = {}) {
       },
     });
 
-    const ajouter = h('button', {
-      class: 'bouton bouton-icone fp-ajout-spe',
-      type: 'button',
-      texte: '＋',
-      title: `Ajouter une spécialité en ${competence.label}`,
-      // Trois colonnes sur la feuille d'origine, trois ici.
-      disabled: entree.specialites.length >= 3,
-      onclick: () => {
-        entree.specialites.push({ nom: '', rang: 0, exp: 0 });
-        modifier(personnage.id);
-        dessiner();
-      },
-    });
+    const cellules = [];
+    for (let colonne = 0; colonne < colonnes; colonne += 1) {
+      cellules.push(
+        h('td', { class: 'fp-td-spe' }, [
+          celluleSpecialite(personnage, competence.id, colonne, 'nom'),
+        ]),
+        h('td', {}, [celluleSpecialite(personnage, competence.id, colonne, 'rang')]),
+        h('td', {}, [celluleSpecialite(personnage, competence.id, colonne, 'exp')])
+      );
+    }
 
-    return h('div', { class: 'fp-competence' }, [
-      h('div', { class: 'fp-competence-haut' }, [
+    return h('tr', {}, [
+      h('td', { class: 'fp-td-nom' }, [
         h('span', { class: 'fp-code', texte: competence.id }),
         h('span', { class: 'fp-nom-competence', texte: competence.label }),
-        rang,
-        ajouter,
       ]),
-      ...entree.specialites.map((_, index) => ligneSpecialite(personnage, competence.id, index)),
+      h('td', {}, [rang]),
+      ...cellules,
     ]);
   }
 
   function dessinerCompetences(personnage) {
+    const colonnes = nombreDeColonnes(personnage);
+
+    const rangeeHaute = [
+      h('th', { class: 'fp-th-nom', rowspan: 2, texte: 'Compétence' }),
+      h('th', { rowspan: 2, texte: 'Rang' }),
+    ];
+    const rangeeBasse = [];
+    for (let colonne = 0; colonne < colonnes; colonne += 1) {
+      rangeeHaute.push(h('th', { class: 'fp-th-groupe', colspan: 3, texte: String(colonne + 1) }));
+      rangeeBasse.push(
+        h('th', { class: 'fp-th-spe', texte: 'Spécialité' }),
+        h('th', { texte: 'Rang' }),
+        h('th', { texte: 'Exp' })
+      );
+    }
+
+    const table = h('table', { class: 'fp-table-competences' }, [
+      h('thead', {}, [h('tr', {}, rangeeHaute), h('tr', {}, rangeeBasse)]),
+      h(
+        'tbody',
+        {},
+        competences().map((competence) => ligneCompetence(personnage, competence, colonnes))
+      ),
+    ]);
+
     gauche.replaceChildren(
       blocIdentite(personnage),
       h('section', { class: 'fp-bloc' }, [
-        h('h3', { texte: 'Compétences' }),
+        h('div', { class: 'fp-entete-bloc' }, [
+          h('h3', { texte: 'Compétences' }),
+          h('button', {
+            class: 'bouton bouton-plat',
+            type: 'button',
+            texte: '＋ Spécialité',
+            title: 'Ouvrir un triplet de colonnes de plus : spécialité, rang, expérience',
+            disabled: colonnes >= maxSpecialites(),
+            onclick: () => {
+              colonnesEnPlus += 1;
+              dessinerCompetences(personnage);
+            },
+          }),
+        ]),
+        // Le tableau défile chez lui : trois triplets de colonnes ne tiennent
+        // pas dans une demi-largeur d'écran, et pousser la page entière vers
+        // la droite emporterait aussi la fiche d'à côté.
+        h('div', { class: 'fp-tableau' }, [table]),
         h('p', {
           class: 'fp-aide',
-          texte: 'Le rang, puis jusqu’à trois spécialités par compétence.',
+          texte:
+            'Une colonne de spécialité laissée sans nom ne s’enregistre pas : ' +
+            'écrivez-y ce qu’elle est, et ce qu’elle permet de faire.',
         }),
-        h(
-          'div',
-          { class: 'fp-liste-competences' },
-          competences().map((competence) => ligneCompetence(personnage, competence))
-        ),
       ])
     );
   }
@@ -990,6 +1057,17 @@ export function creerRenduPerso(conteneur, contexte = {}) {
       }
     },
     recentrer() {},
+
+    /**
+     * Ce qui attend part maintenant (lot 26.A).
+     *
+     * Le bouton « ⟳ » relit le serveur : sans ce vidage, la frappe de la
+     * demi-seconde écoulée n'est pas encore partie, et la feuille reviendrait à
+     * sa valeur d'avant sous les yeux de qui vient de l'écrire — puis
+     * repartirait toute seule juste après. On ne peut pas donner à voir ça.
+     */
+    viderEnvois: () => Promise.all([...enAttente.keys()].map((id) => envoyer(id))),
+
     detruire() {
       // Ce qui n'est pas encore parti part maintenant : quitter la vue ne doit
       // pas perdre la dernière frappe.

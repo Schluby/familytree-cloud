@@ -33,7 +33,23 @@ const RACINE = join('public', PREFIXE);
  * d'export. Ces chaînes-là sont écrites en TypeScript, souvent découpées sur
  * plusieurs lignes par des `+` — d'où une lecture à part.
  */
-const COTE_SERVEUR = ['src/domaine/vues', 'src/domaine/exports.ts'];
+const COTE_SERVEUR = [
+  'src/domaine/vues',
+  'src/domaine/exports.ts',
+  // Lot 25 : les **listes fermées** du jeu. Sept humeurs, deux intentions,
+  // sept techniques, dix actions, dix-neuf compétences, et ce que chacune
+  // produit. Elles s'affichent telles quelles dans les menus de l'intrigue et
+  // dans la feuille — mais elles sont écrites côté serveur, donc aucune règle
+  // du relevé ne les voyait, et le contrôle « zéro manquante » répondait zéro
+  // sur un panneau d'intrigue entièrement en français.
+  //
+  // Pire que muet : deux d'entre elles étaient traduites **par accident**.
+  // « Calmer » et « Replier » existent ailleurs dans le dictionnaire — l'un
+  // comme colonne, l'autre comme bouton du rail — et l'action « Replier »
+  // s'affichait « Collapse » au milieu d'une liste française.
+  'src/domaine/feuille.ts',
+  'src/domaine/referentiels.ts',
+];
 
 /** `readonly description = 'a ' + 'b';` → `a b`. */
 function textesDuServeur(source) {
@@ -50,6 +66,11 @@ function textesDuServeur(source) {
   // `{ id: 'personnes', titre: 'Personnes' }`.
   for (const m of source.matchAll(/\bcol\(\s*'[^']*'\s*,\s*'([^']+)'/g)) trouves.add(m[1]);
   for (const m of source.matchAll(/\btitre:\s*'([^']+)'/g)) trouves.add(m[1]);
+  // Les listes fermées : `{ id: 'charmer', label: 'Charmer', … }`, et ce que
+  // chacune produit — `resultat`, `objectif`, `specialite`. Tout cela part dans
+  // le payload et s'affiche mot pour mot.
+  const champs = /\b(?:label|resultat|objectif|specialite)\s*:\s*'((?:\\.|[^'])*)'/g;
+  for (const m of source.matchAll(champs)) trouves.add(m[1]);
   return trouves;
 }
 
@@ -57,6 +78,30 @@ function textesDuServeur(source) {
 function estDuTexte(valeur) {
   const propre = valeur.trim();
   if (propre.length < 2) return false;
+  /*
+   * Trop long pour être une phrase d'interface.
+   *
+   * Les règles ci-dessous lisent des sources, pas un arbre syntaxique : un
+   * commentaire qui contient une accolade dorsale peut ouvrir un gabarit aux
+   * yeux d'une expression régulière, et le relevé ramène alors deux mille
+   * caractères de code. C'est arrivé au lot 25, sur un commentaire qui citait
+   * la propriété `texte`. La plus longue chaîne affichée du projet tient en
+   * deux cents signes ; au-delà, ce n'est pas du texte, c'est un accident.
+   */
+  if (propre.length > 300) return false;
+  /*
+   * Un morceau de commentaire de bloc, happé de la même façon.
+   *
+   * Le garde-fou de longueur n'a pas suffi : au lot 26, un commentaire qui
+   * citait la fonction `astuce` suivie d'une parenthèse et d'un accent grave a
+   * été lu comme un appel, et le relevé a ramené deux cent trente signes de
+   * prose. Sous les trois cents, donc invisible.
+   *
+   * Une phrase d'interface ne contient jamais une étoile isolée entre deux
+   * espaces ; un commentaire replié sur une ligne, toujours. Vérifié sur les
+   * 1181 chaînes du relevé : aucune n'en porte.
+   */
+  if (/\s\*\s/.test(propre)) return false;
   // Pas une lettre : des chiffres, des symboles, une icône seule.
   if (!/\p{L}{2}/u.test(propre)) return false;
   // Un identifiant, une classe, une adresse, un sélecteur.
@@ -222,6 +267,13 @@ if (process.argv.includes('--manquants')) {
   const manquants = liste.filter((texte) => !connus.has(texte));
   for (const texte of manquants) console.log(texte);
   console.error(`${manquants.length} sans traduction sur ${liste.length} relevés.`);
+  /*
+   * Sortie non nulle : depuis le lot 25, `npm run verif` appelle ce contrôle.
+   * Il existait déjà, mais il fallait penser à le lancer — et c'est ainsi que
+   * trente-trois chaînes ont traversé quatre lots. Un contrôle qu'on n'exécute
+   * pas ne protège de rien.
+   */
+  process.exitCode = manquants.length ? 1 : 0;
 } else {
   for (const texte of liste) console.log(texte);
   console.error(`${liste.length} textes relevés.`);

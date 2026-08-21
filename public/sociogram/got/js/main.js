@@ -48,6 +48,12 @@ const elements = {
   blocAmis: document.getElementById('bloc-amis'),
   copieProfils: document.getElementById('copie-profils'),
   copieLiens: document.getElementById('copie-liens'),
+  // Lot 25 : les trois sous-cases de « Les profils », et leur enveloppe.
+  copieNotes: document.getElementById('copie-notes'),
+  copieHumeurs: document.getElementById('copie-humeurs'),
+  copieFeuille: document.getElementById('copie-feuille'),
+  copieSousProfils: document.getElementById('copie-sous-profils'),
+  copieFormes: document.getElementById('copie-formes'),
   listeAmis: document.getElementById('liste-amis'),
   btnAjouterAmi: document.getElementById('btn-ajouter-ami'),
   listePartages: document.getElementById('liste-partages'),
@@ -126,6 +132,7 @@ const elements = {
   voletCarnet: document.getElementById('volet-carnet'),
   btnFormes: document.getElementById('btn-formes'),
   outilsFormes: document.getElementById('outils-formes'),
+  btnRecharger: document.getElementById('btn-recharger'),
 };
 
 /**
@@ -1235,7 +1242,7 @@ async function rechargerVue({ conserverFocus = false } = {}) {
       },
       surLiaisonRapide: (id, evenement) => liaisonRapide(id, evenement),
       surPositions: (positions) => enregistrerPositions(positions),
-      surSelectionMultiple: (combien) => majSelectionMultiple(combien),
+      surSelectionMultiple: (combien, formes) => majSelectionMultiple(combien, formes),
       surFormeCreee: (donnees, point) => creerForme(donnees, point),
       surFormeModifiee: (id, patch) => enregistrerForme(id, patch),
       surFormeSupprimee: (id) => supprimerForme(id),
@@ -1283,6 +1290,54 @@ async function rechargerVue({ conserverFocus = false } = {}) {
   figerLesPositions();
 }
 
+/* ------------------------------------------------ relire le monde (lot 26.A)
+ *
+ * Deux personnes autour de la même sauvegarde : celle qui n'écrit pas doit
+ * pouvoir voir arriver ce que l'autre pose. F5 le fait déjà — au prix du plan,
+ * du zoom, de la fiche ouverte et du chargement complet de l'application. Ce
+ * bouton-là ne redemande que les données.
+ *
+ * Deux précautions, et elles ne sont pas décoratives :
+ *
+ *  — **on vide d'abord ce qui attend**. Les vues « Perso » et « Maisons »
+ *    postent une demi-seconde après la frappe, la fiche de droite aussi. Relire
+ *    le serveur avant que le patch soit parti ferait revenir le champ à sa
+ *    valeur d'avant sous les yeux de qui vient de l'écrire — puis repartir tout
+ *    seul une demi-seconde plus tard. C'est le pire tour qu'un bouton
+ *    « recharger » puisse jouer : il donnerait l'impression d'effacer ;
+ *  — **un seul à la fois**. Le bouton s'éteint le temps du tour : deux
+ *    rechargements concurrents rendraient deux payloads dans un ordre que
+ *    personne ne contrôle.
+ */
+let rechargementEnCours = false;
+
+async function rechargerTout() {
+  if (rechargementEnCours) return;
+  rechargementEnCours = true;
+  elements.btnRecharger.classList.add('tourne');
+  elements.btnRecharger.disabled = true;
+  try {
+    // Tout ce qui attend part d'abord : le plan (le texte d'une forme), la fiche
+    // de droite, le carnet. Trois files, trois modules, un seul instant.
+    await Promise.all([etat.moteur?.viderEnvois?.(), panneau.viderEnvois?.(), carnet.vider()]);
+    await chargerUnivers();
+    await rechargerVue({ conserverFocus: true });
+    // La fiche de droite ne dépend pas de la vue : elle a sa propre requête, et
+    // c'est souvent elle qu'on regarde en attendant les notes de l'autre.
+    // `afficher` vide sa file avant de relire — voir `panel.js`.
+    if (panneau.estOuvert() && panneau.idCourant()) {
+      await panneau.afficher(panneau.idCourant(), { secrets: !!etat.parametres.secrets });
+    }
+    astuce('Données relues.');
+  } catch (erreur) {
+    message(`Rechargement impossible : ${erreur.message}`);
+  } finally {
+    rechargementEnCours = false;
+    elements.btnRecharger.classList.remove('tourne');
+    elements.btnRecharger.disabled = false;
+  }
+}
+
 /**
  * Un moteur n'implémente que ce qui a du sens pour lui : une grille ne zoome
  * pas, un rendu 3D n'épinglera peut-être rien. On complète le contrat avec
@@ -1308,6 +1363,10 @@ const MOTEUR_MUET = {
     armer() {},
     outilArme: () => null,
   },
+  // Ce qu'une vue garde en file avant de l'envoyer (lot 26.A). Le bouton « ⟳ »
+  // le vide avant de relire le serveur ; une vue sans écriture différée n'a
+  // rien à répondre, mais elle doit répondre.
+  viderEnvois: () => Promise.resolve(),
 };
 
 function adapterMoteur(moteur) {
@@ -1812,6 +1871,12 @@ function confirmerSuppressionPersonne(id, evenement) {
  */
 function menuFond(evenement, point) {
   const choisies = etat.moteur?.selection?.() || [];
+  const formesChoisies = etat.moteur?.selectionFormes?.() || [];
+  // Une seule commande, trois libellés selon ce qui est pris. Ils sont écrits
+  // en toutes lettres à un `label:` et non fabriqués par une fonction : le
+  // relevé des textes ne lit que les porteurs, et un libellé assemblé ailleurs
+  // sort du dictionnaire sans que rien ne le signale.
+  const copier = { icone: '⧉', detail: 'Ctrl + C', onclick: () => copierLaSelection() };
   menu.ouvrir(evenement.clientX, evenement.clientY, [
     { titre: etat.referentiels.meta?.sauvegarde || etat.referentiels.meta?.titre || 'Plan' },
     {
@@ -1823,12 +1888,21 @@ function menuFond(evenement, point) {
     // Copier / coller (lot 23.B). Les deux entrées ne s'affichent que quand
     // elles servent : un menu qui propose « Coller » sans rien à coller apprend
     // seulement qu'on s'est trompé.
-    choisies.length && {
-      label: `Copier ${pluriel(choisies.length, 'fiche')}`,
-      icone: '⧉',
-      detail: 'Ctrl + C',
-      onclick: () => copierLaSelection(),
-    },
+    choisies.length &&
+      !formesChoisies.length && {
+        ...copier,
+        label: `Copier ${pluriel(choisies.length, 'fiche')}`,
+      },
+    choisies.length &&
+      formesChoisies.length && {
+        ...copier,
+        label: `Copier ${pluriel(choisies.length, 'fiche')} et ${pluriel(formesChoisies.length, 'forme')}`,
+      },
+    !choisies.length &&
+      formesChoisies.length && {
+        ...copier,
+        label: `Copier ${pluriel(formesChoisies.length, 'forme')}`,
+      },
     // Une seule entrée, sans question (lot 23.G) : ce qu'on emporte se décide
     // dans « ⚙ Réglages », une fois, et le collage ne demande plus rien.
     lireExtrait(null) && {
@@ -3035,49 +3109,133 @@ const PRESSE_PAPIERS = cle('familytree-presse-papiers');
  */
 const COPIE_PROFILS = cle('familytree-copie-profils');
 const COPIE_LIENS = cle('familytree-copie-liens');
-const optionsCopie = () => ({
-  profils: localStorage.getItem(COPIE_PROFILS) !== '0',
-  liens: localStorage.getItem(COPIE_LIENS) !== '0',
-});
+/*
+ * Lot 25 : trois morceaux de la fiche elle-même.
+ *
+ * Ils **dépendent** de « Les profils » : sans fiche, il n'y a pas de note à
+ * emporter. C'est ce qui les met en retrait, et ce qui fait qu'on les éteint
+ * quand la case au-dessus s'éteint.
+ */
+const COPIE_NOTES = cle('familytree-copie-notes');
+const COPIE_HUMEURS = cle('familytree-copie-humeurs');
+const COPIE_FEUILLE = cle('familytree-copie-feuille');
+/*
+ * Lot 26.B : les formes de fond, au premier niveau.
+ *
+ * Elles ne dépendent d'aucune fiche — une forme ne contient personne — donc
+ * elles ne sont la sous-catégorie de rien : on copie un cadre et son titre tout
+ * seuls aussi bien qu'avec le groupe qu'il entoure.
+ */
+const COPIE_FORMES = cle('familytree-copie-formes');
+
+const optionsCopie = () => {
+  const profils = localStorage.getItem(COPIE_PROFILS) !== '0';
+  return {
+    profils,
+    liens: localStorage.getItem(COPIE_LIENS) !== '0',
+    // Sans les profils, ces trois-là ne veulent rien dire : on les dit faux
+    // plutôt que de laisser le serveur trancher, pour que la question ne se
+    // pose qu'à un seul endroit.
+    notes: profils && localStorage.getItem(COPIE_NOTES) !== '0',
+    humeurs: profils && localStorage.getItem(COPIE_HUMEURS) !== '0',
+    feuille: profils && localStorage.getItem(COPIE_FEUILLE) !== '0',
+    formes: localStorage.getItem(COPIE_FORMES) !== '0',
+  };
+};
+
+/** Le premier niveau : au moins une de ces cases doit rester cochée. */
+const CATEGORIES_COPIE = () => [
+  [elements.copieProfils, COPIE_PROFILS],
+  [elements.copieLiens, COPIE_LIENS],
+  [elements.copieFormes, COPIE_FORMES],
+];
+
+/** Les sous-cases d'une catégorie, avec la clef où chacune se retient. */
+const SOUS_CASES_PROFILS = () => [
+  [elements.copieNotes, COPIE_NOTES],
+  [elements.copieHumeurs, COPIE_HUMEURS],
+  [elements.copieFeuille, COPIE_FEUILLE],
+];
+
+/**
+ * Décocher une catégorie décoche toutes ses sous-catégories.
+ *
+ * Et les éteint : une case qu'on peut cocher alors qu'elle ne s'appliquera pas
+ * est un mensonge poli. Rallumer la catégorie ne rallume pas les sous-cases —
+ * on redit ce qu'on veut, et rien ne repart sans qu'on l'ait demandé.
+ */
+function majSousCasesProfils() {
+  const actif = !!elements.copieProfils?.checked;
+  elements.copieSousProfils?.classList.toggle('eteint', !actif);
+  for (const [boite, memoire] of SOUS_CASES_PROFILS()) {
+    if (!boite) continue;
+    boite.disabled = !actif;
+    if (!actif && boite.checked) {
+      boite.checked = false;
+      localStorage.setItem(memoire, '0');
+    }
+  }
+}
 
 function installerOptionsCopie() {
-  const cases = [
-    [elements.copieProfils, COPIE_PROFILS],
-    [elements.copieLiens, COPIE_LIENS],
-  ];
+  const cases = [...CATEGORIES_COPIE(), ...SOUS_CASES_PROFILS()];
   for (const [boite, memoire] of cases) {
     if (!boite) continue;
     boite.checked = localStorage.getItem(memoire) !== '0';
     boite.addEventListener('change', () => {
-      // Tout décocher ne copierait rien : on rallume l'autre plutôt que de
-      // laisser un raccourci qui ne fait rien et qu'on croira cassé.
-      if (!elements.copieProfils.checked && !elements.copieLiens.checked) {
-        const autre = boite === elements.copieProfils ? elements.copieLiens : elements.copieProfils;
-        autre.checked = true;
-        localStorage.setItem(autre === elements.copieProfils ? COPIE_PROFILS : COPIE_LIENS, '1');
+      /*
+       * Tout décocher ne copierait rien, et Ctrl+C paraîtrait cassé.
+       *
+       * La dernière catégorie cochée refuse donc de s'éteindre. Le lot 23.G en
+       * rallumait une **autre** à la place, ce qui tenait tant qu'il n'y en
+       * avait que deux ; à trois, on ne saurait plus laquelle, et allumer ce
+       * qu'on n'a pas demandé est pire que refuser de tout éteindre.
+       */
+      const categories = CATEGORIES_COPIE().filter(([autre]) => autre);
+      const estCategorie = categories.some(([autre]) => autre === boite);
+      if (estCategorie && !categories.some(([autre]) => autre.checked)) {
+        boite.checked = true;
+        astuce('Il faut emporter quelque chose : cette case reste cochée.');
+        return;
       }
       localStorage.setItem(memoire, boite.checked ? '1' : '0');
+      if (boite === elements.copieProfils) majSousCasesProfils();
     });
   }
+  majSousCasesProfils();
 }
 
 async function copierLaSelection() {
   const ids = etat.moteur?.selection?.() || [];
-  if (!ids.length) {
+  // Les formes prises avec les fiches (lot 26.B) — ou toutes seules.
+  const idsFormes = etat.moteur?.selectionFormes?.() || [];
+  if (!ids.length && !idsFormes.length) {
     astuce('Rien de choisi — Ctrl + glisser dans le vide pour prendre des fiches.');
     return;
   }
   try {
-    const { extrait } = await Api.extrait(ids, optionsCopie());
+    const { extrait } = await Api.extrait(ids, { ...optionsCopie(), idsFormes });
     const texte = JSON.stringify(extrait);
     localStorage.setItem(PRESSE_PAPIERS, texte);
     // Peut échouer (permission, page non focalisée) : le double local suffit à
     // coller chez soi, donc on ne fait pas de bruit pour ça.
     await navigator.clipboard?.writeText?.(texte).catch(() => {});
     const liens = (extrait.relations || []).length;
-    astuce(
-      `${pluriel(ids.length, 'fiche')} et ${pluriel(liens, 'lien')} copiés — Ctrl+V pour les poser.`
-    );
+    const formes = (extrait.formes || []).length;
+    /*
+     * Trois phrases écrites en toutes lettres plutôt qu'une assemblée bout à
+     * bout : le relevé des textes ne voit que ce qui est passé directement à la
+     * fonction astuce, et une phrase fabriquée ailleurs sort du dictionnaire
+     * sans que rien ne le signale. Sans participe dans la première — « 1 forme
+     * copiées » s'était glissé là au premier essai.
+     */
+    if (!ids.length) {
+      astuce(`${pluriel(formes, 'forme')} dans le presse-papiers — Ctrl+V pour les poser.`);
+    } else if (formes) {
+      astuce(`${pluriel(ids.length, 'fiche')}, ${pluriel(liens, 'lien')} et ${pluriel(formes, 'forme')} copiés — Ctrl+V pour les poser.`);
+    } else {
+      astuce(`${pluriel(ids.length, 'fiche')} et ${pluriel(liens, 'lien')} copiés — Ctrl+V pour les poser.`);
+    }
   } catch (erreur) {
     message(`Copie impossible : ${erreur.message}`);
   }
@@ -3109,11 +3267,16 @@ async function collerLExtrait(texte, point) {
     await rechargerVue({ conserverFocus: true });
     // Un extrait de liens seuls ne pose aucune fiche : le dire par le nombre de
     // liens plutôt que par « 0 fiche collée », qui ressemblerait à un échec.
-    astuce(
-      bilan.personnes.length
-        ? `${pluriel(bilan.personnes.length, 'fiche')} et ${pluriel(bilan.relations, 'lien')} collés.`
-        : `${pluriel(bilan.relations, 'lien')} posés entre les fiches déjà là.`
-    );
+    // Même raison pour un extrait de formes seules (lot 26.B).
+    if (bilan.personnes.length && bilan.formes) {
+      astuce(`${pluriel(bilan.personnes.length, 'fiche')}, ${pluriel(bilan.relations, 'lien')} et ${pluriel(bilan.formes, 'forme')} collés.`);
+    } else if (bilan.personnes.length) {
+      astuce(`${pluriel(bilan.personnes.length, 'fiche')} et ${pluriel(bilan.relations, 'lien')} collés.`);
+    } else if (bilan.formes) {
+      astuce(`${pluriel(bilan.formes, 'forme')} de plus sur le plan.`);
+    } else {
+      astuce(`${pluriel(bilan.relations, 'lien')} posés entre les fiches déjà là.`);
+    }
   } catch (erreur) {
     message(`Collage impossible : ${erreur.message}`);
   }
@@ -3126,14 +3289,22 @@ async function collerLExtrait(texte, point) {
  * pastilles dans le même coin se disputeraient la place, et celle-ci ne dit
  * quelque chose que pendant les quelques secondes où l'on déplace un groupe.
  */
-function majSelectionMultiple(combien) {
-  if (!combien) {
+function majSelectionMultiple(combien, formes = 0) {
+  if (!combien && !formes) {
     majStats();
     return;
   }
+  const morceaux = [];
+  if (combien) morceaux.push(`<b>${combien}</b> fiche${combien > 1 ? 's' : ''}`);
+  if (formes) morceaux.push(`<b>${formes}</b> forme${formes > 1 ? 's' : ''}`);
+  // Le conseil suit ce qu'on tient : hors du mode dessin, une forme se copie
+  // mais ne se déplace pas — promettre le contraire enverrait tirer dessus.
+  const conseil = combien
+    ? 'Ctrl + glisser pour les déplacer'
+    : 'Ctrl + C pour les copier';
   elements.stats.innerHTML =
-    `<b>${combien}</b> fiche${combien > 1 ? 's' : ''} en main · ` +
-    '<span class="stats-filtre">Ctrl + glisser pour les déplacer</span>';
+    `${morceaux.join(' et ')} en main · ` +
+    `<span class="stats-filtre">${conseil}</span>`;
 }
 
 function majStats(info) {
@@ -3313,6 +3484,7 @@ elements.btnCarnet.addEventListener('click', () => basculerLeCarnet());
 elements.btnAjouterAmi?.addEventListener('click', () => demanderUnAmi());
 
 construireBarreFormes();
+elements.btnRecharger.addEventListener('click', () => rechargerTout());
 elements.btnFormes.addEventListener('click', () => {
   const moteur = etat.moteur?.formes;
   if (!moteur) return;
@@ -3744,7 +3916,10 @@ document.addEventListener('keydown', (evenement) => {
   // rester Ctrl+C. Et seulement si quelque chose est pris, sinon on volerait la
   // copie d'un texte sélectionné à la souris.
   if ((evenement.ctrlKey || evenement.metaKey) && evenement.key.toLowerCase() === 'c' && !saisie) {
-    if (etat.moteur?.selection?.().length) {
+    const pris =
+      (etat.moteur?.selection?.() || []).length +
+      (etat.moteur?.selectionFormes?.() || []).length;
+    if (pris) {
       evenement.preventDefault();
       copierLaSelection();
     }

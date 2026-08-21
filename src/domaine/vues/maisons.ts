@@ -207,9 +207,9 @@ export class VueMaisons extends Vue {
           caracteristiques: (fiche.caracteristiques as Objet) ?? {},
           // Lot 20.E, tel quel : contrairement aux événements, une unité ne
           // cite personne — il n'y a rien à aller enrichir ailleurs.
+          // Chaque unité porte désormais ses onze compétences d'armée (lot
+          // 25) : la maison n'en a plus.
           unites: (fiche.unites as Objet[]) ?? [],
-          // Lot 24 : les compétences de sa troupe, sur le même principe.
-          competences_armee: (fiche.competences_armee as Objet) ?? {},
           notes: fiche.notes ?? '',
           evenements: evenementsEcrits,
           evenements_lies: evenementsLies.get(id) ?? [],
@@ -237,7 +237,8 @@ export class VueMaisons extends Vue {
         // d'un seul côté (`referentiels.ts`).
         etats_unite: ETATS_UNITE.map((e) => ({ ...e })),
         entrainements_unite: ENTRAINEMENTS_UNITE.map((e) => ({ ...e })),
-        // Les onze compétences d’une armée (lot 24), descendues de même.
+        // Les onze compétences d’une armée (lot 24), descendues de même. Elles
+        // se remplissent unité par unité depuis le lot 25.
         competences_armee_liste: COMPETENCES_ARMEE.map((c) => ({ ...c })),
         annee_courante: dataset.meta.annee_courante ?? '',
         noeuds,

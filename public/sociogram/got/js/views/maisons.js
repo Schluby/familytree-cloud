@@ -225,9 +225,6 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       // Les unités juste sous les caractéristiques (lot 20.E) : ce sont les
       // deux blocs chiffrés, et on passe de « ce qu'elle a » à « ce qu'elle
       // peut envoyer » sans changer de moitié d'écran.
-      // Les compétences d'armée s'intercalent (lot 24) : elles valent pour la
-      // troupe entière, et on les lit avant le détail des bannières.
-      blocCompetencesArmee(maison),
       blocUnites(maison),
       blocNotes(maison),
       blocLiens(maison)
@@ -416,6 +413,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
           { large: true }
         ),
       ]),
+      competencesUnite(maison, index),
       bloc,
     ]);
   }
@@ -427,27 +425,30 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
     ]);
   }
 
-  /* --------------------------------------- compétences d'armée (lot 24)
+  /* ---------------------------------- compétences d'armée (lots 24 puis 25)
    *
    * Onze des dix-neuf compétences du jeu — celles qui ont un sens pour une
-   * troupe. Elles se posent sur la maison et non sur chaque unité : une armée
-   * s'entraîne ensemble, et recopier onze rangs sur douze bannières n'aurait
-   * rien décrit de plus.
+   * troupe. Le lot 24 les posait sur la **maison**, en se disant qu'une armée
+   * s'entraîne ensemble. C'était faux à l'usage : une maison lève des
+   * piquiers, des archers et une garde, et leur donner le même rang de Tir
+   * revenait à ne rien noter du tout. Elles vivent donc sur **l'unité**, avec
+   * le reste de sa ligne de bataille.
    *
-   * Le bloc reste replié tant qu'aucun rang n'est noté : une maison de la
-   * cour n'a pas d'armée, et onze champs vides sur sa fiche ne diraient rien.
+   * Onze champs par unité, sur douze unités, feraient cent trente-deux cases :
+   * d'où le repli tant que rien n'est noté, et le code de trois lettres plutôt
+   * que le nom entier — c'est déjà le vocabulaire de la colonne C du classeur,
+   * et le nom complet reste en infobulle.
    */
-  function blocCompetencesArmee(maison) {
-    if (!maison.competences_armee || typeof maison.competences_armee !== 'object') {
-      maison.competences_armee = {};
-    }
-    const rangs = maison.competences_armee;
+  function competencesUnite(maison, index) {
+    const unite = courante().unites[index];
+    if (!unite.competences || typeof unite.competences !== 'object') unite.competences = {};
+    const rangs = unite.competences;
     const liste = payload.competences_armee_liste || [];
     const remplies = liste.filter((competence) => rangs[competence.id]).length;
 
     const champ = (competence) =>
-      h('label', { class: 'mz-carac' }, [
-        h('span', { class: 'mz-carac-nom', texte: competence.label }),
+      h('label', { class: 'mz-comp-armee', title: competence.label }, [
+        h('span', { class: 'mz-comp-code', texte: competence.id }),
         h('input', {
           type: 'number',
           min: 0,
@@ -460,16 +461,21 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
             // rangs nuls, et les garder ici ferait diverger l'affichage.
             if (brut === '' || Number(brut) === 0) delete rangs[competence.id];
             else rangs[competence.id] = Number(brut);
-            modifier(maison.id, { competences_armee: rangs });
+            modifier(maison.id, { unites: courante().unites });
           },
         }),
       ]);
 
-    const details = h('details', { class: 'mz-bloc' }, [
-      h('summary', { texte: remplies ? `Compétences d’armée (${remplies})` : 'Compétences d’armée' }),
-      h('div', { class: 'mz-caracs' }, liste.map(champ)),
+    // Le compte dans son propre élément, jamais collé au libellé : une chaîne
+    // assemblée n'est plus reconnue par le dictionnaire de traduction.
+    const resume = h('summary', {}, [
+      h('span', { texte: 'Compétences d’armée' }),
+      ...(remplies ? [h('span', { class: 'nombre', texte: String(remplies) })] : []),
     ]);
-    // Ouvert dès qu'il y a quelque chose à lire.
+    const details = h('details', { class: 'mz-unite-competences' }, [
+      resume,
+      h('div', { class: 'mz-comps-armee' }, liste.map(champ)),
+    ]);
     if (remplies) details.open = true;
     return details;
   }
@@ -508,6 +514,7 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
               va: null,
               discipline: null,
               mouvement: '',
+              competences: {},
             });
             modifier(maison.id, { unites: courante().unites }, { immediat: true });
             dessiner();
@@ -934,7 +941,14 @@ export function creerRenduMaisons(conteneur, contexte = {}) {
       dessiner();
     },
 
+    /** Ce qui attend part maintenant — voir la même fonction dans `perso.js`. */
+    viderEnvois: () => Promise.all([...enAttente.keys()].map((id) => envoyer(id))),
+
     detruire() {
+      // Ce qui n'est pas encore parti part maintenant. Cette vue ne le faisait
+      // pas : quitter « Maisons » dans la demi-seconde suivant une frappe la
+      // perdait, sans rien dire. `perso.js`, écrit après, le faisait déjà.
+      for (const id of [...enAttente.keys()]) envoyer(id);
       minuteries.forEach((minuterie) => clearTimeout(minuterie));
       socle.fermer();
       racine.remove();

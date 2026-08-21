@@ -396,13 +396,37 @@ export const Api = {
 
   /* Copier / coller (lot 23.B) : un extrait est du texte, le serveur n'en
      garde aucune trace entre les deux. */
-  /** `{ profils, liens }` : ce qu'on emporte se règle à la copie (lot 23.G). */
-  extrait: (ids, { profils = true, liens = true } = {}) =>
+  /**
+   * Ce qu'on emporte se règle à la copie (lot 23.G), et pas au collage.
+   *
+   * `profils` et `liens` sont les deux moitiés ; `notes`, `humeurs` et
+   * `feuille` (lot 25) sont trois morceaux de la fiche elle-même, qui ne
+   * valent que dans la campagne d'où ils viennent ; `formes` (lot 26.B) est la
+   * troisième moitié, qui ne dépend d'aucune fiche — d'où sa propre liste
+   * d'identifiants, `idsFormes`, et non une devinette sur ce qui se recouvre.
+   */
+  extrait: (
+    ids,
+    {
+      profils = true,
+      liens = true,
+      notes = true,
+      humeurs = true,
+      feuille = true,
+      formes = true,
+      idsFormes = [],
+    } = {}
+  ) =>
     requete(
       `${DOMAINE}/extrait${versQuery({
         ids: ids.join(','),
         profils: profils ? '1' : '0',
         liens: liens ? '1' : '0',
+        notes: notes ? '1' : '0',
+        humeurs: humeurs ? '1' : '0',
+        feuille: feuille ? '1' : '0',
+        formes: formes ? '1' : '0',
+        formes_ids: idsFormes.join(','),
       })}`
     ),
   coller: (extrait, point) =>

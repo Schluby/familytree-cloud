@@ -13,6 +13,7 @@
  *                         genre, naissance, deces, role, ville, avatar,
  *                         feuille, derives} ],
  *       "competences": [ {id, label} ],
+ *       "max_specialites": 8,
  *       "intrigue": { humeurs, intentions, techniques, actions },
  *       "noeuds": [ … ],   // contrat commun : la liste de droite marche encore
  *       "stats":  {…}
@@ -31,6 +32,7 @@ import {
   COMPETENCES,
   HUMEURS_INTRIGUE,
   INTENTIONS,
+  MAX_SPECIALITES,
   TECHNIQUES,
   derives,
 } from '../feuille';
@@ -106,6 +108,11 @@ export class VuePerso extends Vue {
       {
         personnages,
         competences: COMPETENCES.map((c) => ({ ...c })),
+        // Combien de colonnes de spécialités la vue peut ouvrir. Descendu
+        // plutôt que recopié : le navigateur en a besoin pour griser son
+        // bouton « ＋ », et deux plafonds qui divergent, c'est un bouton qui
+        // promet une colonne que le serveur jettera.
+        max_specialites: MAX_SPECIALITES,
         // Toutes les listes fermées de l'intrigue partent avec la vue : le
         // navigateur ne recopie aucun de ces mots, et corriger un libellé de
         // technique se fait d'un seul côté (`feuille.ts`).

@@ -17,6 +17,19 @@
  * et seulement là, on peut les choisir, les déplacer, les redimensionner et les
  * modifier. Ressortir du mode leur rend leur transparence.
  *
+ * ── Les prendre sans entrer dans le mode (lot 26.B) ──────────────────────────
+ *
+ * Il fallait pourtant pouvoir en emporter avec des fiches. La sélection hors
+ * mode dessin passe donc par la **géométrie** et non par les clics : le cadre
+ * Ctrl du plan compare des rectangles en coordonnées de monde, et `sousLePoint`
+ * répond pour un Ctrl + clic. Aucune forme ne redevient cliquable, donc rien
+ * de ce qui précède n'est repris — on peut toujours faire glisser le plan au
+ * travers du grand rectangle du Nord.
+ *
+ * Deux sélections coexistent, et ce ne sont pas les mêmes gestes : `choisie`,
+ * une seule forme, celle qu'on est en train de modifier en mode dessin ;
+ * `prises`, autant qu'on veut, celles qui partiront au copier-coller.
+ *
  * ── Ce que ce module ne fait pas ─────────────────────────────────────────────
  *
  * Il n'appelle pas l'API. Comme le moteur de rendu qui l'accueille, il prévient
@@ -50,6 +63,8 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
   let modeDessin = false;
   let outil = null;
   let choisie = null;
+  /** Celles qu'un cadre de sélection a prises, pour le copier-coller. */
+  const prises = new Set();
   let trace = null;
   let geste = null;
   /**
@@ -163,11 +178,21 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
     elements.clear();
     couche.replaceChildren(...formes.filter(visible).map(dessinerUne));
     if (!elements.has(choisie)) choisie = null;
+    // Une forme qui a quitté l'écran quitte la main : garder une prise sur ce
+    // qu'on ne voit plus ferait copier, plus tard et ailleurs, un rectangle
+    // dont on ne se souvient pas.
+    for (const id of [...prises]) if (!elements.has(id)) prises.delete(id);
     marquerChoisie();
+    marquerPrises();
   }
 
   function marquerChoisie() {
     for (const [id, element] of elements) element.classList.toggle('choisie', id === choisie);
+  }
+
+  function marquerPrises() {
+    for (const [id, element] of elements) element.classList.toggle('prise', prises.has(id));
+    rappels.surPrises?.(prises.size);
   }
 
   function choisir(id) {
@@ -197,7 +222,9 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
     const { id, patchs, minuteur } = envoiDiffere;
     clearTimeout(minuteur);
     envoiDiffere = null;
-    rappels.surModification?.(id, patchs);
+    // On rend la promesse : le bouton « ⟳ » attend que la frappe soit partie
+    // avant de relire le serveur (lot 26.A). Les appels ordinaires l'ignorent.
+    return rappels.surModification?.(id, patchs);
   }
 
   /**
@@ -655,5 +682,53 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
     armer,
     outilArme: () => outil,
     nombre: () => formes.filter(visible).length,
+    /** Le texte tapé dans une forme part maintenant, sans attendre la pause. */
+    viderEnvois: () => viderEnvoi(),
+
+    /* ------------------------------------- prendre des formes (lot 26.B)
+     *
+     * Par la géométrie, jamais par les clics : voir l'entête. Les rectangles
+     * sont rendus en coordonnées de **monde**, celles-là mêmes où le plan
+     * calcule ses boîtes de fiches — les deux se comparent donc directement.
+     */
+
+    /** Les rectangles des formes visibles, du fond vers le dessus. */
+    boites: () =>
+      formes
+        .filter(visible)
+        .map((forme) => ({ id: forme.id, x: forme.x, y: forme.y, l: forme.l, h: forme.h })),
+
+    /** La forme la plus haute sous ce point de monde, ou `null`. */
+    sousLePoint(x, y) {
+      const dessinees = formes.filter(visible);
+      for (let index = dessinees.length - 1; index >= 0; index -= 1) {
+        const forme = dessinees[index];
+        if (x >= forme.x && x <= forme.x + forme.l && y >= forme.y && y <= forme.y + forme.h) {
+          return forme.id;
+        }
+      }
+      return null;
+    },
+
+    prises: () => [...prises],
+
+    definirPrises(ids) {
+      prises.clear();
+      for (const id of ids || []) if (elements.has(id)) prises.add(id);
+      marquerPrises();
+    },
+
+    basculerPrise(id) {
+      if (!elements.has(id)) return;
+      if (prises.has(id)) prises.delete(id);
+      else prises.add(id);
+      marquerPrises();
+    },
+
+    viderPrises() {
+      if (!prises.size) return;
+      prises.clear();
+      marquerPrises();
+    },
   };
 }

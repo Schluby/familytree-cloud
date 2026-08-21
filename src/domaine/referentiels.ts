@@ -129,11 +129,11 @@ export const CHAMPS_MAISON = [
   'notes',
   'evenements',
   'liens',
-  // Lot 20.E : ce qu'elle peut mettre sur le champ de bataille.
+  // Lot 20.E : ce qu'elle peut mettre sur le champ de bataille. Chaque unité
+  // y porte sa ligne de bataille et, depuis le lot 25, ses onze compétences
+  // d'armée — elles ont commencé sur la maison, ce qui donnait le même Tir
+  // aux archers et aux piquiers.
   'unites',
-  // Lot 24 : les compétences de sa troupe, quatrième page du classeur. Elles
-  // valent pour l'armée entière, là où `unites` détaille chaque bannière.
-  'competences_armee',
 ] as const;
 
 /**
@@ -213,6 +213,7 @@ function unites(brut: unknown): Objet[] {
     .map((entree) => {
       const etat = texte(entree.etat, 40);
       const entrainement = texte(entree.entrainement, 40);
+      const rangs = normaliserCompetencesArmee(entree.competences);
       return {
         nom: texte(entree.nom, 120),
         type: texte(entree.type, 120),
@@ -234,6 +235,13 @@ function unites(brut: unknown): Objet[] {
         va: versEntier(entree.va),
         discipline: versEntier(entree.discipline),
         mouvement: texte(entree.mouvement, 60),
+        /*
+         * Lot 25 : les onze compétences d'armée, descendues de la maison sur
+         * l'unité. Contrairement au reste de la ligne, elles ne sont écrites
+         * que si l'une d'elles porte un rang — soixante unités qui traînent
+         * chacune un `"competences":{}` feraient un kilo-octet pour rien.
+         */
+        ...(Object.keys(rangs).length ? { competences: rangs } : {}),
       };
     })
     // Une unité sans nom ni type n'est rien : c'est une ligne ajoutée puis
@@ -371,11 +379,12 @@ export function appliquerMaison(base: Objet | null, patch: Objet): Objet {
     if (liste.length) fiche.unites = liste;
     else delete fiche.unites;
   }
-  if (fourni(patch, 'competences_armee')) {
-    const rangs = normaliserCompetencesArmee(patch.competences_armee);
-    if (Object.keys(rangs).length) fiche.competences_armee = rangs;
-    else delete fiche.competences_armee;
-  }
+  /*
+   * `competences_armee` a vécu ici un lot durant (24) : onze rangs posés sur
+   * la maison entière. Le lot 25 les a descendus sur chaque unité — voir
+   * `unites()` — et le champ de la maison n'est plus ni écrit ni relu. Aucune
+   * sauvegarde n'en portait, ce qui a été vérifié avant de le retirer.
+   */
 
   if (!fiche.label) throw new ErreurReferentiel("une maison a besoin d'un nom");
   return fiche;

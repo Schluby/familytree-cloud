@@ -6,8 +6,19 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 23** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 20/08/2026.
+**Les sept lots du plan sont livrés, puis les lots 8 à 26** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 21/08/2026.
+
+Les lots 24 à 26 (20 et 21/08) portent sur **la table de jeu**. Le 24 apporte la
+feuille de personnage, portée du classeur, et la popup d'intrigue où l'humeur de
+la cible donne le modificateur ; le 25 met les compétences d'armée **sur chaque
+unité de guerre** au lieu de la maison, ajoute les spécialités en colonnes à
+droite des compétences, et trois sous-cases à ce que la copie emporte d'une
+fiche. Le 26 ajoute le bouton **⟳ Recharger** — relire le serveur sans perdre le
+plan ni le zoom — et permet de **prendre les formes de fond hors du mode
+dessin** pour les copier avec les fiches. Voir « Relire, et emporter les formes
+(lot 26) » plus bas : la leçon transposable est qu'une sélection peut se faire
+par la géométrie plutôt que par les clics.
 
 Le lot 23 (20/08) ouvre l'application aux autres : des **amitiés** entre comptes,
 et un arbre qu'on peut confier **en écriture** à un ami. Ce qui l'empêchait
@@ -1269,6 +1280,114 @@ Le relevé ne voit ni les tableaux ni les arguments d'une fonction inconnue.
 version anglaise ; ses voisins passaient parce qu'ils existaient *ailleurs* sous
 un porteur reconnu. La liste des porteurs est nominative dans l'outil : y
 ajouter sa fonction fait partie du travail, au même titre que la traduction.
+
+## La feuille et l'armée, relues par la table (lot 25)
+
+**Les compétences d'armée sont sur l'unité, pas sur la maison.** Le lot 24 les
+posait sur la bannière entière, ce qui donnait le même Tir aux archers et aux
+piquiers. Elles sont dans `unites[].competences`, normalisées par
+`normaliserCompetencesArmee`, et **écrites seulement si un rang y est noté** —
+contrairement au reste de la ligne d'unité, qui s'écrit toujours. Soixante
+unités traînant chacune un `"competences":{}` feraient un kilo-octet pour rien.
+
+**Une colonne de spécialité sautée garde sa place.** `specialites()` ne coupe
+que ce qui traîne **après** la dernière case remplie. La règle d'avant écartait
+toute spécialité sans nom, et ce qu'on écrivait dans la troisième colonne
+remontait dans la première au rechargement. Le navigateur comble les trous à
+l'écriture (`while (entree.specialites.length <= colonne)`) ; les deux moitiés
+de la règle doivent rester d'accord.
+
+**Le plafond de spécialités descend dans le payload.** `max_specialites` vient
+de `MAX_SPECIALITES` (`feuille.ts`). Le recopier dans le navigateur ferait un
+bouton qui promet une colonne que le serveur jettera.
+
+**Ce que la copie emporte se règle à la copie.** `notes`, `humeurs` et
+`feuille` s'ajoutent à `profils` et `liens` dans `/api/extrait`. Ils ne
+s'appliquent que si `profils` est vrai, et c'est le **navigateur** qui le dit
+(`optionsCopie()`), pour que la question ne se pose qu'à un seul endroit.
+
+**Décocher une catégorie décoche ses sous-catégories, et les éteint.**
+`majSousCasesProfils()` dans `main.js`. Toute nouvelle sous-case doit passer
+par `SOUS_CASES_PROFILS()` — c'est cette liste qui porte la cascade.
+
+**Le relevé de textes lit maintenant les listes fermées du serveur.**
+`feuille.ts` et `referentiels.ts` sont dans `COTE_SERVEUR`, et les porteurs
+`label`, `resultat`, `objectif`, `specialite` y sont lus. Sans ça, le panneau
+d'intrigue restait entièrement en français pendant que le compteur annonçait
+zéro manquante. **Ajouter une liste fermée, c'est ajouter ses traductions.**
+
+**Une traduction fausse est pire que pas de traduction.** Le dictionnaire est
+une table de correspondances exactes : un mot qui a deux sens dans
+l'application n'en aura qu'une. « Replier » désignait le bouton du rail, et
+l'action d'intrigue s'affichait « Collapse ». Elle s'appelle « Se replier »
+maintenant. Deux sens, deux libellés — l'identifiant, lui, ne bouge jamais.
+
+**`npm run verif` lance le contrôle des traductions**, et il sort en échec s'il
+manque quelque chose. Un contrôle qu'on n'exécute pas ne protège de rien.
+
+## Relire, et emporter les formes (lot 26)
+
+**Le bouton ⟳ vide les files avant de relire.** `rechargerTout()` dans
+`main.js` attend `etat.moteur?.viderEnvois?.()`, `panneau.viderEnvois?.()` et
+`carnet.vider()` **avant** `chargerUnivers()` et `rechargerVue()`. Sans ça, le
+champ qu'on vient d'écrire revient à sa valeur d'avant sous les yeux de qui
+l'écrit, puis repart tout seul une demi-seconde plus tard. **Toute vue qui
+introduit une écriture différée doit exposer `viderEnvois()`** — `MOTEUR_MUET`
+porte la version vide, donc l'oubli ne casse rien : il perd juste la frappe.
+
+**Un seul rechargement à la fois** (`rechargementEnCours`). Deux payloads rendus
+dans un ordre non contrôlé, c'est un plan qui saute sans raison visible.
+
+**Les formes se prennent par la géométrie, jamais par les clics.** C'est le
+cœur du lot : `pointer-events: none` au repos reste vrai, parce qu'une forme qui
+attrape les clics rend le plan intraversable là où elle est (lot 20.D). Le cadre
+Ctrl de `views/cartes.js` lit `formes.boites()` — des rectangles en coordonnées
+de monde, les mêmes que les boîtes de fiches — et le Ctrl + clic passe par
+`formes.sousLePoint(x, y)`. **Ne pas « réparer » cela en rendant `.forme`
+cliquable.**
+
+**Un cadre de zéro pixel recoupe la forme sous le curseur.** `majBande` la prend
+donc déjà au `mousedown` d'un simple Ctrl + clic ; basculer par-dessus la rendait
+aussitôt, et le clic ne faisait rien du tout. `finirBande` repart de
+`avantFormes` avant de basculer. Deux gestes qui s'annulent ne se voient pas à
+la lecture — seulement à l'essai.
+
+**Deux sélections dans `js/formes.js`, à ne pas confondre.** `choisie` est la
+forme qu'on modifie en mode dessin (une seule) ; `prises` est la main du
+copier-coller (autant qu'on veut). `dessiner()` élague `prises` de tout ce qui
+n'est plus visible : garder une prise sur ce qu'on ne voit plus ferait copier,
+plus tard et ailleurs, un rectangle dont on ne se souvient pas.
+
+**Les formes voyagent par identifiant** (`formes_ids`), jamais par recouvrement.
+Une forme ne contient personne : prendre « celles qui touchent » emporterait le
+grand rectangle du Nord avec deux Stark.
+
+**Le coin haut-gauche d'un collage compte les formes.** Sans elles, un cadre
+tracé *autour* d'un groupe se repose décalé de ce qu'il entoure — il commence
+plus haut et plus à gauche que la première fiche.
+
+**Une portée orpheline repasse au plan général.** Une forme `vue: 'profils'`
+dont aucun profil visé ne survit au collage ne paraîtrait nulle part, donc
+serait introuvable. Mal placée se corrige, invisible non.
+
+**« Au moins une catégorie cochée » ne se règle plus en rallumant une autre.**
+À deux cases, le lot 23.G rallumait « l'autre » ; à trois, on ne saurait pas
+laquelle. `CATEGORIES_COPIE()` porte le premier niveau, et la dernière cochée
+refuse de s'éteindre. **Toute nouvelle catégorie passe par cette liste**, comme
+toute sous-case passe par `SOUS_CASES_PROFILS()`.
+
+**Le relevé de textes se fait encore avoir par les commentaires.** Troisième
+fois : un commentaire citant la fonction `astuce` suivie d'une parenthèse et
+d'un accent grave a été lu comme un appel, et le relevé a ramené deux cent
+trente signes de prose — sous le plafond de trois cents, donc invisible. Une
+étoile isolée entre deux espaces suffit à reconnaître un commentaire replié :
+`estDuTexte` la refuse désormais. **Ne pas citer un porteur de texte suivi
+d'un accent grave dans un commentaire.**
+
+**Rien n'enregistre sur Entrée, sauf l'année et les fenêtres de création.**
+Tout le reste s'écrit seul après une pause de frappe (500 ms, 700 pour le
+carnet, 400 pour une forme). Fermer l'onglet dans cette fenêtre perd la frappe —
+aucun `pagehide` n'est posé.
 
 ## Pour repartir
 

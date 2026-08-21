@@ -94,20 +94,46 @@ export function rangDe(feuille: Objet | null | undefined, code: string): number 
  * Normalisation de la feuille
  * -------------------------------------------------------------------------- */
 
+/**
+ * Combien de spécialités une compétence peut porter.
+ *
+ * Le classeur en pose trois — trois triplets de colonnes « Spécialité *n* /
+ * Rang *n* / Exp *n* ». Ce n'est pas une règle du jeu, c'est la largeur d'une
+ * page A4 ; l'écran n'a pas cette limite, et le lot 25 laisse ajouter des
+ * colonnes. Huit est un garde-fou, pas un plafond de jeu : au-delà, ce n'est
+ * plus une feuille mais un fichier qu'on remplit par accident.
+ */
+export const MAX_SPECIALITES = 8;
+
 /** Une spécialité : un nom, un rang, de l'expérience. */
 function specialites(brut: unknown): Objet[] {
   if (!Array.isArray(brut)) return [];
   return brut
     .filter(estObjet)
-    // Trois par compétence, comme les trois colonnes de la feuille.
-    .slice(0, 3)
+    .slice(0, MAX_SPECIALITES)
     .map((entree) => ({
-      nom: texte(entree.nom, 80),
+      // Long, et voulu : la colonne « Spécialité » sert aussi à dire *ce que
+      // la spécialité fait*, ce que le classeur écrivait en marge.
+      nom: texte(entree.nom, 600),
       rang: chiffre(entree.rang, 0, 20),
       exp: chiffre(entree.exp, 0, 999),
     }))
-    // Une spécialité sans nom n'est rien : une ligne ouverte puis abandonnée.
-    .filter((entree) => entree.nom);
+    .filter((_, index, liste) => {
+      /*
+       * On ne coupe **que la fin**.
+       *
+       * La règle du lot 24 écartait toute spécialité sans nom, ce qui tassait
+       * la liste : une spécialité écrite dans la troisième colonne remontait
+       * dans la première au rechargement, et la colonne qu'on avait ouverte
+       * pour elle disparaissait. Depuis le lot 25 les colonnes sont une
+       * grille, et une case laissée vide au milieu garde sa place — trente
+       * octets, et seulement pour qui saute volontairement une colonne.
+       *
+       * Ce qui traîne après la dernière case remplie, en revanche, ne dit
+       * rien : c'est une colonne ouverte puis abandonnée.
+       */
+      return liste.slice(index).some((entree) => entree.nom || entree.rang || entree.exp);
+    });
 }
 
 function competences(brut: unknown): Objet {
@@ -410,7 +436,15 @@ export const ACTIONS_INTRIGUE = [
   { id: 'calmer', label: 'Calmer', test: 'PER', contre: '', resultat: 'Regain de sang-froid égal au rang de Persuasion, + 1 par degré de réussite' },
   { id: 'comprendre', label: 'Comprendre', test: 'VIG', contre: 'DUP', resultat: 'Découvre l’humeur et la technique, et + 1D en Persuasion ou Duperie pour le reste de l’intrigue' },
   { id: 'rempart', label: 'Rempart', test: 'STA', contre: 'VOL', resultat: 'Humeur de l’adversaire + 1' },
-  { id: 'replier', label: 'Replier', test: 'VOL', contre: 'VOL', resultat: 'Le résultat du test devient la défense d’intrigue' },
+  /*
+   * « Se replier », et non « Replier » : le dictionnaire de traduction est une
+   * table de correspondances exactes, et « Replier » y désigne déjà le bouton
+   * qui referme le rail. L'action d'intrigue s'affichait donc « Collapse » au
+   * milieu d'une liste française — une traduction fausse, ce qui est pire que
+   * pas de traduction du tout. Deux sens, deux libellés ; l'identifiant, lui,
+   * ne bouge pas, donc rien de ce qui est déjà noté ne se perd.
+   */
+  { id: 'replier', label: 'Se replier', test: 'VOL', contre: 'VOL', resultat: 'Le résultat du test devient la défense d’intrigue' },
   { id: 'influence', label: 'Influence', test: '', contre: 'VIG + ING + STA', resultat: 'Le test est celui de la technique retenue' },
   { id: 'bienseance', label: 'Bienséance (+dB)', test: 'STA', contre: 'VIG + ING + STA', resultat: 'Un dé bonus à placer dans l’intrigue, au début seulement' },
 ] as const;
@@ -502,8 +536,13 @@ export function calculerIntrigue(feuille: Objet | null | undefined, choix: Objet
  * Feuille d'armée — quatrième page du classeur
  *
  * Les compétences d'une armée : onze des dix-neuf, celles qui ont un sens pour
- * une troupe. Elles se posent sur la **maison**, à côté des unités du lot 20.E,
- * parce qu'une armée n'appartient à personne en particulier.
+ * une troupe.
+ *
+ * Elles se posaient sur la **maison** au lot 24 — une seule ligne de rangs
+ * pour toute la bannière. C'était une lecture trop rapide du classeur : une
+ * maison n'a pas *une* armée mais des unités, et des piquiers levés à la
+ * hâte n'ont ni le Tir des archers ni la Discipline des gardes. Depuis le lot
+ * 25 les rangs vivent sur **l'unité**, avec le reste de sa ligne de bataille.
  * -------------------------------------------------------------------------- */
 
 export const COMPETENCES_ARMEE = [

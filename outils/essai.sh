@@ -2559,10 +2559,6 @@ verifier "les onze competences d'armee descendent" 11 "$(lire competences_armee_
 verifier "  dont le corps a corps" oui "$(contient '"id":"CAC","label":"Corps à corps"')"
 verifier "une maison a qui donner une armee" 201 "$(code "$BOCAL_A" POST /api/maisons '{"label":"Karstark","couleur":"#3b5b7a"}')"
 MAISON_ARMEE="$(lire maison.id)"
-verifier "on lui pose des rangs" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"competences_armee":{"CAC":4,"TIR":2,"DRE":0}}')"
-code "$BOCAL_A" GET /api/vue/maisons > /dev/null
-verifier "  ils sont la" oui "$(contient '"competences_armee":{"CAC":4,"TIR":2}')"
-verifier "  et le rang zero n'est pas ecrit" non "$(contient '"DRE":0')"
 verifier "une unite porte sa ligne de bataille" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"unites":[{"nom":"Piquiers","type":"infanterie","degats_cc":5,"degats_dis":2,"va":3,"discipline":4,"mouvement":"4"}]}')"
 code "$BOCAL_A" GET /api/vue/maisons > /dev/null
 verifier "  les degats au contact" oui "$(contient '"degats_cc":5')"
@@ -2587,10 +2583,237 @@ verifier "la ligne d'attente n'est pas un round" oui "$(contient 'if (!intrigue.
 # chiffre, et le curseur perdu.
 verifier "les nombres ne redessinent pas le panneau" oui "$(contient 'if (redessine) redessiner();')"
 verifier "le bandeau d'onglets se filtre" oui "$(contient "class: 'fp-recherche'")"
-code - GET /js/views/maisons.js > /dev/null
-verifier "la maison montre ses competences d'armee" oui "$(contient 'function blocCompetencesArmee')"
 code - GET /css/app.css > /dev/null
 verifier "la feuille a son habillage" oui "$(contient '.vue-perso {')"
+
+# ---------------------------------------------------------------------------
+# Lot 25 : les specialites en colonnes, et l'armee par unite
+#
+# Deux deplacements demandes apres essai a la table. Ce qui doit tenir :
+#
+#  1. Les competences d'armee vivent sur l'UNITE, plus sur la maison. Le lot 24
+#     les posait sur la banniere entiere, ce qui donnait le meme Tir aux
+#     archers et aux piquiers. La maison ne doit plus rien en savoir.
+#  2. Les specialites sont des COLONNES, a droite de la competence. Il peut y
+#     en avoir plus de trois, une specialite peut porter une phrase entiere, et
+#     une colonne sautee garde sa place — sinon ce qu'on ecrit dans la
+#     troisieme remonte dans la premiere au rechargement.
+# ---------------------------------------------------------------------------
+
+echo "-- 25.A les competences d'armee descendent sur l'unite"
+verifier "on pose des rangs sur une unite" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"unites":[{"nom":"Archers","type":"tir","competences":{"TIR":4,"VIG":2,"DRE":0}},{"nom":"Piquiers","type":"infanterie","competences":{"CAC":5}}]}')"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "  les archers tirent" oui "$(contient '"competences":{"TIR":4,"VIG":2}')"
+verifier "  les piquiers frappent au contact" oui "$(contient '"competences":{"CAC":5}')"
+verifier "  le rang zero n'est pas ecrit" non "$(contient '"DRE":0')"
+verifier "  la liste des onze descend toujours" 11 "$(lire competences_armee_liste.length)"
+verifier "une unite sans rang n'ecrit pas d'objet vide" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"unites":[{"nom":"Piquiers","type":"infanterie"}]}')"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "  aucune cle competences" non "$(contient '"competences"')"
+verifier "la maison n'en porte plus" 200 "$(code "$BOCAL_A" PATCH /api/maisons/$MAISON_ARMEE '{"competences_armee":{"CAC":4}}')"
+code "$BOCAL_A" GET /api/vue/maisons > /dev/null
+verifier "  le champ de la maison est ignore" non "$(contient 'competences_armee":{')"
+
+echo "-- 25.B les specialites, en colonnes"
+verifier "la vue dit combien de colonnes on peut ouvrir" 8 "$(code "$BOCAL_A" GET /api/vue/perso > /dev/null; lire max_specialites)"
+verifier "cinq specialites sur une competence" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"CAC":{"rang":4,"specialites":[{"nom":"Epee longue","rang":2,"exp":30},{"nom":"Hache","rang":1},{"nom":"Lance","rang":1},{"nom":"Bouclier","rang":3},{"nom":"Lutte","rang":1}]}}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  les cinq tiennent" 5 "$(lire personne.feuille.competences.CAC.specialites.length)"
+verifier "  la cinquieme aussi" Lutte "$(lire personne.feuille.competences.CAC.specialites.4.nom)"
+verifier "une specialite peut porter une phrase" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"CAC":{"rang":4,"specialites":[{"nom":"Epee longue : deux mains, +1D quand la cible porte une armure lourde, et rien du tout a cheval — c est la note qui manquait au classeur, ou la colonne faisait quarante signes.","rang":2}]}}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  elle n'est pas coupee a quatre-vingts signes" oui "$(contient 'la colonne faisait quarante signes')"
+# Les colonnes sont une grille : une case vide au milieu garde sa place, sinon
+# une specialite ecrite en troisieme colonne remonterait en premiere au
+# rechargement, et la colonne ouverte pour elle disparaitrait.
+verifier "une colonne sautee garde sa place" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"CAC":{"rang":4,"specialites":[{"nom":"","rang":0,"exp":0},{"nom":"","rang":0,"exp":0},{"nom":"Bouclier","rang":3}]}}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  les trois cases tiennent" 3 "$(lire personne.feuille.competences.CAC.specialites.length)"
+verifier "  et la troisieme est la bonne" Bouclier "$(lire personne.feuille.competences.CAC.specialites.2.nom)"
+verifier "ce qui traine apres la derniere ne tient pas" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"competences":{"CAC":{"rang":4,"specialites":[{"nom":"Hache","rang":1},{"nom":"","rang":0,"exp":0},{"nom":"","rang":0,"exp":0}]}}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  il ne reste que la remplie" 1 "$(lire personne.feuille.competences.CAC.specialites.length)"
+verifier "une competence dont tout est vide s'efface" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"age":31,"competences":{"CAC":{"rang":0,"specialites":[{"nom":"","rang":0,"exp":0},{"nom":"","rang":0,"exp":0}]}}}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  plus trace du corps a corps" non "$(contient '"CAC"')"
+
+echo "-- 25.C les six zones de texte libre sont restees"
+verifier "on en ecrit" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"feuille":{"attributs":"grand","vices":"orgueil","vertus":"loyal","allies":"les Stark","ennemis":"les Lannister","notes":"a suivre"}}')"
+code "$BOCAL_A" GET /api/personnes/$FEUILLE_ID > /dev/null
+verifier "  les attributs tiennent" grand "$(lire personne.feuille.attributs)"
+verifier "  les vices aussi" orgueil "$(lire personne.feuille.vices)"
+verifier "  et les notes" "a suivre" "$(lire personne.feuille.notes)"
+
+echo "-- 25.D ce que la copie emporte d'une fiche"
+# Trois morceaux qui appartiennent a la fiche mais pas a ce qu'on montre du
+# doigt : les notes disent cette campagne-ci, les humeurs visent ces joueurs-la,
+# la feuille est le personnage joue. Trois cases, sous « Les profils ».
+verifier "une fiche a copier, bien garnie" 200 "$(code "$BOCAL_A" PATCH /api/personnes/$FEUILLE_ID '{"notes":"ce qui s est passe","relations_joueurs":{"j1":{"note":5,"commentaire":"loyal"}},"feuille":{"competences":{"VOL":{"rang":5}}}}')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID" > /dev/null
+verifier "par defaut tout part" oui "$(contient 'ce qui s est passe')"
+verifier "  les humeurs aussi" oui "$(contient '"relations_joueurs"')"
+verifier "  et la feuille" oui "$(contient '"feuille"')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&notes=0" > /dev/null
+verifier "sans les notes, elles ne partent pas" non "$(contient 'ce qui s est passe')"
+verifier "  mais la fiche est bien la" oui "$(contient 'Sansa')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&humeurs=0" > /dev/null
+verifier "sans les humeurs non plus" non "$(contient '"relations_joueurs"')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&feuille=0" > /dev/null
+verifier "ni la feuille de personnage" non "$(contient '"feuille"')"
+verifier "  et les notes, elles, restent" oui "$(contient 'ce qui s est passe')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&notes=0&humeurs=0&feuille=0" > /dev/null
+verifier "les trois a la fois" non "$(contient '"feuille"')"
+verifier "  et la fiche part quand meme" oui "$(contient 'Sansa')"
+
+echo "-- 25 cote navigateur"
+code - GET /js/views/perso.js > /dev/null
+verifier "les competences sont un tableau" oui "$(contient "h('table', { class: 'fp-table-competences' }")"
+verifier "  dont l'en-tete tient sur deux rangees" oui "$(contient "colspan: 3")"
+verifier "  et qui defile chez lui" oui "$(contient "class: 'fp-tableau'")"
+verifier "on peut ouvrir un triplet de plus" oui "$(contient "texte: '＋ Spécialité'")"
+# Ecrire dans la troisieme colonne quand les deux premieres sont vides doit
+# marcher : on comble les trous plutot que d'empiler a la suite.
+verifier "une colonne sautee se comble" oui "$(contient 'while (entree.specialites.length <= colonne)')"
+code - GET /js/views/maisons.js > /dev/null
+verifier "l'unite montre ses competences d'armee" oui "$(contient 'function competencesUnite')"
+verifier "  et la maison n'en a plus" non "$(contient 'function blocCompetencesArmee')"
+code - GET /js/main.js > /dev/null
+# Decocher une categorie decoche toutes ses sous-categories, et les eteint :
+# une case qu'on peut cocher alors qu'elle ne s'appliquera pas est un mensonge.
+verifier "les sous-cases suivent leur categorie" oui "$(contient 'function majSousCasesProfils')"
+verifier "  et ne s'appliquent pas sans elle" oui "$(contient "notes: profils && localStorage.getItem(COPIE_NOTES) !== '0'")"
+code - GET / > /dev/null
+verifier "les trois sous-cases sont dans les reglages" oui "$(contient 'id="copie-notes"')"
+verifier "  dont les humeurs" oui "$(contient 'id="copie-humeurs"')"
+verifier "  et la feuille" oui "$(contient 'id="copie-feuille"')"
+code - GET /css/app.css > /dev/null
+verifier "le tableau des competences a son habillage" oui "$(contient '.fp-table-competences {')"
+verifier "l'unite a ses onze cases" oui "$(contient '.mz-comps-armee {')"
+verifier "les sous-cases sont en retrait" oui "$(contient '.option-copie-sous {')"
+
+# ---------------------------------------------------------------------------
+# Lot 26 : relire sans recharger, et emporter les formes avec les fiches
+# ---------------------------------------------------------------------------
+#
+# Deux choses sans rapport, sinon qu'elles repondent au meme reproche : ce qu'on
+# voit a l'ecran n'est pas toujours ce qui est en base, et ce qu'on prend a la
+# main n'est pas tout ce qu'on voulait prendre.
+
+echo "-- 26.A relire sans recharger la page"
+code - GET / > /dev/null
+verifier "la barre du bas a son bouton" oui "$(contient 'id="btn-recharger"')"
+code - GET /js/main.js > /dev/null
+verifier "  qui relit tout" oui "$(contient 'async function rechargerTout')"
+# Un seul rechargement a la fois : deux payloads rendus dans un ordre que
+# personne ne controle, c'est un plan qui saute sans raison visible.
+verifier "  un seul a la fois" oui "$(contient 'if (rechargementEnCours) return;')"
+# Et surtout : ce qui attend part d'abord. Relire avant que le patch soit parti
+# ferait revenir le champ a sa valeur d'avant sous les yeux de qui l'ecrit.
+verifier "  apres avoir vide ce qui attend" oui "$(contient 'panneau.viderEnvois?.()')"
+code - GET /js/views/perso.js > /dev/null
+verifier "la feuille sait vider sa file" oui "$(contient 'viderEnvois:')"
+code - GET /js/views/maisons.js > /dev/null
+verifier "les maisons aussi" oui "$(contient 'viderEnvois:')"
+# Cette vue-la ne le faisait pas en partant : quitter « Maisons » dans la
+# demi-seconde suivant une frappe la perdait, sans rien dire.
+verifier "  et n'oublient plus rien en partant" oui "$(contient 'for (const id of [...enAttente.keys()]) envoyer(id);')"
+code - GET /css/app.css > /dev/null
+verifier "l'icone tourne pendant le tour" oui "$(contient '#btn-recharger.tourne .ico')"
+
+echo "-- 26.B les formes de fond dans le copier-coller"
+# Une forme ne contient personne : elle voyage parce qu'on l'a montree du doigt,
+# jamais parce qu'elle recouvre quelqu'un. D'ou une liste d'identifiants, et non
+# un « prends celles qui touchent ».
+verifier "poser un cadre a copier" 201 "$(code "$BOCAL_A" POST /api/formes '{"genre":"rectangle","x":1000,"y":1000,"l":400,"h":300,"texte":"les pretendants"}')"
+FORME_COPIE="$(lire forme.id)"
+verifier "  et un second, qu'on ne prendra pas" 201 "$(code "$BOCAL_A" POST /api/formes '{"genre":"ellipse","x":9000,"y":9000,"texte":"a laisser"}')"
+
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID" > /dev/null
+verifier "sans rien designer, aucune forme ne part" non "$(contient 'les pretendants')"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&formes_ids=$FORME_COPIE" > /dev/null
+verifier "designee, elle part" oui "$(contient 'les pretendants')"
+verifier "  et elle seule" non "$(contient 'a laisser')"
+verifier "  une forme dans l'extrait" 1 "$(lire extrait.formes.length)"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&formes_ids=$FORME_COPIE&formes=0" > /dev/null
+verifier "la case decochee la retient" non "$(contient 'les pretendants')"
+verifier "  et la fiche part quand meme" oui "$(contient 'Sansa')"
+
+# Des formes sans fiche font un extrait valable : on copie un cadre et son titre
+# pour les reposer ailleurs.
+code "$BOCAL_A" GET "/api/extrait?ids=&formes_ids=$FORME_COPIE" > /dev/null
+verifier "des formes seules suffisent" oui "$(contient 'les pretendants')"
+verifier "  sans aucune fiche" 0 "$(lire extrait.personnes.length)"
+# Les deux autres cases decochees, mais une forme montree du doigt : c'est une
+# copie legitime. Sans forme designee, en revanche, on refuse toujours — sinon
+# decocher les deux cesserait d'etre une erreur (23.G).
+verifier "  meme sans profils ni liens" 200 "$(code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&profils=0&liens=0&formes_ids=$FORME_COPIE")"
+verifier "  mais rien du tout reste refuse" 400 "$(code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&profils=0&liens=0")"
+code "$BOCAL_A" GET "/api/extrait?ids=&formes_ids=$FORME_COPIE" > /dev/null
+node -e "
+  const fs = require('fs');
+  const d = JSON.parse(fs.readFileSync('$DOSSIER/corps.json', 'utf8'));
+  fs.writeFileSync('$DOSSIER/coller.json', JSON.stringify({ extrait: d.extrait, x: 5000, y: 6000 }));
+"
+verifier "on les colle ailleurs" 201 "$(fichier "$BOCAL_A" POST /api/coller "$DOSSIER/coller.json")"
+verifier "  une forme de plus" 1 "$(lire formes)"
+code "$BOCAL_A" GET /api/formes > /dev/null
+# Le coin haut-gauche du groupe se pose sous le curseur : une forme seule y
+# arrive donc exactement.
+verifier "  posee la ou on colle" oui "$(contient '"x":5000')"
+verifier "  et a la bonne hauteur" oui "$(contient '"y":6000')"
+
+# La portee suit les fiches. Quand le profil vise part avec la forme, elle vise
+# la copie ; quand il ne part pas, elle repasse au plan general — invisible se
+# corrige mal, mal placee se corrige d'un glisser.
+code "$BOCAL_A" PATCH "/api/formes/$FORME_COPIE" "{\"vue\":\"profils\",\"profils\":[\"$FEUILLE_ID\"]}" > /dev/null
+code "$BOCAL_A" GET /api/formes > /dev/null
+AVANT_FORMES="$(lire formes.length)"
+code "$BOCAL_A" GET "/api/extrait?ids=$FEUILLE_ID&formes_ids=$FORME_COPIE" > /dev/null
+node -e "
+  const fs = require('fs');
+  const d = JSON.parse(fs.readFileSync('$DOSSIER/corps.json', 'utf8'));
+  fs.writeFileSync('$DOSSIER/coller.json', JSON.stringify({ extrait: d.extrait, x: 200, y: 300 }));
+"
+verifier "coller la fiche et sa forme" 201 "$(fichier "$BOCAL_A" POST /api/coller "$DOSSIER/coller.json")"
+NOUVELLE_FICHE="$(lire personnes.0)"
+code "$BOCAL_A" GET /api/formes > /dev/null
+verifier "  la forme est arrivee" "$((AVANT_FORMES + 1))" "$(lire formes.length)"
+verifier "  elle vise la copie, pas l'original" "$NOUVELLE_FICHE" "$(lire formes.$AVANT_FORMES.profils.0)"
+
+code "$BOCAL_A" PATCH "/api/formes/$FORME_COPIE" '{"vue":"profils","profils":["fantome-inexistant"]}' > /dev/null
+code "$BOCAL_A" GET /api/formes > /dev/null
+AVANT_FORMES="$(lire formes.length)"
+code "$BOCAL_A" GET "/api/extrait?ids=&formes_ids=$FORME_COPIE" > /dev/null
+verifier "une portee orpheline part telle quelle" oui "$(contient 'fantome-inexistant')"
+node -e "
+  const fs = require('fs');
+  const d = JSON.parse(fs.readFileSync('$DOSSIER/corps.json', 'utf8'));
+  fs.writeFileSync('$DOSSIER/coller.json', JSON.stringify({ extrait: d.extrait, x: 10, y: 20 }));
+"
+verifier "  et se colle" 201 "$(fichier "$BOCAL_A" POST /api/coller "$DOSSIER/coller.json")"
+code "$BOCAL_A" GET /api/formes > /dev/null
+verifier "  mais repasse au plan general" plan "$(lire formes.$AVANT_FORMES.vue)"
+verifier "  sans profil orphelin" 0 "$(lire formes.$AVANT_FORMES.profils.length)"
+
+echo "-- 26.B cote navigateur"
+code - GET /js/formes.js > /dev/null
+# La selection hors mode dessin passe par la geometrie, jamais par les clics :
+# une forme qui attrape les clics en permanence rend le plan intraversable.
+verifier "une forme se prend sans devenir cliquable" oui "$(contient 'sousLePoint(x, y)')"
+verifier "  et le cadre lit des rectangles" oui "$(contient 'boites: () =>')"
+verifier "  au repos, rien ne change" oui "$(contient 'pointer-events: none')"
+code - GET /js/views/cartes.js > /dev/null
+verifier "le cadre Ctrl prend aussi les formes" oui "$(contient 'formes.definirPrises([...formesPrises])')"
+verifier "  et un Ctrl + clic en bascule une" oui "$(contient 'formes.basculerPrise(id)')"
+verifier "  le copier-coller les lit" oui "$(contient 'selectionFormes: () => formes.prises()')"
+code - GET /js/main.js > /dev/null
+verifier "la copie emporte les formes designees" oui "$(contient 'idsFormes = etat.moteur?.selectionFormes?.()')"
+# Tout decocher ne copierait rien : la derniere categorie refuse de s'eteindre.
+verifier "  au moins une categorie reste cochee" oui "$(contient 'const CATEGORIES_COPIE = () => [')"
+code - GET / > /dev/null
+verifier "la case est dans les reglages" oui "$(contient 'id="copie-formes"')"
+code - GET /css/app.css > /dev/null
+verifier "une forme prise se voit" oui "$(contient '.forme.prise {')"
 
 # ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps

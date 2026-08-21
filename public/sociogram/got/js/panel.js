@@ -789,6 +789,8 @@ export function creerPanneau(element, rappels = {}) {
     afficher,
     fermer,
     majCitations,
+    /** Ce qui attend part maintenant — le bouton « ⟳ » l'appelle (lot 26.A). */
+    viderEnvois: envoyer,
     estOuvert: () => !!brouillon,
     idCourant: () => brouillon?.id || null,
     definirReferentiels(nouveaux) {

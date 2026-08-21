@@ -269,9 +269,34 @@
               <input type="checkbox" id="copie-profils" checked />
               <span>Les profils</span>
             </label>
+            <!-- Trois morceaux de la fiche elle-même (lot 25). En retrait,
+                 parce qu'ils dépendent de la case au-dessus : sans les
+                 profils, il n'y a pas de notes à emporter. Décocher « Les
+                 profils » les décoche tous les trois et les éteint. -->
+            <div class="option-copie-sous" id="copie-sous-profils">
+              <label class="option-copie">
+                <input type="checkbox" id="copie-notes" checked />
+                <span>Leurs notes</span>
+              </label>
+              <label class="option-copie">
+                <input type="checkbox" id="copie-humeurs" checked />
+                <span>Leurs humeurs envers les joueurs</span>
+              </label>
+              <label class="option-copie">
+                <input type="checkbox" id="copie-feuille" checked />
+                <span>Leur feuille de personnage</span>
+              </label>
+            </div>
             <label class="option-copie">
               <input type="checkbox" id="copie-liens" checked />
               <span>Les liens entre eux</span>
+            </label>
+            <!-- Les formes de fond (lot 26.B). Au premier niveau et non en
+                 retrait : une forme ne tient à aucune fiche, elle se copie
+                 seule aussi bien qu'avec un groupe. -->
+            <label class="option-copie">
+              <input type="checkbox" id="copie-formes" checked />
+              <span>Les formes de fond prises avec</span>
             </label>
           </div>
         </section>
@@ -401,6 +426,14 @@
             <span class="ico">▭</span><span class="lib">Formes</span>
           </button>
           <span class="outils-formes" id="outils-formes" hidden></span>
+          <!-- Relire ce qui est en base sans repasser par le chargement de la
+               page (lot 26.A). Deux personnes jouent sur le même monde : celle
+               qui n'écrit pas doit pouvoir voir arriver ce que l'autre pose,
+               et F5 coûte le plan, le zoom et la fiche ouverte. -->
+          <button class="bouton bouton-plat" id="btn-recharger"
+                  title="Relire les données du serveur sans recharger la page">
+            <span class="ico">⟳</span><span class="lib">Recharger</span>
+          </button>
           <span class="separateur-vertical"></span>
           <span class="groupe-cadrage" id="groupe-cadrage">
             <button class="bouton bouton-plat" id="btn-ajuster" title="Tout afficher">

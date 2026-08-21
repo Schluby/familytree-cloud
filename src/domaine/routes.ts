@@ -567,13 +567,26 @@ routesDomaine.get('/extrait', async (c) => {
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);
+  // Les formes voyagent par leur identifiant et non par un « prends celles qui
+  // touchent » (lot 26.B) : une forme ne contient personne, donc c'est la
+  // sélection qui les désigne, une par une.
+  const idsFormes = (c.req.query('formes_ids') || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
   // `profils=0` / `liens=0` (lot 23.G) : ce qu'on emporte se règle **à la
   // copie**, pas au collage. Absents, on prend tout — c'est ce qu'on veut neuf
-  // fois sur dix.
+  // fois sur dix. Le lot 25 y ajoute trois morceaux de la fiche elle-même,
+  // sur le même principe : absents, ils partent.
   try {
     const extrait = pressePapiers.extraire(courant.dataset, ids, {
       profils: c.req.query('profils') !== '0',
       liens: c.req.query('liens') !== '0',
+      notes: c.req.query('notes') !== '0',
+      humeurs: c.req.query('humeurs') !== '0',
+      feuille: c.req.query('feuille') !== '0',
+      formes: c.req.query('formes') !== '0',
+      idsFormes,
     });
     return c.json({ extrait });
   } catch (erreur) {

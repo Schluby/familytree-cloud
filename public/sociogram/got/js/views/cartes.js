@@ -87,6 +87,9 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       surModification: (id, patch) => contexte.surFormeModifiee?.(id, patch),
       surSuppression: (id) => contexte.surFormeSupprimee?.(id),
       surOutil: (genre) => contexte.surOutilForme?.(genre),
+      // Une forme prise ou rendue change ce qu'emporterait un Ctrl+C : le même
+      // écriteau que les fiches doit le dire (lot 26.B).
+      surPrises: () => marquerSelection(),
       // Pour nommer les profils auxquels une forme est rattachée. Le moteur les
       // a déjà sous la main : inutile de les redemander à `main.js`.
       profils: () =>
@@ -241,12 +244,14 @@ export function creerRenduCartes(conteneur, contexte = {}) {
 
   function marquerSelection() {
     cartes.forEach((carte, id) => carte.classList.toggle('selectionnee', selection.has(id)));
-    contexte.surSelectionMultiple?.(selection.size);
+    contexte.surSelectionMultiple?.(selection.size, formes.prises().length);
   }
 
   function viderSelection() {
-    if (!selection.size) return;
+    if (!selection.size && !formes.prises().length) return;
     selection.clear();
+    // Les formes se prennent dans le même geste : elles se reposent avec lui.
+    formes.viderPrises();
     marquerSelection();
   }
 
@@ -367,6 +372,10 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       // Un nouveau cadre **ajoute** à ce qui est déjà pris : on compose une main
       // en plusieurs passes plutôt que de tout reprendre à chaque fois.
       avant: new Set(selection),
+      avantFormes: formes.prises(),
+      // Reste faux tant que rien n'a été tracé : c'est ce qui distingue le
+      // cadre du simple Ctrl + clic, traité au lâcher.
+      aTrace: false,
     };
     bandeSelection.hidden = false;
     majBande(evenement);
@@ -380,6 +389,7 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     const y1 = evenement.clientY - bande.cadre.top;
     const gauche = Math.min(bande.x0, x1);
     const haut = Math.min(bande.y0, y1);
+    if (Math.abs(x1 - bande.x0) > 3 || Math.abs(y1 - bande.y0) > 3) bande.aTrace = true;
     bandeSelection.style.left = `${gauche}px`;
     bandeSelection.style.top = `${haut}px`;
     bandeSelection.style.width = `${Math.abs(x1 - bande.x0)}px`;
@@ -396,11 +406,22 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       const touche = boite.x < mx1 && boite.x + boite.l > mx0 && boite.y < my1 && boite.y + boite.h > my0;
       if (touche) selection.add(id);
     });
+    // Les formes de fond entrent dans le même cadre (lot 26.B). Elles vivent
+    // déjà en coordonnées de monde — les mêmes que ces boîtes — donc il n'y a
+    // rien de plus à convertir, et surtout rien à rendre cliquable.
+    const formesPrises = new Set(bande.avantFormes);
+    formes.boites().forEach((boite) => {
+      const touche =
+        boite.x < mx1 && boite.x + boite.l > mx0 && boite.y < my1 && boite.y + boite.h > my0;
+      if (touche) formesPrises.add(boite.id);
+    });
+    formes.definirPrises([...formesPrises]);
     marquerSelection();
   }
 
   function finirBande(evenement) {
     if (!bande) return;
+    const { aTrace, avantFormes } = bande;
     bande = null;
     bandeSelection.hidden = true;
     document.removeEventListener('mousemove', majBande, true);
@@ -408,6 +429,20 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     finBande = performance.now();
     evenement.preventDefault();
     evenement.stopPropagation();
+
+    // Ctrl + clic sans rien tracer : s'il y a une forme dessous, on la prend ou
+    // on la rend. C'est le pendant exact du Ctrl + clic sur une fiche, en
+    // passant par la géométrie puisqu'une forme au repos n'attrape pas les
+    // clics — voir l'entête de `js/formes.js`.
+    if (aTrace) return;
+    // On repart de l'état d'avant le clic, et c'est indispensable : un cadre de
+    // zéro pixel **recoupe** la forme sous le curseur, donc `majBande` l'a déjà
+    // prise. Basculer par-dessus la rendait aussitôt, et le clic ne faisait
+    // rien du tout — deux gestes qui s'annulent, invisibles à la lecture.
+    formes.definirPrises(avantFormes);
+    const point = pointMonde(evenement);
+    const id = formes.sousLePoint(point.x, point.y);
+    if (id) formes.basculerPrise(id);
   }
 
   // ------------------------------------------------------- glisser un lien
@@ -1968,8 +2003,18 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       });
     },
 
+    /**
+     * Ce que le plan garde en file avant de l'envoyer (lot 26.A).
+     *
+     * Seul le texte écrit dans une forme est différé ici : une fiche qu'on
+     * déplace part au lâcher, un lien à la validation.
+     */
+    viderEnvois: () => formes.viderEnvois(),
+
     /** Ce qui est pris en ce moment — pour l'écriteau du plan. */
     selection: () => [...selection],
+    /** Et les formes de fond prises avec (lot 26.B) : le copier-coller les lit. */
+    selectionFormes: () => formes.prises(),
     viderSelection,
 
     /** Un événement souris → les coordonnées du plan, pour y poser une fiche. */
