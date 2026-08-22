@@ -290,10 +290,16 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     if (!deport) return;
     const curseur = pointMonde(evenement);
     deport.quoi.forEach(({ id, boite, ecartX, ecartY }) => {
-      // Jamais au-delà du coin : le monde commence à zéro, et une fiche posée
-      // en négatif serait rognée par le cadre.
-      boite.x = Math.max(0, curseur.x + ecartX);
-      boite.y = Math.max(0, curseur.y + ecartY);
+      // Plus de coin (lot 27.B) : le monde n'a plus de bord en haut ni à
+      // gauche, une fiche peut donc porter une coordonnée négative — cette
+      // ligne posait autrefois `Math.max(0, …)`. Le cadre de dessin (le
+      // <svg> des liens) suit désormais cette étendue au lieu de la
+      // supposer positive — voir `origineX`/`origineY` dans
+      // `calculerMiseEnPage` et leur usage dans `positionner()`. Sans ce
+      // second réglage, une fiche déplacée ici aurait perdu ses traits de
+      // parenté en route.
+      boite.x = curseur.x + ecartX;
+      boite.y = curseur.y + ecartY;
       const carte = cartes.get(id);
       carte.style.left = `${boite.x}px`;
       carte.style.top = `${boite.y}px`;
@@ -1063,6 +1069,21 @@ export function creerRenduCartes(conteneur, contexte = {}) {
       boite.y += decalageY;
     });
 
+    // Le cadre du dessin (le <svg> des liens, calé par défaut sur le même
+    // coin que les fiches) doit couvrir tout ce qui existe — et depuis que
+    // les glissers ne sont plus bornés à zéro (lot 27.B), une fiche ancrée
+    // peut se trouver au-dessus ou à gauche de l'origine du monde. Ancré, ce
+    // coin valait jusqu'ici zéro par construction (la butée du glisser
+    // l'interdisait) ; `origineX`/`origineY` ne reculent donc que si
+    // quelque chose l'exige vraiment. Dans tout monde où rien n'est passé en
+    // négatif — donc dans tous les mondes d'avant ce lot — ils restent à
+    // zéro et rien ne change. C'est `positionner()` qui recale le <svg> sur
+    // cette origine : agrandir seulement `largeur`/`hauteur` ne suffirait
+    // pas, le coin du dessin resterait à zéro et tout ce qui est avant
+    // resterait hors champ.
+    const origineX = ancrage ? Math.min(0, finale.x0) : 0;
+    const origineY = ancrage ? Math.min(0, finale.y0) : 0;
+
     return {
       boites,
       familles: [...familles.values()],
@@ -1076,10 +1097,13 @@ export function creerRenduCartes(conteneur, contexte = {}) {
         );
       }),
       sociaux: [...sociaux, ...fratriesEloignees].filter(lienVisible),
-      // Ancré, le monde part de zéro et non du coin de la boîte englobante :
-      // c'est la même origine que les positions enregistrées.
-      largeur: ancrage ? finale.x1 + GEO.marge : finale.x1 - finale.x0 + GEO.marge * 2,
-      hauteur: ancrage ? finale.y1 + GEO.marge : finale.y1 - finale.y0 + GEO.marge * 2,
+      origineX,
+      origineY,
+      // Ancré, le bord droit part de zéro et non du coin de la boîte
+      // englobante : c'est la même origine que les positions enregistrées.
+      // `- origineX/Y` rattrape le seul cas où ce coin-là ne vaut plus zéro.
+      largeur: (ancrage ? finale.x1 + GEO.marge : finale.x1 - finale.x0 + GEO.marge * 2) - origineX,
+      hauteur: (ancrage ? finale.y1 + GEO.marge : finale.y1 - finale.y0 + GEO.marge * 2) - origineY,
     };
   }
 
@@ -1346,9 +1370,20 @@ export function creerRenduCartes(conteneur, contexte = {}) {
     });
     monde.style.width = `${disposition.largeur}px`;
     monde.style.height = `${disposition.hauteur}px`;
+    // Le <svg> reste calé au coin des fiches par défaut (`.liens` le pose à
+    // `left: 0; top: 0` dans la feuille de style) — sauf quand la boîte
+    // englobante déborde avant zéro : on décale alors son coin du même
+    // montant que sa `viewBox`. Les deux doivent bouger ensemble : décaler
+    // l'un sans l'autre dessinerait les liens à côté des fiches plutôt que
+    // dessus (lot 27.B).
+    svg.style.left = `${disposition.origineX}px`;
+    svg.style.top = `${disposition.origineY}px`;
     svg.setAttribute('width', disposition.largeur);
     svg.setAttribute('height', disposition.hauteur);
-    svg.setAttribute('viewBox', `0 0 ${disposition.largeur} ${disposition.hauteur}`);
+    svg.setAttribute(
+      'viewBox',
+      `${disposition.origineX} ${disposition.origineY} ${disposition.largeur} ${disposition.hauteur}`
+    );
     if (!animer) {
       // force un reflow pour que la classe soit prise en compte immédiatement
       void coucheCartes.offsetWidth;

@@ -412,12 +412,31 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   position: absolute;
   box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
+  /* `overflow: visible`, et c'est un changement du lot 27.C. La forme portait
+     `hidden` pour retenir son texte ; mais ses poignées débordent volontairement
+     de quelques pixels (`-5px`), et `hidden` les **rognait de moitié** — celle
+     du coin bas-droit, seule à exister alors, se réduisait à un onglet de 6 px
+     par 6, à peu près invisible et à peu près invisable. C'est le texte qu'il
+     faut retenir, pas les prises : le débordement se règle donc un cran plus
+     bas, sur `.forme-texte`. */
+  overflow: visible;
 }
-.forme-texte {
+/* Attention au nom : `forme-texte` désigne **deux choses**. Sur un `.forme`,
+   c'est le genre de la forme (`forme forme-texte`, une zone de texte) ; à
+   l'intérieur, c'est le bloc de texte de n'importe quelle forme. D'où le
+   `>` : sans lui, une règle écrite pour le bloc s'applique aussi à la zone de
+   texte elle-même. Le lot 27.C s'y est fait prendre — un `max-width: 100%`
+   destiné au bloc a ramené la forme entière à 20 px de large, `100%` d'un
+   parent sans dimension. Les règles voisines évitent le piège autrement, en
+   passant par `.formes.actives .forme .forme-texte`. */
+.forme > .forme-texte {
   padding: 6px 10px; text-align: center; line-height: 1.25;
   white-space: pre-wrap; word-break: break-word;
   outline: none; /* `contenteditable` pose un cadre système par-dessus */
+  /* Ce que `.forme` ne retient plus depuis qu'elle laisse dépasser ses
+     poignées : un texte plus long que sa boîte s'arrête au bord au lieu de
+     déborder sur le plan. */
+  max-width: 100%; max-height: 100%; overflow: hidden;
 }
 /* Le texte ne se saisit que sur la forme **déjà choisie** : sinon le premier
    clic poserait un curseur au lieu de la sélectionner, et on ne pourrait plus
@@ -431,16 +450,67 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
    `.actives` : on prend des formes hors du mode dessin, c'est tout le propos.
    Pointillé comme celui des fiches, parce que c'est la même main. */
 .forme.prise { outline: 2px dashed var(--accent); outline-offset: 3px; }
-/* La poignée de redimensionnement, au coin bas-droit. Invisible hors mode
-   dessin : elle n'a rien à signaler quand on ne peut pas s'en servir. */
-.forme-poignee { display: none; }
+/* ── Le mode dessin fait taire les prises de clic des liens (lot 27.C) ──────
+ *
+ * Les couches de `.monde` s'empilent dans cet ordre : les formes au fond, le
+ * <svg> des liens au-dessus, les fiches par-dessus tout. Or `.lien-prise` est
+ * une prise **invisible** de 13 px de large (voir plus bas) et elle reste
+ * active en permanence : là où une relation passe au-dessus d'une forme, c'est
+ * le lien qui reçoit le `mousedown`, jamais la forme.
+ *
+ * Sur un plan peuplé, ce n'est pas une gêne théorique. Mesuré sur le monde de
+ * démonstration : d'une zone de texte de 220 × 60, **104 points sur 320
+ * étaient pris par des connecteurs** — un tiers de sa surface, aux endroits
+ * qui changent quand la mise en page bouge. Un grand rectangle garde presque
+ * toujours de quoi s'attraper ailleurs, une zone de texte non : d'où le
+ * « on ne peut pas déplacer le texte, ça n'agit pas comme un rectangle ».
+ *
+ * Pendant qu'on dessine, ce ne sont donc pas les liens qu'on vise. Ils
+ * retrouvent leurs prises en sortant du mode. Les fiches, elles, gardent les
+ * leurs : elles sont **visibles**, donc on sait qu'on clique dessus — ce qui
+ * était traître ici, c'est de perdre un geste contre ce qu'on ne voit pas. */
+.plan.formes-en-cours .lien-prise { pointer-events: none; }
+
+/* Les poignées, tout autour de la forme choisie. Invisibles hors mode dessin :
+   elles n'ont rien à signaler quand on ne peut pas s'en servir.
+   Le lot 20.D n'en posait qu'une, au coin bas-droit, et le geste ne savait
+   qu'agrandir vers la droite et vers le bas : impossible de reprendre de la
+   place par le haut sans déplacer la forme d'abord. */
+.forme-poignee, .forme-deplace { display: none; }
 .formes.actives .forme-poignee {
   display: block;
-  position: absolute; right: -5px; bottom: -5px;
+  position: absolute;
   width: 11px; height: 11px; border-radius: 3px;
   background: var(--carte-fond); border: 2px solid var(--accent);
-  cursor: nwse-resize;
 }
+.forme-poignee-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.forme-poignee-n { left: 50%; top: -5px; margin-left: -5px; cursor: ns-resize; }
+.forme-poignee-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.forme-poignee-e { right: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+.forme-poignee-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.forme-poignee-s { left: 50%; bottom: -5px; margin-left: -5px; cursor: ns-resize; }
+.forme-poignee-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.forme-poignee-w { left: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+
+/* La poignée de déplacement, posée **au-dessus** de la forme et non dedans.
+   Elle ne sert qu'à la forme choisie, et c'est là qu'elle est indispensable :
+   une forme choisie rend son texte saisissable pour qu'on puisse écrire dedans
+   (lot 22.C), et une zone de texte est presque entièrement couverte par le
+   sien. Sans cette prise, on ne pouvait plus l'attraper que par ses marges.
+   Au-dessus plutôt que dans un coin : elle ne cache pas le texte, et elle ne
+   se dispute pas la place avec les huit poignées de taille. */
+.formes.actives .forme.choisie .forme-deplace {
+  display: flex; align-items: center; justify-content: center;
+  position: absolute; left: 50%; top: -24px; transform: translateX(-50%);
+  width: 30px; height: 18px; border-radius: 5px;
+  background: var(--accent); color: #fff;
+  font-size: 11px; line-height: 1; letter-spacing: .12em;
+  cursor: move; user-select: none;
+}
+/* Loin, une poignée de 11 px en fait deux : elle ne se vise plus, et son
+   liseré brouille la forme. Même parti que `.carte-poignee` (lot 16.I) — on
+   les retire, le glisser par le corps de la forme reste. */
+.plan.loin .forme-poignee, .plan.loin .forme-deplace { display: none; }
 
 /* La surface de tracé : posée sur le plan et non dans le monde, pour couvrir
    l'écran sans subir le zoom. Elle n'existe que pendant qu'un outil est armé. */
@@ -852,12 +922,15 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
 /* Une demande reçue attend un geste : elle se voit avant les autres. */
 .ami-recue { background: var(--accent-doux); }
 
-/* La fiche de droite (lot 22.B).
-   Elle part plus large qu'avant — 330 px pour un bloc de notes de six lignes,
-   c'était trop peu — et surtout elle s'étire : `--fiche-largeur` est écrite par
-   `js/panel.js` quand on tire la poignée de son bord gauche, et retenue d'une
-   séance à l'autre. La valeur par défaut vit ici pour que la page s'affiche
-   juste avant même que le JavaScript ait parlé. */
+/* La fiche de droite (lot 22.B) et le carnet en volet (lot 27.A) s'étirent
+   par le même geste : une poignée sur leur bord gauche, une largeur retenue
+   d'une séance à l'autre. `installerEtirement` (js/main.js) porte le
+   mécanisme une seule fois ; ce qui reste propre à chacun, c'est sa variable
+   CSS, sa clé de `localStorage` et sa borne basse.
+   La fiche part plus large qu'avant le lot 22.B — 330 px pour un bloc de
+   notes de six lignes, c'était trop peu. La valeur par défaut de chacun vit
+   dans sa propre règle (celle du carnet est plus bas, sur `.volet-carnet`),
+   pour que la page s'affiche juste avant même que le JavaScript ait parlé. */
 .panneau {
   width: var(--fiche-largeur, 400px);
   flex: 0 0 var(--fiche-largeur, 400px);
@@ -868,14 +941,21 @@ a.bouton { text-decoration: none; display: inline-flex; align-items: center; lin
   position: relative;
 }
 /* Six pixels de large, débordant de trois sur le plan : de quoi l'attraper
-   sans viser. Invisible au repos — c'est le bord du panneau. */
+   sans viser. Invisible au repos — c'est le bord du panneau (ou du volet du
+   carnet, qui porte la même classe et le même bord gauche à saisir).
+   Les deux poignées partagent cette classe, donc l'état « en cours
+   d'étirement » se scope par volet (`.panneau .pn-poignee`,
+   `.volet-carnet .pn-poignee`) : sans ce scope, tirer l'une allumerait aussi
+   le liseré de l'autre, restée immobile. */
 .pn-poignee {
   position: absolute; left: -3px; top: 0; bottom: 0; width: 6px;
   cursor: col-resize; z-index: 3; background: transparent;
 }
 .pn-poignee:hover,
-body.fiche-en-etirement .pn-poignee { background: var(--accent); opacity: .55; }
-body.fiche-en-etirement { cursor: col-resize; user-select: none; }
+body.fiche-en-etirement .panneau .pn-poignee,
+body.carnet-en-etirement .volet-carnet .pn-poignee { background: var(--accent); opacity: .55; }
+body.fiche-en-etirement,
+body.carnet-en-etirement { cursor: col-resize; user-select: none; }
 
 .pn-onglets { display: flex; border-bottom: 1px solid var(--bord); flex: 0 0 auto; }
 .onglet {
@@ -1083,7 +1163,78 @@ body.sombre .puce-rang-heritier.actif { color: #a9c3dc; border-color: #3d4f63; b
   width: 286px; padding: 11px 12px 10px;
   display: flex; flex-direction: column; gap: 9px;
 }
+
+/* ------------------------------------------ un mot aux autres (lot 27.D)
+ *
+ * Deux objets, et ils ne se ressemblent pas exprès. Le panneau d'envoi est un
+ * panneau flottant comme les autres — on l'ouvre, on écrit, il se ferme. La
+ * pile de mots reçus, elle, est la **seule** chose de l'application qui
+ * apparaisse sans qu'on l'ait demandée : elle se tient donc en bas à droite,
+ * sans rien recouvrir d'utile, et s'en va toute seule. */
+.flottant.msg-editeur {
+  width: 300px; padding: 11px 12px 10px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.msg-ligne { display: flex; align-items: center; gap: 8px; }
+.msg-lib { font-size: 12.5px; color: var(--texte-faible); }
+.msg-a-qui { flex: 1; min-width: 0; font-size: 13px; }
+.msg-champ {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 62px;
+  background: var(--fond-3); border: 1px solid var(--bord); border-radius: var(--rayon);
+  padding: 7px 9px; font: inherit; font-size: 14px; line-height: 1.45; outline: none;
+}
+.msg-champ:focus { border-color: var(--accent); background: var(--fond-2); }
+.msg-pied { display: flex; align-items: center; gap: 8px; }
+/* `inline-flex` et un `gap` : le nombre et le mot sont deux nœuds distincts —
+   le dictionnaire compare le texte entier d'un nœud, donc « 480 signes » écrit
+   d'un bloc ne se traduirait jamais. L'espace entre eux est donc de la mise en
+   page, pas un caractère. */
+.msg-reste {
+  flex: 1; display: inline-flex; align-items: baseline; gap: 4px;
+  font-size: 11.5px; color: var(--texte-faible); font-variant-numeric: tabular-nums;
+}
+
+/* La pile des mots reçus. `pointer-events: none` sur la pile et `auto` sur
+   chaque carte : entre deux cartes, on rend le clic au plan — sinon une
+   colonne invisible de 300 px barrerait le coin de l'écran pendant vingt
+   secondes, ce qui est exactement le défaut que le lot 20.D a passé du temps à
+   éviter pour les formes. */
+.msg-pile {
+  position: fixed; right: 16px; bottom: 74px; z-index: 40;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  pointer-events: none;
+}
+.msg-recu {
+  pointer-events: auto; cursor: pointer;
+  width: min(300px, calc(100vw - 32px)); box-sizing: border-box;
+  background: var(--carte-fond); border: 1px solid var(--bord-clair);
+  border-left: 3px solid var(--accent); border-radius: var(--rayon);
+  box-shadow: var(--ombre-panneau); padding: 8px 10px;
+  animation: msg-arrive .22s ease;
+}
+.msg-recu.part { opacity: 0; transition: opacity .4s ease; }
+.msg-recu-qui { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+.msg-recu-nom { font-size: 12.5px; font-weight: 600; color: var(--accent-fonce); }
+.msg-recu-prive {
+  font-size: 10.5px; color: var(--texte-faible);
+  border: 1px solid var(--bord); border-radius: 4px; padding: 0 4px;
+}
+.msg-recu-texte {
+  margin: 0; font-size: 14px; line-height: 1.45; color: var(--texte);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+@keyframes msg-arrive {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 .fe-entete { display: flex; align-items: center; justify-content: space-between; }
+/* Un en-tête par lequel on traîne son panneau (lot 27.C). La classe est posée
+   par `creerFlottant` quand on lui passe `deplacable`, et par personne d'autre :
+   les panneaux qu'on ne déplace pas ne doivent pas *avoir l'air* de se
+   déplacer. `user-select: none` sur le seul en-tête — le corps du panneau, lui,
+   reste un texte qu'on peut sélectionner. */
+.fl-deplacable { cursor: move; user-select: none; }
+body.flottant-en-deplacement { cursor: move; user-select: none; }
 .fe-actions { display: flex; align-items: center; gap: 4px; }
 
 /* La portée : sur le plan général, ou en centrant sur certains profils. */
@@ -1985,8 +2136,17 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
  * colonne permanente). Ce qui change tient en trois déclarations — le reste
  * est commun, sinon les deux places se mettraient à diverger. */
 
+/* Étirable depuis le lot 27.A — même poignée et même mécanisme que la fiche
+   de droite (`installerEtirement`, dans js/main.js). `position: relative` est
+   pour la poignée : sans lui, son `left: -3px` se positionnerait par rapport
+   à `.corps`, le premier ancêtre positionné plus haut, pas par rapport au
+   bord du volet. La largeur par défaut suit la fenêtre plutôt qu'un 400 px
+   unique pour tout le monde ; `clamp` lui garde un plancher — en dessous de
+   320 px, voir le commentaire sur `.cn-sommaire-ouvert` plus bas. */
 .volet-carnet {
-  width: 400px; flex: 0 0 400px;
+  position: relative;
+  width: var(--carnet-largeur, clamp(320px, 34vw, 520px));
+  flex: 0 0 var(--carnet-largeur, clamp(320px, 34vw, 520px));
   background: var(--fond-2);
   border-left: 1px solid var(--bord);
   min-height: 0; min-width: 0;
@@ -1999,7 +2159,20 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   flex: 1; min-width: 0; min-height: 0;
   background: var(--fond-2);
 }
-.carnet-large { background: var(--fond-2); }
+/* Pleine scène : monté à même `#scene` (`main.js`, `enregistrerRendu('carnet',
+   …)`), exactement comme `.vue-perso` et `.vue-maisons`. `#scene` est un
+   `<main>`, `display: block` par défaut — `.scene { flex: 1 }` le dimensionne
+   bien lui-même dans `.corps`, mais ne fait pas de ses propres enfants des
+   items flexibles pour autant. Sans ce `position: absolute; inset: 0`,
+   `.carnet` restait un `flex: 1` sans effet et grandissait à la hauteur de
+   son contenu — mesuré le 22/08/2026, 1727 px pour 536 disponibles, dont
+   1191 px introuvables au défilement (lot 27.A). Une fois borné à la boîte de
+   la scène, `.cn-sommaire` et `.cn-rendu` (déjà `overflow-y: auto`) et
+   `.cn-note` (déjà `min-height: 0`) défilent tout seuls. */
+.carnet-large {
+  position: absolute; inset: 0;
+  background: var(--fond-2);
+}
 
 .cn-barre {
   display: flex; align-items: center; gap: 6px;
@@ -2037,9 +2210,12 @@ body.sombre .bandeau-demo.presse { background: #352c12; color: #e8c96a; border-b
   background: var(--fond-3);
   border-right: 1px solid var(--bord);
 }
-/* Étroit : le sommaire se pose **par-dessus** la note. Le volet fait 400 px ;
-   lui prendre 230 pour une liste laisserait 170 px de texte, ce qui n'est plus
-   une note mais une colonne de mots. */
+/* Étroit : le sommaire se pose **par-dessus** la note, plutôt qu'à côté.
+   Depuis le lot 27.A le volet s'étire, mais sa borne basse reste 320 px
+   (`CARNET_MIN`, js/main.js) : lui prendre 230 px pour une liste laisserait
+   90 px de texte au pire des cas, ce qui n'est plus une note mais une colonne
+   de mots. Une vraie colonne resterait à l'étroit même une fois le volet
+   tiré — d'où l'overlay, quelle que soit la largeur retenue. */
 .cn-sommaire-ouvert .cn-sommaire {
   display: flex;
   position: absolute; left: 0; top: 0; bottom: 0; width: 78%;

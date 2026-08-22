@@ -33,6 +33,7 @@ import { creerRaccourcis } from './raccourcis.js';
 import { creerOffres } from './offres.js';
 import { installerLangue } from './langue.js';
 import { creerChoixLangue } from './choix-langue.js';
+import { creerMessages } from './messages.js';
 
 /** Cloisonnée par application : les deux sociogrammes partagent l'origine. */
 const CLE_THEME = cle('familytree-theme');
@@ -133,6 +134,7 @@ const elements = {
   btnFormes: document.getElementById('btn-formes'),
   outilsFormes: document.getElementById('outils-formes'),
   btnRecharger: document.getElementById('btn-recharger'),
+  btnMessages: document.getElementById('btn-messages'),
 };
 
 /**
@@ -522,6 +524,11 @@ async function demarrer() {
     // un écran vide n'aurait nulle part où atterrir, et la visite guidée passe
     // avant — c'est elle qui a une place à montrer.
     proposerLesNotesRecues();
+    // Les messages volants (27.D) en dernier, et sans être attendus : ils ne
+    // conditionnent aucun affichage, et leur installation commence par demander
+    // qui d'autre voit ce monde — un aller-retour qui n'a pas à retarder le
+    // plan. S'il n'y a personne, le bouton reste caché et rien ne bat.
+    installerLesMessages();
   } catch (erreur) {
     message(`Impossible de contacter l'API : ${erreur.message}`);
   }
@@ -1149,7 +1156,10 @@ async function choisirVue(vueId) {
     if (etat.carnetPlace === 'volet') {
       await carnet.vider();
       elements.voletCarnet.hidden = true;
-      elements.voletCarnet.replaceChildren();
+      // Retire le carnet, pas le volet : sa poignée d'étirement (lot 27.A)
+      // vit dans ce conteneur en permanence, `replaceChildren` l'aurait
+      // emportée avec le reste.
+      carnet.element.remove();
     }
     etat.carnetPlace = 'vue';
   } else if (etat.carnetPlace === 'vue') {
@@ -1328,6 +1338,10 @@ async function rechargerTout() {
     if (panneau.estOuvert() && panneau.idCourant()) {
       await panneau.afficher(panneau.idCourant(), { secrets: !!etat.parametres.secrets });
     }
+    // ⟳ veut dire « montre-moi ce qui est arrivé », et un mot qu'on nous a
+    // laissé en fait partie : l'attendre dix secondes de plus n'aurait pas de
+    // sens quand on vient justement de demander (lot 27.D).
+    await messagerie?.relever();
     astuce('Données relues.');
   } catch (erreur) {
     message(`Rechargement impossible : ${erreur.message}`);
@@ -1421,7 +1435,10 @@ async function poserLeCarnetEnVolet() {
   if (etat.carnetPlace === 'vue') await choisirVue(vueDeRepli());
   etat.carnetPlace = 'volet';
   elements.voletCarnet.hidden = false;
-  elements.voletCarnet.replaceChildren(carnet.element);
+  // `append`, pas `replaceChildren` : le volet garde en permanence la
+  // poignée d'étirement installée par `installerEtirementCarnet` (lot 27.A),
+  // et `append` détache tout seul le carnet de la scène s'il y était.
+  elements.voletCarnet.append(carnet.element);
   carnet.replacer(false);
   majBoutonCarnet();
   await carnet.charger();
@@ -1432,7 +1449,7 @@ async function rangerLeCarnet() {
   await carnet.vider();
   etat.carnetPlace = null;
   elements.voletCarnet.hidden = true;
-  elements.voletCarnet.replaceChildren();
+  carnet.element.remove(); // la poignée reste ; voir poserLeCarnetEnVolet
   majBoutonCarnet();
 }
 
@@ -2829,60 +2846,113 @@ function dessinerOptions(vue) {
  * de droite le dit mieux, et en entier. Ce qui reste est ce que rien d'autre ne
  * dit — combien de fiches sont affichées, et combien le filtre en écarte.
  */
-/* ------------------------------------------------- la fiche qu'on peut étirer
+/* -------------------------------------------------- les volets qu'on étire
  *
- * Lot 22.B. Une largeur fixe convient à la moitié des tables : celles qui
- * écrivent trois lignes de notes la trouvent trop large, celles qui en écrivent
- * trente la trouvent trop étroite. On la fait tirer, et on la retient.
+ * Lot 22.B pour la fiche, lot 27.A pour le carnet en volet : le même geste —
+ * une poignée sur le bord gauche, une largeur retenue d'une séance à l'autre.
+ * Une largeur fixe convient à la moitié des tables : celles qui écrivent
+ * trois lignes de notes la trouvent trop large, celles qui en écrivent trente
+ * la trouvent trop étroite. `installerEtirement` porte le mécanisme une
+ * seule fois ; chaque appelant n'apporte que ce qui lui est propre — sa
+ * variable CSS, sa clé de `localStorage`, sa borne basse.
  *
- * Bornes : jamais moins de 300 px (sous quoi la grille à deux colonnes de la
- * fiche se casse), jamais plus de la moitié de l'écran (au-delà, c'est le plan
- * qu'on n'a plus).
+ * Borne haute commune aux deux : jamais plus de la moitié de l'écran, **et**
+ * jamais au point de ne plus laisser `PLAN_MIN` au plan. Ce second plafond ne
+ * se voit que si les deux volets sont ouverts *et* tirés en même temps —
+ * chacun sous son propre plafond de moitié d'écran, ils peuvent quand même à
+ * eux deux avaler toute la scène. On a préféré ce filet commun à « laisser
+ * faire » : un onglet resté ouvert des semaines avec les deux volets au
+ * maximum ne doit pas transformer la scène en bande de quelques pixels — le
+ * plan est ce qu'on est venu regarder, pas un détail qui cède le premier.
  */
-const FICHE_LARGEUR = cle('familytree-fiche-largeur');
-const FICHE_MIN = 300;
+const PLAN_MIN = 200; // même seuil que le commentaire sur `.volet-carnet` dans app.css : en dessous, « un plan qui ne montre plus de réseau »
 
-function largeurFicheMax() {
-  return Math.max(FICHE_MIN, Math.round(window.innerWidth / 2));
-}
+function installerEtirement({ conteneur, variable, stockage, largeurMin, classeCorps, titre }) {
+  // Mesuré sur la scène **telle qu'elle est avant le geste**. Elle rétrécit
+  // à mesure qu'on tire ; la remesurer à chaque mouvement ferait fuir le
+  // plafond devant soi. Ce qu'elle vaut à cet instant dit déjà ce que le rail
+  // et l'autre volet (ouvert ou non) laissent de place — rien à additionner
+  // à la main, et rien à mettre à jour si le rail change de largeur un jour.
+  const plafond = () => Math.max(largeurMin, Math.min(
+    Math.round(window.innerWidth / 2),
+    Math.round(
+      conteneur.getBoundingClientRect().width +
+      elements.scene.getBoundingClientRect().width -
+      PLAN_MIN
+    )
+  ));
 
-function appliquerLargeurFiche(pixels) {
-  const borne = Math.min(largeurFicheMax(), Math.max(FICHE_MIN, Math.round(pixels)));
-  document.documentElement.style.setProperty('--fiche-largeur', `${borne}px`);
-  return borne;
-}
+  const appliquer = (pixels, max) => {
+    const borne = Math.min(max, Math.max(largeurMin, Math.round(pixels)));
+    document.documentElement.style.setProperty(variable, `${borne}px`);
+    return borne;
+  };
 
-function installerEtirementFiche() {
-  const retenue = Number(localStorage.getItem(FICHE_LARGEUR));
-  if (retenue) appliquerLargeurFiche(retenue);
+  const retenue = Number(localStorage.getItem(stockage));
+  if (retenue) appliquer(retenue, plafond());
 
   const poignee = document.createElement('div');
   poignee.className = 'pn-poignee';
-  poignee.title = 'Étirer la fiche';
-  elements.panneauVolet.prepend(poignee);
+  poignee.title = titre;
+  conteneur.prepend(poignee);
 
   poignee.addEventListener('mousedown', (evenement) => {
     if (evenement.button !== 0) return;
     evenement.preventDefault();
-    document.body.classList.add('fiche-en-etirement');
+    document.body.classList.add(classeCorps);
 
-    // La fiche est collée à droite : sa largeur, c'est la distance du curseur
-    // au bord droit de la fenêtre. Rien à mémoriser, rien à accumuler.
-    const suivre = (mouvement) =>
-      appliquerLargeurFiche(window.innerWidth - mouvement.clientX);
+    // Le volet est collé à droite de ce qui le suit — la fenêtre pour la
+    // fiche, la fiche elle-même pour le carnet quand les deux sont ouverts.
+    // Sa largeur, c'est donc la distance du curseur à *son propre* bord
+    // droit, mesurée une fois : le bord de la fenêtre ne serait plus le bon
+    // dès qu'un autre volet est ouvert à sa droite.
+    const droite = conteneur.getBoundingClientRect().right;
+    const max = plafond();
+    const suivre = (mouvement) => appliquer(droite - mouvement.clientX, max);
 
     const lacher = (mouvement) => {
       document.removeEventListener('mousemove', suivre, true);
       document.removeEventListener('mouseup', lacher, true);
-      document.body.classList.remove('fiche-en-etirement');
-      localStorage.setItem(
-        FICHE_LARGEUR,
-        String(appliquerLargeurFiche(window.innerWidth - mouvement.clientX))
-      );
+      document.body.classList.remove(classeCorps);
+      localStorage.setItem(stockage, String(appliquer(droite - mouvement.clientX, max)));
     };
 
     document.addEventListener('mousemove', suivre, true);
     document.addEventListener('mouseup', lacher, true);
+  });
+}
+
+// Bornes : jamais moins de 300 px, sous quoi la grille à deux colonnes de la
+// fiche se casse.
+const FICHE_LARGEUR = cle('familytree-fiche-largeur');
+const FICHE_MIN = 300;
+
+function installerEtirementFiche() {
+  installerEtirement({
+    conteneur: elements.panneauVolet,
+    variable: '--fiche-largeur',
+    stockage: FICHE_LARGEUR,
+    largeurMin: FICHE_MIN,
+    classeCorps: 'fiche-en-etirement',
+    titre: 'Étirer la fiche',
+  });
+}
+
+// Bornes : jamais moins de 320 px — en dessous, l'éditeur n'est plus une note
+// mais une colonne de mots (voir le commentaire sur `.cn-sommaire-ouvert`
+// dans app.css, qui explique pourquoi le sommaire reste un calque à cette
+// largeur plutôt qu'une vraie colonne).
+const CARNET_LARGEUR = cle('familytree-carnet-largeur');
+const CARNET_MIN = 320;
+
+function installerEtirementCarnet() {
+  installerEtirement({
+    conteneur: elements.voletCarnet,
+    variable: '--carnet-largeur',
+    stockage: CARNET_LARGEUR,
+    largeurMin: CARNET_MIN,
+    classeCorps: 'carnet-en-etirement',
+    titre: 'Étirer le carnet',
   });
 }
 
@@ -3516,7 +3586,30 @@ installerTelephone(elements);
 // alors dans sa forme définitive, et l'état retenu s'y applique une seule fois.
 installerRail();
 installerEtirementFiche();
+installerEtirementCarnet();
 installerOptionsCopie();
+
+/* ------------------------------------------- un mot aux autres (lot 27.D)
+ *
+ * Le module ne sait rien de l'application : on lui passe le bouton, le monde
+ * dont il s'agit, et de quoi parler à l'écran. Il n'est installé que sur son
+ * propre monde — sous procuration ou sur un arbre partagé, « les autres »
+ * désigneraient les gens d'une table qui n'est pas la nôtre.
+ */
+let messagerie = null;
+
+async function installerLesMessages() {
+  if (PROCURATION || PARTAGE) return;
+  const fiche = sauvegardeActive();
+  if (!fiche) return;
+  messagerie = creerMessages({
+    bouton: elements.btnMessages,
+    sauvegardeId: fiche.id,
+    astuce,
+    message,
+  });
+  await messagerie.installer();
+}
 // Créer quelqu'un sans viser : le clic droit dans le vide reste, mais il n'est
 // pas un geste qu'on trouve tout seul — et au doigt, il n'existait pas.
 elements.btnNouveauProfil.addEventListener('click', (evenement) => {

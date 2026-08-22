@@ -44,6 +44,19 @@ import { grillePalette } from './palette.js';
 const TAILLE_DEFAUT = { rectangle: [280, 190], ellipse: [240, 240], texte: [220, 60] };
 /** En deçà, on considère que c'était un clic et non un tracé. */
 const TRACE_MINIMAL = 12;
+/** La plus petite forme qu'on accepte de fabriquer en tirant une poignée. */
+const TAILLE_MINIMALE = 24;
+
+/**
+ * Les huit prises de redimensionnement, dans le sens des aiguilles.
+ *
+ * Chacune dit ce qu'elle tire : `n` et `s` bougent un bord horizontal, `e` et
+ * `w` un bord vertical, les quatre autres les deux à la fois. Tirer par le
+ * nord ou par l'ouest **déplace l'origine** en même temps que la taille — d'où
+ * le patch à quatre champs dans `surFinGeste`, alors que le lot 20.D n'en
+ * envoyait que deux.
+ */
+const COTES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 export const OUTILS = [
   { genre: 'rectangle', icone: '▭', label: 'Rectangle' },
@@ -84,7 +97,11 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
   // `persistant` : c'est un vrai formulaire. Sans lui, ouvrir le nuancier du
   // système ou cliquer dans le panneau après un glisser le referme — et on
   // repart de la forme sans avoir rien pu régler.
-  const socle = creerFlottant({ persistant: true });
+  //
+  // `deplacable` : ce panneau-là se pose sur le plan, à l'endroit exact où l'on
+  // vient de cliquer — donc souvent sur la forme qu'on règle. On le pousse de
+  // côté au lieu de le fermer et de le rouvrir ailleurs (lot 27.C).
+  const socle = creerFlottant({ persistant: true, deplacable: '.fe-entete' });
 
   /* ------------------------------------------------------------------ rendu */
 
@@ -139,7 +156,18 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
 
     const element = h('div', { class: `forme forme-${forme.genre}`, 'data-forme': forme.id }, [
       texte,
-      h('span', { class: 'forme-poignee', title: 'Redimensionner' }),
+      // Une prise pour déplacer, huit pour redimensionner. La première n'a
+      // l'air de rien tant qu'on pense aux rectangles : c'est la zone de texte
+      // qui l'exige, puisque son texte couvre sa surface dès qu'elle est
+      // choisie — voir `.forme-deplace` dans app.css.
+      h('span', { class: 'forme-deplace', texte: '⠿', title: 'Déplacer cette forme' }),
+      ...COTES.map((cote) =>
+        h('span', {
+          class: `forme-poignee forme-poignee-${cote}`,
+          'data-cote': cote,
+          title: 'Redimensionner',
+        })
+      ),
     ]);
     styleDe(forme, element);
 
@@ -156,8 +184,8 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
       // Sans ça, d3 prendrait le glisser pour un déplacement du plan.
       evenement.preventDefault();
       evenement.stopPropagation();
-      const redimensionne = evenement.target.classList.contains('forme-poignee');
-      demarrerGeste(forme, evenement, redimensionne ? 'taille' : 'position');
+      const cote = evenement.target.dataset?.cote;
+      demarrerGeste(forme, evenement, cote ? 'taille' : 'position', cote);
     });
 
     element.addEventListener('click', (evenement) => {
@@ -248,11 +276,12 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
 
   /* --------------------------------------------------- déplacer, agrandir */
 
-  function demarrerGeste(forme, evenement, quoi) {
+  function demarrerGeste(forme, evenement, quoi, cote = null) {
     const curseur = pointMonde(evenement);
     geste = {
       forme,
       quoi,
+      cote,
       aBouge: false,
       depart: { x: forme.x, y: forme.y, l: forme.l, h: forme.h },
       ecartX: forme.x - curseur.x,
@@ -266,13 +295,30 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
   function surGeste(evenement) {
     if (!geste) return;
     const curseur = pointMonde(evenement);
-    const { forme, quoi } = geste;
+    const { forme, quoi, cote, depart } = geste;
     if (quoi === 'position') {
       forme.x = Math.round(curseur.x + geste.ecartX);
       forme.y = Math.round(curseur.y + geste.ecartY);
     } else {
-      forme.l = Math.max(8, Math.round(geste.depart.l + (curseur.x - geste.curseur.x)));
-      forme.h = Math.max(8, Math.round(geste.depart.h + (curseur.y - geste.curseur.y)));
+      const dx = curseur.x - geste.curseur.x;
+      const dy = curseur.y - geste.curseur.y;
+      // On raisonne en bords, jamais en « largeur plus un écart » : c'est ce
+      // qui permet de tirer par le nord ou par l'ouest sans que la forme parte
+      // en marche arrière. Le bord qu'on ne touche pas ne bouge pas, et le
+      // plancher s'applique **du bon côté** — tirer le bord gauche au-delà du
+      // droit s'arrête net au lieu de retourner la forme.
+      let gauche = depart.x;
+      let haut = depart.y;
+      let droite = depart.x + depart.l;
+      let bas = depart.y + depart.h;
+      if (cote.includes('w')) gauche = Math.min(droite - TAILLE_MINIMALE, depart.x + dx);
+      if (cote.includes('e')) droite = Math.max(gauche + TAILLE_MINIMALE, depart.x + depart.l + dx);
+      if (cote.includes('n')) haut = Math.min(bas - TAILLE_MINIMALE, depart.y + dy);
+      if (cote.includes('s')) bas = Math.max(haut + TAILLE_MINIMALE, depart.y + depart.h + dy);
+      forme.x = Math.round(gauche);
+      forme.y = Math.round(haut);
+      forme.l = Math.round(droite - gauche);
+      forme.h = Math.round(bas - haut);
     }
     geste.aBouge = true;
     styleDe(forme, elements.get(forme.id));
@@ -289,12 +335,20 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
 
     // On n'envoie que ce qui a bougé : déplacer une forme est le geste le plus
     // fréquent, et il n'a pas à renvoyer sa couleur et son texte.
+    //
+    // Un redimensionnement porte **aussi** l'origine depuis le lot 27.C : tirer
+    // par le nord ou par l'ouest déplace le coin autant qu'il change la taille,
+    // et n'envoyer que `l`/`h` faisait revenir la forme à sa place d'avant au
+    // rechargement suivant — le bord retrouvé, mais de l'autre côté.
     const patch =
-      quoi === 'position' ? { x: forme.x, y: forme.y } : { l: forme.l, h: forme.h };
-    const inchange =
       quoi === 'position'
-        ? forme.x === depart.x && forme.y === depart.y
-        : forme.l === depart.l && forme.h === depart.h;
+        ? { x: forme.x, y: forme.y }
+        : { x: forme.x, y: forme.y, l: forme.l, h: forme.h };
+    const inchange =
+      forme.x === depart.x &&
+      forme.y === depart.y &&
+      forme.l === depart.l &&
+      forme.h === depart.h;
     if (!inchange) rappels.surModification?.(forme.id, patch);
   }
 
@@ -528,7 +582,7 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
       h('p', {
         class: 'fe-aide',
         texte:
-          'Glisser pour déplacer, le coin en bas à droite pour redimensionner, et cliquer une seconde fois pour écrire dedans. Une forme ne contient personne : elle ne change rien aux données.',
+          'Glisser pour déplacer — ou la prise ⠿ au-dessus, une fois la forme choisie. Les huit poignées la redimensionnent, et un second clic écrit dedans. Ce panneau se pousse par son titre. Une forme ne contient personne : elle ne change rien aux données.',
       }),
     ]);
 
@@ -668,6 +722,11 @@ export function creerCoucheFormes({ monde, plan, pointMonde, rappels = {} }) {
     basculerMode(actif) {
       modeDessin = actif;
       couche.classList.toggle('actives', actif);
+      // La marque va aussi sur le plan, et pas seulement sur la couche : c'est
+      // le plan qui abrite les prises de clic des liens, et elles doivent se
+      // retirer le temps du dessin. Voir `.plan.formes-en-cours` dans app.css,
+      // qui explique le défaut mesuré au lot 27.C.
+      plan.classList.toggle('formes-en-cours', actif);
       if (!actif) {
         armer(null);
         choisie = null;

@@ -19,6 +19,7 @@ import { routesAdmin } from './admin/routes';
 import { routesDomaine, santeDuMonde } from './domaine/routes';
 import { routesPartages } from './partages/routes';
 import { routesAmis } from './amis/routes';
+import { routesMessages } from './messages/routes';
 import { lireCookie, NOM_COOKIE, resoudreSession } from './auth/sessions';
 import { contenuDepart } from './depart/contenu';
 import type { Variables } from './intergiciels';
@@ -181,6 +182,7 @@ app.route('/api/partages', routesPartages);
  * -------------------------------------------------------------------------- */
 
 app.route('/api/amis', routesAmis);
+app.route('/api/messages', routesMessages);
 
 /* --------------------------------------------------------------------------
  * Le domaine : l'arbre lui-même, sur le contrat d'adresses de la version

@@ -6,8 +6,18 @@ choix restent [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Où on en est
 
-**Les sept lots du plan sont livrés, puis les lots 8 à 26** — des tranches qui
-n'étaient pas au plan d'origine, demandées entre le 10 et le 21/08/2026.
+**Les sept lots du plan sont livrés, puis les lots 8 à 27** — des tranches qui
+n'étaient pas au plan d'origine, demandées entre le 10 et le 22/08/2026.
+
+Le lot 27 (22/08) répare trois gestes qui ne passaient pas, et ouvre une porte.
+Le carnet en pleine page **tenait 1727 px dans une scène qui n'en montre que
+536**, sans défilement possible ; le plan avait une **butée à zéro** qui
+empêchait de monter une fiche vers le haut ; et une zone de texte était
+indéplaçable parce que **les prises de clic invisibles des liens la
+recouvraient** — un tiers de sa surface, mesuré. S'y ajoutent les huit poignées
+de redimensionnement, la popup des formes qu'on pousse, et les **messages
+volants** : un mot aux autres, qui vit trois minutes et ne se garde pas. Voir
+« Trois gestes qui ne passaient pas (lot 27) » plus bas.
 
 Les lots 24 à 26 (20 et 21/08) portent sur **la table de jeu**. Le 24 apporte la
 feuille de personnage, portée du classeur, et la popup d'intrigue où l'humeur de
@@ -1114,8 +1124,13 @@ Quatre morceaux, mais un seul qui change la façon de penser le plan.
    vous la réactivez, toutes les positions enregistrées deviennent fausses d'un
    même vecteur, à chaque ouverture, sans erreur nulle part. C'est le piège de
    ce lot.
-3. **Le monde part de zéro**, donc les glissers sont bornés à `Math.max(0, …)`.
-   Une fiche en coordonnée négative serait rognée par le cadre.
+3. **Le monde partait de zéro**, et les glissers étaient bornés à
+   `Math.max(0, …)` — ~~une fiche en coordonnée négative serait rognée par le
+   cadre~~. **Plus vrai depuis le lot 27.B** : la butée a sauté et le cadre du
+   dessin suit l'étendue réelle (`origineX`/`origineY`, posés sur le `<svg>`
+   **et** sur sa `viewBox`). Une fiche monte au-dessus et à gauche de l'origine,
+   ses traits de parenté avec elle. La borne qui reste est celle du serveur,
+   symétrique (±200 000), et elle n'a rien à voir avec un coin.
 
 `figerLesPositions()` (`main.js`) écrit ce que le calcul vient de trouver, une
 fois par monde, via `PATCH /personnes/positions` — **une** requête pour
@@ -1388,6 +1403,90 @@ d'un accent grave dans un commentaire.**
 Tout le reste s'écrit seul après une pause de frappe (500 ms, 700 pour le
 carnet, 400 pour une forme). Fermer l'onglet dans cette fenêtre perd la frappe —
 aucun `pagehide` n'est posé.
+
+## Trois gestes qui ne passaient pas (lot 27)
+
+**La leçon centrale du lot : ce qui bloque un geste est souvent invisible, et
+n'est presque jamais l'objet qu'on regarde.** Les trois défauts avaient une
+cause plausible dans le code, et dans deux cas sur trois ce n'était pas la
+bonne. Il a fallu **mesurer dans le navigateur** pour trancher. Si un geste ne
+passe pas, balayez la boîte au `elementFromPoint` avant de raisonner : c'est ce
+qui a trouvé la vraie cause en un appel.
+
+**Une vue montée dans `#scene` doit être `position: absolute; inset: 0`.**
+`#scene` est un `<main>` en `display: block` ; `.scene { flex: 1 }` le
+dimensionne lui-même dans `.corps`, mais **ne rend pas ses enfants flexibles**.
+Le carnet en pleine page, seul à ne pas être absolu, grandissait donc à la
+hauteur de son contenu : 1727 px mesurés pour 536 disponibles, et `body {
+overflow: hidden }` rendait les 1191 px restants introuvables. `.vue-perso` et
+la vue Maisons échappaient au piège en étant absolues. **Toute vue nouvelle doit
+l'être aussi.**
+
+**Les prises de clic des liens recouvrent les formes.** `.lien-prise` est un
+trait **invisible** de 13 px — sans lui un connecteur de 1,7 px serait
+intraçable — et il vit dans le `<svg>` qui est **au-dessus** de la couche des
+formes. Sur une zone de texte de 220 × 60 du monde de démonstration : **104
+points sur 320 volés**. Un grand rectangle garde de quoi s'attraper ailleurs,
+une petite forme non — d'où « le texte ne se déplace pas, contrairement aux
+rectangles », qui était exact et n'avait rien à voir avec le texte. Le mode
+dessin retire leurs prises aux liens (`.plan.formes-en-cours`) et les leur rend
+en sortant. **Les fiches gardent les leurs** : elles sont visibles, donc on sait
+qu'on clique dessus.
+
+**`overflow: hidden` sur un conteneur rogne les poignées qui débordent.** La
+poignée du lot 20.D débordait de 5 px et se réduisait à un onglet de 6 × 6 :
+invisible, invisable. Le débordement se règle **sur ce qu'on veut retenir** (le
+texte), pas sur le conteneur qui porte les prises.
+
+**`forme-texte` désigne deux choses**, et c'est un piège à retardement : le
+genre d'une forme (`forme forme-texte`) et le bloc de texte à l'intérieur de
+n'importe quelle forme. Une règle écrite pour le second s'applique au premier.
+Un `max-width: 100%` destiné au bloc a ramené la zone de texte entière à 20 px
+de large — 100 % d'un parent sans dimension. **Écrire `.forme > .forme-texte`**,
+ou passer par `.formes.actives .forme .forme-texte` comme les règles voisines.
+
+**Un redimensionnement qui déplace l'origine doit envoyer l'origine.** Tirer par
+le nord ou l'ouest change `x`/`y` autant que `l`/`h` ; le patch du lot 20.D
+n'envoyait que `l`/`h`, et la forme revenait à sa place au rechargement suivant.
+Le geste raisonne en **bords** (gauche/haut/droite/bas) et non en « largeur plus
+un écart » : c'est ce qui fait que le plancher s'applique du bon côté et qu'une
+forme ne se retourne pas quand on tire un bord au-delà de l'autre.
+
+**Un panneau flottant qu'on déplace doit déplacer son ancre.** `replacer()`
+repose le panneau sur `ancre` à chaque `requestAnimationFrame`, à deux relances
+courtes, sur `ResizeObserver` et sur `resize` (lot 23.A). Bouger l'élément sans
+toucher l'ancre le ramène tout seul dans la demi-seconde. `creerFlottant({
+deplacable: '<sélecteur d'en-tête>' })` fait ce qu'il faut ; l'option est
+facultative et un seul panneau la demande.
+
+**Les messages volants ne se gardent pas, et c'est une contrainte de
+conception, pas un réglage.** Trois minutes (`DUREE_VIE`), une purge à chaque
+lecture **et** à chaque écriture, sur toute la table. Il n'y a donc aucune tâche
+de fond, et rien à relire. Deux conséquences à ne pas défaire :
+- **La garde de débit compte sur la table elle-même**, donc sur une fenêtre de
+  trois minutes. Lui donner une mémoire plus longue (dans `tentatives`, par
+  exemple) referait exister la trace qu'on refuse d'écrire.
+- **L'horloge est celle du serveur** : `depuis` reprend le `maintenant` du tour
+  précédent, jamais `Date.now()`. Deux horloges qui divergent, ce sont des
+  messages perdus ou répétés à chaque tour.
+
+**On n'interroge que l'onglet regardé** (`document.visibilityState`), et revenir
+à l'onglet relève tout de suite. Attention en essai : **le navigateur
+d'inspection rapporte `hidden`**, donc rien ne bat et l'absence de message n'est
+pas une panne — passer par ⟳, qui relève aussi.
+
+**Deux volets étirables peuvent avaler la scène.** Chacun sous son propre
+plafond (la moitié de l'écran) ne suffit pas : à deux, ils la mangent.
+`installerEtirement` mesure la scène **une fois, au `mousedown`** — la remesurer
+à chaque `mousemove` ferait fuir le plafond devant soi — et garde `PLAN_MIN` au
+plan.
+
+**Le harnais ne peut rien prouver de tout ça.** Il est entièrement HTTP : il ne
+compose aucune page, donc ne mesure ni un débordement ni un clic volé. Les
+contrôles de 27.A, 27.B et 27.C vérifient que le correctif est **servi** — un
+filet contre l'oubli de déploiement, pas une preuve de comportement. La preuve
+est dans PLAN.md, avec ses nombres. 27.D, lui, est du serveur pur et s'éprouve
+entièrement dans le harnais.
 
 ## Pour repartir
 

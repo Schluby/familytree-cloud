@@ -195,8 +195,14 @@ export function poser(element, x, y, { marge = 8 } = {}) {
  * sur un clic extérieur ou une perte de focus est une catastrophe — la roue
  * des couleurs du système et les listes déroulantes natives font perdre le
  * focus à la fenêtre. On n'y sort que par ✕ ou Échap.
+ *
+ * `deplacable` : un sélecteur d'en-tête (`'.fe-entete'`) par lequel on traîne
+ * le panneau. Il faut le demander, et un seul le demande — l'éditeur de forme,
+ * qui se pose forcément sur le plan et cache donc parfois ce qu'on est en
+ * train de régler (lot 27.C). Les autres panneaux sortent d'un clic droit ou
+ * d'un bouton : on les referme au lieu de les pousser.
  */
-export function creerFlottant({ surFermeture, persistant = false } = {}) {
+export function creerFlottant({ surFermeture, persistant = false, deplacable = null } = {}) {
   let element = null;
   /** L'endroit visé au montage : il sert à replacer le panneau s'il grandit. */
   let ancre = { x: 0, y: 0 };
@@ -273,6 +279,46 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
     else placer(element, ancre.x, ancre.y);
   }
 
+  /**
+   * Traîner le panneau par son en-tête (lot 27.C).
+   *
+   * Le geste met à jour **l'ancre**, et passe en pose exacte. C'est tout le
+   * point délicat : `replacer()` repose le panneau sur son ancre à chaque
+   * `requestAnimationFrame`, à deux relances courtes, sur `ResizeObserver` et
+   * sur `resize` de la fenêtre (lot 23.A). Déplacer sans toucher à l'ancre
+   * aurait donc rendu le panneau à sa place d'origine tout seul, dans la demi-
+   * seconde. En déplaçant l'ancre, ces filets continuent de faire leur travail
+   * — rattraper un panneau qui grandit et sortirait de l'écran — mais autour de
+   * l'endroit qu'on a choisi.
+   */
+  function installerDeplacement() {
+    const entete = element.querySelector(deplacable);
+    if (!entete) return;
+    entete.classList.add('fl-deplacable');
+    entete.addEventListener('mousedown', (evenement) => {
+      // Un bouton dans l'en-tête (✕, la corbeille) reste un bouton.
+      if (evenement.button !== 0 || evenement.target.closest('button, input, select')) return;
+      evenement.preventDefault(); // sinon le glisser sélectionne le titre
+      const cadre = element.getBoundingClientRect();
+      const ecartX = cadre.left - evenement.clientX;
+      const ecartY = cadre.top - evenement.clientY;
+      document.body.classList.add('flottant-en-deplacement');
+
+      const suivre = (mouvement) => {
+        ancre = { x: mouvement.clientX + ecartX, y: mouvement.clientY + ecartY };
+        exactement = true;
+        poser(element, ancre.x, ancre.y);
+      };
+      const lacher = () => {
+        document.removeEventListener('mousemove', suivre, true);
+        document.removeEventListener('mouseup', lacher, true);
+        document.body.classList.remove('flottant-en-deplacement');
+      };
+      document.addEventListener('mousemove', suivre, true);
+      document.addEventListener('mouseup', lacher, true);
+    });
+  }
+
   function monter(contenu, x, y, { exact = false } = {}) {
     fermer();
     element = contenu;
@@ -281,6 +327,7 @@ export function creerFlottant({ surFermeture, persistant = false } = {}) {
     document.body.append(element);
     if (exact) poser(element, x, y);
     else placer(element, x, y);
+    if (deplacable) installerDeplacement();
 
     /**
      * Un panneau grandit **après** avoir été placé (lot 23.A).

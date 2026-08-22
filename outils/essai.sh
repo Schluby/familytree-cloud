@@ -2816,6 +2816,132 @@ code - GET /css/app.css > /dev/null
 verifier "une forme prise se voit" oui "$(contient '.forme.prise {')"
 
 # ---------------------------------------------------------------------------
+# Lot 27 : le carnet tenu dans l'ecran, le plan sans butee, les formes qu'on
+# etire, et un mot aux autres qui ne se garde pas
+#
+# 27.A et 27.C sont des defauts de mise en page et de saisie : le harnais est
+# entierement HTTP, il ne compose aucune page et ne peut donc pas mesurer un
+# debordement ni un clic vole. Ce qu'il verifie ici, c'est que le correctif est
+# bien **servi** — un filet contre l'oubli, pas une preuve de comportement. La
+# preuve, elle, a ete faite au navigateur et elle est ecrite dans PLAN.md.
+#
+# 27.D, en revanche, est du serveur pur et s'eprouve entierement ici.
+# ---------------------------------------------------------------------------
+
+echo "-- 27.A le carnet tenu dans l'ecran"
+code - GET /css/app.css > /dev/null
+# La vue pleine page grandissait a la hauteur de son contenu dans une scene qui
+# ne defile pas : 1727 px pour 536 disponibles, le reste introuvable.
+verifier "la vue carnet est bornee a la scene" oui "$(contient '.carnet-large {')"
+verifier "  et le volet s'etire" oui "$(contient '--carnet-largeur')"
+code - GET /js/main.js > /dev/null
+verifier "les deux volets partagent un seul mecanisme" oui "$(contient 'function installerEtirement(')"
+verifier "  le carnet a le sien" oui "$(contient 'installerEtirementCarnet')"
+# Deux volets sous leur propre plafond peuvent quand meme avaler la scene.
+verifier "  et le plan garde un plancher" oui "$(contient 'const PLAN_MIN =')"
+
+echo "-- 27.B le plan sans butee"
+code - GET /js/views/cartes.js > /dev/null
+verifier "une fiche passe avant zero" non "$(contient 'boite.x = Math.max(0, curseur.x + ecartX)')"
+# Le vrai piege du lot : le cadre du dessin restait cale sur zero, donc une
+# fiche montee au-dessus perdait ses traits de parente en route.
+verifier "  et le cadre des liens la suit" oui "$(contient 'svg.style.left = `${disposition.origineX}px`')"
+verifier "  viewBox comprise" oui "$(contient '${disposition.origineX} ${disposition.origineY}')"
+
+echo "-- 27.C les formes qu'on etire et qu'on deplace"
+code - GET /js/formes.js > /dev/null
+verifier "huit poignees, plus une seule" oui "$(contient "const COTES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']")"
+verifier "  une prise pour deplacer" oui "$(contient "class: 'forme-deplace'")"
+# Tirer par le nord ou l'ouest deplace l'origine : sans x et y dans le patch,
+# la forme revenait a sa place d'avant au rechargement suivant.
+verifier "  le patch de taille porte l'origine" oui "$(contient '{ x: forme.x, y: forme.y, l: forme.l, h: forme.h }')"
+verifier "  le mode dessin se marque sur le plan" oui "$(contient "plan.classList.toggle('formes-en-cours', actif)")"
+code - GET /css/app.css > /dev/null
+# 104 points sur 320 d'une zone de texte etaient pris par des connecteurs
+# invisibles : c'est ce qui rendait le texte indeplacable.
+verifier "les liens lachent leurs prises pendant le dessin" oui "$(contient '.plan.formes-en-cours .lien-prise { pointer-events: none; }')"
+# `overflow: hidden` rognait de moitie les poignees qui debordent de 5 px.
+verifier "  la forme ne rogne plus ses poignees" oui "$(contient '.forme > .forme-texte {')"
+code - GET /js/dom.js > /dev/null
+verifier "un panneau flottant peut se pousser" oui "$(contient 'function installerDeplacement()')"
+# `replacer()` repose le panneau sur son ancre a chaque relance : deplacer sans
+# bouger l'ancre l'aurait ramene tout seul dans la demi-seconde.
+verifier "  et le glisser deplace l'ancre" oui "$(contient 'ancre = { x: mouvement.clientX + ecartX, y: mouvement.clientY + ecartY }')"
+
+echo "-- 27.D un mot aux autres, qui ne se garde pas"
+verifier "sans session, rien" 401 "$(code - GET "/api/messages?sauvegarde=$ARBRE_PARTAGE")"
+verifier "il faut dire de quel monde" 400 "$(code "$BOCAL_A" GET /api/messages)"
+verifier "un monde inconnu ne se devine pas" 404 "$(code "$BOCAL_A" GET '/api/messages?sauvegarde=pas-un-monde')"
+# A remet B en lecture sur son arbre : l'amitie a ete defaite plus haut, et
+# c'est justement ce qu'on veut eprouver — voir un monde suffit pour s'y parler,
+# l'ecriture est une autre affaire.
+code "$BOCAL_A" PUT "/api/partages/$ARBRE_PARTAGE/lecteurs" "{\"lecteurs\":[\"$EMAIL_B\"]}" > /dev/null
+verifier "B lit de nouveau l'arbre de A" lecture "$(lire lecteurs.0.droit)"
+verifier "A voit B autour du monde" 200 "$(code "$BOCAL_A" GET "/api/messages/destinataires?sauvegarde=$ARBRE_PARTAGE")"
+verifier "  et un seul, jamais lui-meme" 1 "$(lire destinataires.length)"
+verifier "B voit A, marque proprietaire" true "$(code "$BOCAL_B" GET "/api/messages/destinataires?sauvegarde=$ARBRE_PARTAGE" > /dev/null; lire destinataires.0.proprietaire)"
+verifier "un tiers n'est pas autour du monde" 403 "$(code "$BOCAL_I" GET "/api/messages/destinataires?sauvegarde=$ARBRE_PARTAGE")"
+verifier "  et le refus nomme la raison" oui "$(contient 'ne vous est pas ouverte')"
+
+verifier "B envoie un mot a tout le monde" 201 "$(code "$BOCAL_B" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"les Dothrakis passent le fleuve\"}")"
+# Trois minutes, et rien d'autre : c'est toute la regle de conservation.
+CREE_LE="$(lire cree_le)"
+EXPIRE_LE="$(lire expire_le)"
+verifier "  il porte sa date de peremption" 180 "$((EXPIRE_LE - CREE_LE))"
+verifier "A le recoit" 200 "$(code "$BOCAL_A" GET "/api/messages?sauvegarde=$ARBRE_PARTAGE&depuis=0")"
+verifier "  et il dit qui parle" 1 "$(lire messages.length)"
+verifier "  a tout le monde, donc sans destinataire" "" "$(lire messages.0.destinataire)"
+# L'heure vient du serveur et non de la machine : deux horloges qui divergent,
+# ce sont des messages perdus ou repetes au tour suivant.
+verifier "  le serveur donne l'heure" oui "$([ -n "$(lire maintenant)" ] && echo oui || echo non)"
+verifier "B ne se relit pas lui-meme" 0 "$(code "$BOCAL_B" GET "/api/messages?sauvegarde=$ARBRE_PARTAGE&depuis=0" > /dev/null; lire messages.length)"
+verifier "un tiers ne lit pas la conversation" 403 "$(code "$BOCAL_I" GET "/api/messages?sauvegarde=$ARBRE_PARTAGE&depuis=0")"
+verifier "rien de neuf depuis maintenant" 0 "$(code "$BOCAL_A" GET "/api/messages?sauvegarde=$ARBRE_PARTAGE&depuis=$((EXPIRE_LE + 60))" > /dev/null; lire messages.length)"
+
+verifier "un message vide est refuse" 400 "$(code "$BOCAL_A" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"   \"}")"
+verifier "un message trop long aussi" 400 "$(code "$BOCAL_A" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"$(printf 'x%.0s' $(seq 501))\"}")"
+verifier "  et il dit la limite" oui "$(contient '500')"
+verifier "on ne s'ecrit pas a soi-meme" 400 "$(code "$BOCAL_A" GET "/api/messages/destinataires?sauvegarde=$ARBRE_PARTAGE" > /dev/null; ID_B="$(lire destinataires.0.id)"; code "$BOCAL_B" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"a moi\",\"destinataire\":\"$ID_B\"}")"
+code "$BOCAL_A" GET "/api/messages/destinataires?sauvegarde=$ARBRE_PARTAGE" > /dev/null
+ID_B_AUTOUR="$(lire destinataires.0.id)"
+verifier "A ecrit a B seul" 201 "$(code "$BOCAL_A" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"viens voir la carte\",\"destinataire\":\"$ID_B_AUTOUR\"}")"
+verifier "  et B le recoit" oui "$(code "$BOCAL_B" GET "/api/messages?sauvegarde=$ARBRE_PARTAGE&depuis=0" > /dev/null; contient 'viens voir la carte')"
+verifier "un destinataire hors du monde est refuse" 403 "$(code "$BOCAL_A" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"pour un tiers\",\"destinataire\":\"$ID_INVITE\"}")"
+verifier "un tiers n'ecrit pas non plus" 403 "$(code "$BOCAL_I" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"je m'invite\"}")"
+
+echo "-- 27.D le debit est garde"
+# Sans garde, une boucle dans une console remplit la table de quelqu'un d'autre.
+DERNIER_CODE=201
+for i in $(seq 1 22); do
+  DERNIER_CODE="$(code "$BOCAL_A" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"message $i\"}")"
+  [ "$DERNIER_CODE" = "429" ] && break
+done
+verifier "au bout d'une vingtaine, on freine" 429 "$DERNIER_CODE"
+verifier "  et on dit combien attendre" oui "$(contient 'attente')"
+# Le debit est par compte : B n'a pas a payer pour A.
+verifier "l'autre continue d'ecrire" 201 "$(code "$BOCAL_B" POST /api/messages "{\"sauvegarde\":\"$ARBRE_PARTAGE\",\"texte\":\"moi je passe encore\"}")"
+
+echo "-- 27.D cote navigateur"
+code - GET / > /dev/null
+# Cache par defaut : la plupart des tables jouent seules, et un bouton qui
+# n'ouvrirait qu'une liste vide promettrait quelque chose qui n'existe pas.
+verifier "le bouton existe et se cache" oui "$(contient 'id="btn-messages" hidden')"
+code - GET /js/messages.js > /dev/null
+verifier "on interroge, on n'ouvre pas de canal" oui "$(contient 'const PERIODE =')"
+# Un onglet d'arriere-plan laisse ouvert la nuit ne frappe pas a la porte.
+verifier "  et seulement l'onglet regarde" oui "$(contient "document.visibilityState === 'visible'")"
+# L'horloge du serveur, jamais celle de la machine : deux horloges qui
+# divergent, ce sont des messages perdus ou repetes a chaque tour.
+verifier "  l'heure vient du serveur" oui "$(contient 'depuis = reponse.maintenant')"
+verifier "  revenir a l'onglet relit tout de suite" oui "$(contient "addEventListener('visibilitychange'")"
+code - GET /js/api.js > /dev/null
+verifier "les trois adresses sont cablees" oui "$(contient 'destinatairesMessages:')"
+code - GET /css/app.css > /dev/null
+# Une colonne invisible de 300 px barrerait le coin de l'ecran pendant vingt
+# secondes : c'est le defaut que le lot 20.D a evite pour les formes.
+verifier "la pile ne barre pas le plan" oui "$(contient '.msg-pile {')"
+
+# ---------------------------------------------------------------------------
 # Retour aux comptes : ce qui doit rester vrai quoi qu'on ait fait entre-temps
 # ---------------------------------------------------------------------------
 

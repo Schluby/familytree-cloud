@@ -3052,3 +3052,286 @@ Un trou connu, laissé tel quel faute d'avoir été demandé : **fermer l'onglet
 dans la demi-seconde qui suit une frappe perd cette frappe.** Changer de vue,
 fermer la fiche ou quitter le carnet vident la file ; fermer l'onglet, non. Une
 ligne sur `pagehide` le réglerait.
+
+## 27.A — Le carnet tenu dans l'écran, et son volet qu'on étire
+
+*« Rajouter un scroll pour les notes (car pour le moment on ne peut pas
+scroller vers le bas pour voir le reste des notes lorsqu'il y-en a qui
+"dépassent" de l'écran). »*
+
+*« Permettre d'étendre la vue des notes (qu'elles s'étendent automatiquement
+aussi mais redimensionnement à la souris). »*
+
+Le carnet en pleine scène était la **seule** vue à ne pas être bornée à la
+boîte de la scène. `.vue-perso` et « Maisons » sont en `position: absolute;
+inset: 0` dans `#scene` (`position: relative`), donc elles ne peuvent pas
+dépasser l'écran et leurs colonnes défilent chacune pour soi. `.carnet-large`
+était en `position: relative; flex: 1` — sauf que `#scene` est un `<main>`,
+`display: block` par défaut, et `.scene { flex: 1 }` le dimensionne bien
+**lui-même** dans `.corps` sans faire de ses propres enfants des items
+flexibles pour autant. `flex: 1` sur `.carnet-large` ne s'appliquait donc
+nulle part, et le carnet grandissait à la hauteur de son contenu — mesuré le
+22/08/2026, fenêtre de 720 px, 1727 px de haut pour 536 disponibles, et
+1191 px introuvables au défilement puisque `html, body` sont en
+`overflow: hidden`. Exactement le symptôme décrit.
+
+Le correctif tient en une déclaration : `.carnet-large { position: absolute;
+inset: 0; }`, le même traitement que les deux autres vues. Une fois borné,
+rien d'autre n'avait besoin d'être touché — `.cn-sommaire` et `.cn-rendu`
+étaient déjà `overflow-y: auto`, `.cn-note` déjà `min-height: 0`. Vérifié après
+coup avec 24 notes : `#scene` et `.carnet-large` mesurent tous les deux
+614 = 614 (plus aucun débordement de la boîte), `.cn-sommaire` mesure
+537 de haut pour 869 de contenu et défile *dans sa boîte* — `scrollTop` monte
+jusqu'à 332 (869 − 537, pile), et la 24ᵉ note devient atteignable. Le volet
+(`.volet-carnet`), qui fonctionnait déjà, n'a pas été touché sur ce point ; la
+media query téléphone qui pose le volet en calque plein écran non plus.
+
+**La poignée.** La fiche de droite s'étire depuis le lot 22.B ; le carnet en
+volet fait maintenant le même geste, par le même mécanisme —
+`installerEtirement` (`js/main.js`) est désormais la seule fonction qui pose
+une poignée, borne une largeur et la retient dans `localStorage`, paramétrée
+par la variable CSS, la clé (`cle()`), la borne basse et la classe posée sur
+`<body>` pendant le glisser. La fiche garde exactement son ancien
+comportement : borne basse 300 px, clé `familytree-fiche-largeur`, variable
+`--fiche-largeur` — vérifié après coup en la tirant seule à son maximum, elle
+s'arrête pile à la moitié de la fenêtre, comme avant. Le carnet apporte
+`--carnet-largeur`, la clé `familytree-carnet-largeur` et une borne basse de
+320 px : en dessous, le sommaire en calque (`.cn-sommaire-ouvert`) ne
+laisserait plus que 90 px de texte, ce qui n'est plus une note. Les deux
+poignées partagent la classe `.pn-poignee` ; l'état « en cours d'étirement »
+est donc scopé par volet (`.panneau .pn-poignee`,
+`.volet-carnet .pn-poignee`) dans `app.css`, sinon tirer l'une aurait allumé
+le liseré de l'autre, restée immobile.
+
+**La largeur par défaut suit la fenêtre.** `--carnet-largeur` retombe sur
+`clamp(320px, 34vw, 520px)` quand rien n'a été retenu — écrit dans `app.css`
+pour que la page s'affiche juste avant même que le JavaScript ait parlé,
+exactement comme `--fiche-largeur` le fait déjà. La largeur retenue d'une
+séance à l'autre l'emporte toujours sur ce défaut.
+
+**Les deux volets peuvent être ouverts ensemble, et c'est le point qui
+méritait qu'on s'arrête.** Chacun, seul, reste plafonné à la moitié de
+l'écran — inchangé. Mais rien n'empêchait auparavant, et n'empêcherait pas
+plus aujourd'hui sans y penser, que les deux soient tirés au maximum **en
+même temps** : sur une fenêtre de 1280 px, rail (246) + fiche (640) + carnet
+(640) dépasse déjà la fenêtre à lui seul, et la scène — seul élément
+réellement élastique de la rangée — se retrouverait à zéro pixel, voire le
+panneau de droite rogné hors de l'écran. On a choisi une **borne commune**
+plutôt que de laisser faire : le plan est ce qu'on est venu regarder ici, pas
+un détail qui peut céder le premier. Plutôt que de deviner la largeur du rail
+ou de l'autre volet, `installerEtirement` mesure `#scene` **telle qu'elle est
+avant le geste** (une seule fois, à `mousedown` — la remesurer à chaque
+`mousemove` ferait fuir le plafond devant soi, puisqu'elle rétrécit à mesure
+qu'on tire) et calcule combien le volet peut encore grandir sans faire passer
+la scène sous 200 px (`PLAN_MIN`, le même seuil que le commentaire déjà
+présent sur `.volet-carnet` à propos de la lisibilité du plan). Cette seconde
+borne ne change rien tant qu'un seul volet est ouvert — la place ne manque
+pas, elle se réduit alors exactement à « moitié de l'écran », vérifié en
+tirant la fiche seule à 1600 px de large : elle s'arrête à 800 px pile. Elle
+ne se voit que si les deux sont ouverts et tirés loin : vérifié en tirant le
+carnet à fond avec la fiche déjà ouverte à 400 px sur 1600 px de fenêtre — le
+carnet s'arrête à 754 px (pas 800, la moitié de l'écran qu'il aurait atteinte
+seul) et la scène tient exactement à 200 px, jamais moins.
+
+Les chaînes visibles nouvelles (« Étirer la fiche » existait déjà ; « Étirer
+le carnet » est neuve) sont dans `traductions.js`. Fichiers touchés :
+`public/sociogram/got/css/app.css` (`.carnet-large`, `.volet-carnet`,
+`.pn-poignee`, le commentaire de `.cn-sommaire-ouvert`) et
+`public/sociogram/got/js/main.js` (`installerEtirement` partagé,
+`poserLeCarnetEnVolet` et `rangerLeCarnet` qui gardent désormais la poignée du
+volet au lieu de la balayer avec `replaceChildren`).
+
+## 27.B — Le plan sans butée
+
+*« Il y a une sorte de limite aux profils qu'ils ne peuvent pas dépasser : il
+faut le retirer (faire vers l'infini pour le haut aussi). »*
+
+La butée tenait en une ligne de `surDeplacement` (`js/views/cartes.js`) :
+`boite.x = Math.max(0, curseur.x + ecartX)`, et sa pareille sur `y`. Elle
+datait du lot 22.D, et REPRISE.md la justifiait sans détour : « Une fiche en
+coordonnée négative serait rognée par le cadre. » Ce n'était pas de la
+prudence gratuite — à l'époque, c'était vrai, et c'est ce qui a fait de ce lot
+plus qu'une ligne à effacer.
+
+**Retirer la butée seule aurait déplacé les fiches sans leurs traits de
+parenté.** Le `<svg>` des liens (`.liens`) est posé à `left: 0; top: 0` dans
+`.monde`, et dimensionné à chaque mise en page par `svg.setAttribute` sur
+`width`/`height` et une `viewBox="0 0 largeur hauteur"`. Tant que la butée
+interdisait à une fiche ancrée d'aller au-dessus ou à gauche de zéro, ce coin
+*était* celui de la boîte englobante, et `largeur: finale.x1 + GEO.marge`
+(`calculerMiseEnPage`, étape 12) suffisait à tout couvrir. Une fois la butée
+levée, ce n'est plus vrai — et élargir `largeur`/`hauteur` seul n'aurait rien
+réglé : un rectangle qu'on agrandit ne déplace pas son coin, et ce coin-là
+restait cloué à zéro quoi qu'on fasse de sa taille.
+
+**`origineX`/`origineY` reculent le coin quand la boîte l'exige, pas avant.**
+Deux nouveaux champs de la disposition, calculés une fois pour toutes —
+`Math.min(0, finale.x0)` / `Math.min(0, finale.y0)` — donc à zéro dans tout
+monde d'avant ce lot, à la vraie borne négative sinon. `positionner()` recale
+le `<svg>` dessus : sa `viewBox` **et** son propre coin CSS (`svg.style.left`/
+`top`) doivent bouger ensemble, sinon les liens se seraient dessinés à côté
+des fiches plutôt que dessus.
+
+Le reste du plan n'avait pas besoin d'être touché, et la butée ne protégeait
+rien d'autre — ce n'est pas une supposition, c'est ce qu'un tour complet du
+fichier a montré. « Ajuster » (`cadrerSur()`) et le cadre de sélection Ctrl
+bornent déjà leurs boîtes par `Math.min`/`Math.max` à chaque appel, sans coin
+fixe supposé : retirer la butée ne les fait donc pas cadrer sur du vide.
+`pointMonde()` et la création d'un profil « là où l'on clique »
+(`menuFond` → `Api.creerPersonne`) n'ont jamais rien borné. `tracerLiens`
+écrit des coordonnées dans des commandes SVG (`M`, `H`, `V`, `L`) qui
+acceptent le négatif nativement. Côté serveur, `normaliserPosition`
+(`src/domaine/models.ts`) porte déjà une borne — mais **symétrique**
+(`±200000`, la même que pour les formes de fond), pas une butée à zéro : rien
+à y changer. `formes.js`, lui, n'avait aucune butée du tout, ni à zéro ni
+symétrique — une forme de fond a toujours pu passer en négatif côté client.
+`coller()` (`src/domaine/presse_papiers.ts`) calcule le coin d'un extrait par
+un `Math.min` déjà indifférent au signe. Et `d3.zoom()` n'a jamais porté de
+`translateExtent` : le panoramique était déjà infini, ce lot n'y touche pas.
+
+**Vérifié en conditions réelles, pas seulement lu.** Un glisser simulé
+(Ctrl + mousedown/mousemove/mouseup, `view: window` comme l'exige le piège
+déjà payé au lot 24) a posé Eddard Stark à `(-2002, -1503)` ; le `<svg>` a
+suivi (`viewBox="-2002 -1503 5910 4159"`) ; et surtout, `elementFromPoint`
+retrouve le `path.lien-prise[data-relation="r-rickard-eddard"]` exactement là
+où la géométrie le prédit, au-dessus de la carte déplacée — la preuve que le
+trait est réellement peint et cliquable en négatif, pas seulement juste
+calculé. Un rechargement complet de la page a ensuite confirmé que la
+position survit à l'aller-retour serveur, sans qu'aucune couche ne la ramène
+à zéro. La position d'essai a été remise à `(566, 1802)` après coup.
+
+REPRISE.md, section « Le plan qui obéit (lot 22) », affirme encore qu'« une
+fiche en coordonnée négative serait rognée par le cadre » — vrai avant ce
+lot, faux depuis. Elle n'a pas été corrigée ici (hors des livrables de cette
+tranche) ; qui la relit doit savoir qu'elle date d'avant le 27.B.
+
+## 27.C — Les formes : étirer, déplacer le texte, pousser la popup
+
+*« Permettre d'étirer les formes pour les redimensionner. Rendre les popups
+(celle de formes) déplaçable. Permettre de déplacer le texte, pour l'instant on
+ne peut pas (n'agit pas comme les formes rectangle par ex). »*
+
+La troisième demande était la plus intéressante, parce que la cause n'était pas
+où la lecture du code la plaçait. On pouvait croire au coupable évident : une
+forme choisie rend son texte saisissable pour qu'on puisse écrire dedans (lot
+22.C), et une zone de texte est presque entièrement couverte par le sien. C'est
+vrai, et ce n'était pas ça.
+
+**Ce sont les liens qui volaient le geste.** Les couches de `.monde` s'empilent
+dans cet ordre : les formes au fond, le `<svg>` des liens au-dessus, les fiches
+par-dessus tout. Or `.lien-prise` est une prise **invisible** de treize pixels
+de large — sans elle, un connecteur de 1,7 px serait intraçable à la souris — et
+elle reste active en permanence, mode dessin compris. Là où une relation passe
+au-dessus d'une forme, c'est le lien qui reçoit le `mousedown`.
+
+Mesuré sur le monde de démonstration, une zone de texte de 220 × 60 : **104
+points sur 320 pris par des connecteurs**, un tiers de sa surface, et aux
+endroits qui changent dès que la mise en page bouge. Un grand rectangle garde
+presque toujours de quoi s'attraper ailleurs ; une zone de texte, non. D'où
+« ça n'agit pas comme les formes rectangle » — c'est exactement ça, et ce
+n'était pas une impression. Le mode dessin retire donc leurs prises aux liens
+(`.plan.formes-en-cours`), et les leur rend en sortant : après correction, 324
+points libres sur 324. Les fiches, elles, gardent les leurs — elles sont
+**visibles**, donc on sait qu'on clique dessus ; ce qui était traître ici, c'est
+de perdre un geste contre ce qu'on ne voit pas.
+
+**Les poignées étaient rognées de moitié.** Elles débordent volontairement de
+cinq pixels, et `.forme` portait `overflow: hidden` pour retenir son texte :
+celle du coin bas-droit, seule à exister, se réduisait à un onglet de 6 × 6, à
+peu près invisible et à peu près invisable. C'est le texte qu'il faut retenir,
+pas les prises — le débordement descend donc d'un cran, sur `.forme-texte`.
+
+Ce déplacement a coûté un défaut au passage, et il mérite d'être noté :
+`forme-texte` désigne **deux choses**, le genre d'une forme (`forme
+forme-texte`) et le bloc de texte à l'intérieur de n'importe quelle forme. Une
+règle écrite pour le bloc s'est appliquée à la zone de texte elle-même, et un
+`max-width: 100%` — cent pour cent d'un parent sans dimension — l'a ramenée à
+vingt pixels de large. Le `>` répare, et le commentaire prévient le suivant.
+
+**Huit poignées au lieu d'une**, et un geste qui raisonne en **bords** plutôt
+qu'en « largeur plus un écart » : tirer par le nord ou par l'ouest déplace
+l'origine autant qu'il change la taille, et le plancher de 24 px s'applique du
+bon côté — tirer le bord gauche au-delà du droit s'arrête net au lieu de
+retourner la forme. Conséquence à ne pas manquer : le patch envoyé au serveur
+porte désormais `x`, `y`, `l` et `h`, alors que le lot 20.D n'envoyait que
+`l`/`h`. Sans les deux premiers, un redimensionnement par le haut revenait à sa
+place au rechargement suivant — le bord retrouvé, mais de l'autre côté.
+Vérifié : poignée nord-ouest tirée de (−40, −20), l'origine passe de
+(1717, 1240) à (1677, 1220) et la taille de 220 × 60 à 260 × 80, **relu depuis
+le serveur**.
+
+**Une prise pour déplacer**, posée au-dessus de la forme choisie et non dedans :
+elle ne cache pas le texte et ne se dispute pas la place avec les huit autres.
+C'est la réponse au défaut secondaire — celui qu'on voyait dans le code.
+
+**La popup se pousse par son en-tête.** Le point délicat n'est pas le glisser,
+c'est `replacer()` : le socle repose le panneau sur son ancre à chaque
+`requestAnimationFrame`, à deux relances courtes, sur `ResizeObserver` et sur
+`resize` (lot 23.A). Déplacer sans toucher à l'ancre l'aurait ramené tout seul
+dans la demi-seconde. Le glisser **déplace l'ancre**, donc ces filets continuent
+de rattraper un panneau qui grandirait hors de l'écran, mais autour de l'endroit
+choisi. Vérifié : poussé de (438, 23) à (278, 25), toujours à (278, 25) une
+seconde et demie plus tard. L'option est facultative et un seul appelant la
+demande — les huit `creerFlottant` de `editeurs.js` ne changent pas de
+comportement.
+
+**Ce qui n'est pas fait :** déplacer une forme hors du mode dessin. C'est
+toujours ce qui garde le plan glissable.
+
+## 27.D — Un mot aux autres, qui ne se garde pas
+
+*« Mettre un truc qui permette d'envoyer des msg aux autres (pas une
+messagerie), juste une petite popup temporaire qui permet d'envoyer des msg et
+qui ne sont pas stockés. »*
+
+**Pas de WebSocket, pas de Durable Object.** Ce serait une liaison de plus dans
+`wrangler.jsonc`, un coût de plus et une classe de pannes de plus, pour un mot
+qui peut arriver dix secondes plus tard sans que personne s'en aperçoive. On
+reste sur D1 et sur de l'interrogation périodique, comme tout le reste.
+
+**La péremption est la seule règle de conservation : trois minutes.** Une purge
+tourne à chaque lecture et à chaque écriture, sur toute la table et pas
+seulement sur la sauvegarde en cours — un message périmé n'intéresse plus
+personne, d'où qu'il vienne. Il n'y a donc aucune tâche de fond à programmer, et
+rien à consulter plus tard : c'est le sens exact de « pas stockés ». Ce n'est
+pas une messagerie, c'est le mot qu'on se passe à la table.
+
+**« Les autres », c'est qui voit le même monde** : le propriétaire de la
+sauvegarde et les comptes de `partages`, lecteur ou rédacteur — un lecteur voit
+le même plan et a tout autant de raison d'y glisser un mot. La condition est
+celle que `partages/routes.ts` pose déjà pour ouvrir un arbre, vérifiée côté
+serveur à chaque appel.
+
+**L'horloge est celle du serveur.** `depuis` reprend le `maintenant` du tour
+précédent, jamais `Date.now()`. Une machine en avance de deux minutes ne verrait
+jamais rien arriver ; une machine en retard relirait les mêmes mots à chaque
+tour.
+
+**On n'interroge que l'onglet regardé**, et revenir à l'onglet relit tout de
+suite : sur un mot qui vit cent quatre-vingts secondes, dix secondes d'attente
+au retour sont une part sérieuse de sa vie — et c'est le moment où l'on a le
+plus de chances d'avoir quelque chose à lire, puisque personne ne regardait.
+⟳ relève aussi, pour la même raison.
+
+**Le bouton reste caché tant que personne d'autre ne voit ce monde.** La plupart
+des tables jouent seules ; un bouton qui n'ouvrirait qu'une liste vide
+promettrait quelque chose qui n'existe pas.
+
+**La pile de mots reçus est la seule chose de l'application qui apparaisse sans
+qu'on l'ait demandée**, d'où la retenue : une carte en bas à droite, qui s'en va
+au bout de vingt-quatre secondes ou d'un clic. `pointer-events: none` sur la
+pile et `auto` sur chaque carte — entre deux cartes le clic retombe sur le plan,
+sinon une colonne invisible de 300 px barrerait le coin de l'écran pendant vingt
+secondes, ce qui est exactement le défaut que le lot 20.D a passé du temps à
+éviter pour les formes.
+
+**Une garde de débit**, vingt messages par fenêtre de trois minutes et par
+compte, comptés sur la table elle-même — elle ne garde rien de plus long, donc
+la fenêtre est mécaniquement celle de la péremption. Ajouter un compteur à
+mémoire plus longue referait exister la trace qu'on refuse justement d'écrire.
+Réponse 429, et le nombre de secondes à attendre.
+
+Un détail de traduction qui vaut la règle générale : le compteur de signes vit
+dans **deux nœuds**, le nombre et le mot. Le dictionnaire compare le texte
+entier d'un nœud — « 480 signes » écrit d'un bloc ne se traduirait jamais.
+L'espace entre les deux est de la mise en page (`gap: 4px`), pas un caractère.

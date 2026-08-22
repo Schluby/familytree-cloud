@@ -213,6 +213,26 @@ export const Api = {
   accepterAmi: (id) => requete(`/api/amis/${id}/accepter`, { method: 'POST' }),
   retirerAmi: (id) => requete(`/api/amis/${id}`, { method: 'DELETE' }),
 
+  /* ------------------------------------------- les messages volants (27.D)
+   *
+   * Trois minutes de mémoire, et rien de plus : voir
+   * `migrations/0012_messages_volants.sql`. Ce n'est pas une messagerie, et
+   * ces adresses n'en fabriquent pas une — il n'y a rien à relire.
+   *
+   * `depuis` vient du **serveur** (`maintenant` de l'appel précédent) et non
+   * de l'horloge de la machine : deux horloges qui divergent, ce sont des
+   * messages perdus ou répétés à chaque tour.
+   */
+  messages: (sauvegarde, depuis = 0) =>
+    requete(`/api/messages${versQuery({ sauvegarde, depuis })}`),
+  destinatairesMessages: (sauvegarde) =>
+    requete(`/api/messages/destinataires${versQuery({ sauvegarde })}`),
+  envoyerMessage: (sauvegarde, texte, destinataire = null) =>
+    requete('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ sauvegarde, texte, destinataire }),
+    }),
+
   // ------------------------------------------------------------ les partages
   /** Les arbres qu'on m'a ouverts. */
   partages: () => requete('/api/partages'),
